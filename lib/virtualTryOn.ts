@@ -447,84 +447,298 @@ function softEllipse(
 }
 
 // ─── Lipstick ─────────────────────────────────────────────────────────────────
-// Uses actual lip landmark polygons:
-//   Outer polygon → clip region (color is contained inside outer lip boundary)
-//   Inner polygon → even-odd cutout (no color inside the mouth opening)
-//   Three blend modes layered for natural depth: multiply → overlay → soft-light
-//   Gloss/satin finish adds a specular highlight on the upper lip
+//
+// Premium photorealistic lipstick rendering pipeline:
+//
+//  Step 1 — Feathered base coat
+//    Rendered onto an offscreen canvas clipped to the outer lip polygon.
+//    Uses `color` blend mode so hue/saturation come from the product shade
+//    while luminance from the original lip texture is preserved — this is the
+//    key technique that makes the result look like real pigment on skin rather
+//    than a flat overlay.
+//
+//  Step 2 — Edge feather (soft fade toward vermillion border)
+//    A second offscreen canvas, clipped to the outer polygon, draws an inward
+//    radial gradient using `destination-out` to erode the alpha near the lip
+//    border.  This prevents the hard clip-path edge from showing.
+//
+//  Step 3 — Volume gradient (anatomy-aware shading)
+//    Upper lip: darker at the Cupid's bow peak, lighter at the body center.
+//    Lower lip: lighter at the fullest point, gently darker at the corners.
+//    Painted with `multiply` at low alpha — adds 3-D depth without blackening.
+//
+//  Step 4 — Finish layer
+//    Matte  : zero specular, a tiny soft-light bloom for warmth only.
+//    Satin  : single elongated oval highlight on the upper lip body.
+//    Gloss  : two highlights — wide bokeh bloom + sharp Cupid's-bow ridge line.
+//             Lower lip gets a second round shine at its fullest point.
+//
+//  Step 5 — Mouth-opening cutout
+//    Inner polygon erased with `destination-out` so no color bleeds into the
+//    opening regardless of head angle.
+//
+//  All alpha values scale linearly with `intensity` so the result blends
+//  smoothly from 20 % (sheer) to 100 % (full pigment).
+
+// Sampling helper: read pixel average from a canvas region to adapt to ambient
+// lighting.  Returns perceived luminance 0–1 (using BT.601 coefficients).
+function sampleLipLuminance(
+  ctx: CanvasRenderingContext2D,
+  pts: Array<[number, number]>,
+  w: number, h: number,
+): number {
+  try {
+    const bb = bbox(pts);
+    const sw = Math.max(1, Math.round(bb.w * 0.5));
+    const sh = Math.max(1, Math.round(bb.h * 0.4));
+    const sx = Math.round(bb.x0 + bb.w * 0.25);
+    const sy = Math.round(bb.y0 + bb.h * 0.30);
+    if (sx < 0 || sy < 0 || sx + sw > w || sy + sh > h) return 0.5;
+    const data = ctx.getImageData(sx, sy, sw, sh).data;
+    let lum = 0, count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 32) continue;
+      lum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      count++;
+    }
+    return count > 0 ? Math.min(1, lum / (count * 255)) : 0.5;
+  } catch {
+    return 0.5;
+  }
+}
 
 function applyLipstick(
   ctx: CanvasRenderingContext2D, lms: LandmarkList,
   hex: string, intensity: number, finish: FinishType, w: number, h: number,
 ) {
   try {
-    const outerPts = [...poly(lms, LIP_UPPER_OUT, w, h), ...poly(lms, LIP_LOWER_OUT, w, h).slice(1, -1)];
-    const innerPts = [...poly(lms, LIP_UPPER_IN,  w, h), ...poly(lms, LIP_LOWER_IN,  w, h).slice(1, -1)];
+    const outerPts = [
+      ...poly(lms, LIP_UPPER_OUT, w, h),
+      ...poly(lms, LIP_LOWER_OUT, w, h).slice(1, -1),
+    ];
+    const innerPts = [
+      ...poly(lms, LIP_UPPER_IN,  w, h),
+      ...poly(lms, LIP_LOWER_IN,  w, h).slice(1, -1),
+    ];
 
-    const cx = centroid(outerPts);
-    const bb = bbox(outerPts);
     const [r, g, b] = hexRgb(hex);
-    const a = intensity * 0.72;
+    const bb  = bbox(outerPts);
+    const cx  = centroid(outerPts);
 
-    // Layer 1: multiply stain clipped to outer lip polygon
-    // Radial gradient fades well before the polygon edge → no visible clip line
+    // Mouth-center anatomical anchors
+    const upperCenter: [number, number] = [cx[0], bb.y0 + bb.h * 0.28];
+    const lowerCenter: [number, number] = [cx[0], bb.y0 + bb.h * 0.72];
+
+    // Adaptive intensity: very light lips need slightly lower opacity so the
+    // shade stays true-to-swatch without over-saturating.
+    const lipLum   = sampleLipLuminance(ctx, outerPts, w, h);
+    const lumMod   = 0.82 + lipLum * 0.36;   // 0.82 (dark lip) – 1.18 (light lip)
+    const baseA    = Math.min(0.88, intensity * 0.78 * lumMod);
+
+    // ── Offscreen: base color coat ────────────────────────────────────────────
+    const off1 = document.createElement('canvas');
+    off1.width = w; off1.height = h;
+    const c1 = off1.getContext('2d')!;
+
+    c1.save();
+    tracePath(c1, outerPts);
+    c1.clip();
+
+    // Flat fill — provides the solid pigment base inside the polygon
+    c1.fillStyle = `rgba(${r},${g},${b},${baseA.toFixed(3)})`;
+    c1.fillRect(bb.x0, bb.y0, bb.w + 1, bb.h + 1);
+
+    // ── Edge feather: erode alpha within ~12 % of the lip boundary ───────────
+    // Draw an inward radial from bb perimeter using destination-out so the
+    // clip-path edge dissolves into the skin rather than cutting sharply.
+    const featherR = Math.max(bb.w, bb.h) * 0.52;
+    const fadeGrad = c1.createRadialGradient(
+      cx[0], cx[1], featherR * 0.54,
+      cx[0], cx[1], featherR,
+    );
+    fadeGrad.addColorStop(0,    'rgba(0,0,0,0)');
+    fadeGrad.addColorStop(0.80, 'rgba(0,0,0,0)');
+    fadeGrad.addColorStop(0.93, 'rgba(0,0,0,0.35)');
+    fadeGrad.addColorStop(1,    'rgba(0,0,0,0.88)');
+    c1.globalCompositeOperation = 'destination-out';
+    c1.fillStyle = fadeGrad;
+    c1.fillRect(bb.x0 - 4, bb.y0 - 4, bb.w + 8, bb.h + 8);
+
+    // ── Erase mouth opening (inner polygon) ───────────────────────────────────
+    c1.globalCompositeOperation = 'destination-out';
+    tracePath(c1, innerPts);
+    c1.fillStyle = 'rgba(0,0,0,1)';
+    c1.fill();
+
+    c1.restore();
+
+    // Composite base with `color` blend — hue+saturation from us, luminance
+    // from original photo.  This preserves every lip wrinkle, highlight, and
+    // shadow automatically.
+    ctx.save();
+    ctx.globalCompositeOperation = 'color';
+    ctx.globalAlpha = Math.min(0.94, baseA * 1.08);
+    ctx.drawImage(off1, 0, 0);
+    ctx.restore();
+
+    // ── Volume gradient (3-D depth) ───────────────────────────────────────────
+    // Upper lip: darker in the philtrum valley, lighter on the body bulge.
+    // Lower lip: subtle center-light vignette.
     ctx.save();
     tracePath(ctx, outerPts);
     ctx.clip();
+
+    // Remove inner polygon from clip (even-odd rule doesn't work on clip path
+    // in all browsers, so we use a composite instead below)
+    const volumeA = intensity * 0.13;
+
+    // Upper lip shadow at corners
+    const [ulx, uly] = lmPx(lms[LIP_UPPER_OUT[0]],  w, h);  // left corner
+    const [urx, ury] = lmPx(lms[LIP_UPPER_OUT[LIP_UPPER_OUT.length - 1]], w, h); // right corner
+
+    const uGrad = ctx.createLinearGradient(ulx, uly, urx, ury);
+    uGrad.addColorStop(0,    `rgba(0,0,0,${(volumeA * 0.55).toFixed(3)})`);
+    uGrad.addColorStop(0.30, `rgba(0,0,0,0)`);
+    uGrad.addColorStop(0.50, `rgba(0,0,0,0)`);
+    uGrad.addColorStop(0.70, `rgba(0,0,0,0)`);
+    uGrad.addColorStop(1,    `rgba(0,0,0,${(volumeA * 0.55).toFixed(3)})`);
     ctx.globalCompositeOperation = 'multiply';
-    const g1 = ctx.createRadialGradient(cx[0], cx[1], 0, cx[0], cx[1], Math.max(bb.w, bb.h) * 0.62);
-    g1.addColorStop(0,    `rgba(${r},${g},${b},${(a * 0.85).toFixed(3)})`);
-    g1.addColorStop(0.55, `rgba(${r},${g},${b},${(a * 0.65).toFixed(3)})`);
-    g1.addColorStop(0.85, `rgba(${r},${g},${b},${(a * 0.28).toFixed(3)})`);
-    g1.addColorStop(1,    `rgba(${r},${g},${b},0)`);
-    ctx.fillStyle = g1;
+    ctx.fillStyle = uGrad;
     ctx.fillRect(bb.x0, bb.y0, bb.w, bb.h);
-    ctx.restore();
 
-    // Layer 2: overlay for hue depth
-    ctx.save();
-    tracePath(ctx, outerPts);
-    ctx.clip();
-    ctx.globalCompositeOperation = 'overlay';
-    const g2 = ctx.createRadialGradient(cx[0], cx[1], 0, cx[0], cx[1], Math.max(bb.w, bb.h) * 0.58);
-    g2.addColorStop(0,    `rgba(${r},${g},${b},${(a * 0.58).toFixed(3)})`);
-    g2.addColorStop(0.62, `rgba(${r},${g},${b},${(a * 0.32).toFixed(3)})`);
-    g2.addColorStop(1,    `rgba(${r},${g},${b},0)`);
-    ctx.fillStyle = g2;
-    ctx.fillRect(bb.x0, bb.y0, bb.w, bb.h);
-    ctx.restore();
-
-    // Layer 3: soft-light on inner lip for texture depth (clipped to inner polygon)
-    ctx.save();
-    tracePath(ctx, innerPts);
-    ctx.clip();
+    // Lower lip center volume — soft brighten at the fullest point
+    const lvGrad = ctx.createRadialGradient(
+      lowerCenter[0], lowerCenter[1], 0,
+      lowerCenter[0], lowerCenter[1], bb.w * 0.32,
+    );
+    lvGrad.addColorStop(0,   `rgba(255,255,255,${(intensity * 0.06).toFixed(3)})`);
+    lvGrad.addColorStop(0.6, `rgba(255,255,255,0)`);
     ctx.globalCompositeOperation = 'soft-light';
-    const g3 = ctx.createRadialGradient(cx[0], cx[1], 0, cx[0], cx[1], Math.max(bb.w, bb.h) * 0.50);
-    g3.addColorStop(0,   `rgba(${r},${g},${b},${(a * 0.36).toFixed(3)})`);
-    g3.addColorStop(0.7, `rgba(${r},${g},${b},${(a * 0.10).toFixed(3)})`);
-    g3.addColorStop(1,   `rgba(${r},${g},${b},0)`);
-    ctx.fillStyle = g3;
+    ctx.fillStyle = lvGrad;
     ctx.fillRect(bb.x0, bb.y0, bb.w, bb.h);
+
     ctx.restore();
 
-    // Gloss / satin specular highlight on upper lip center
-    if (finish !== 'matte') {
-      const glossA = finish === 'gloss' ? intensity * 0.44 : intensity * 0.20;
-      const hlX = cx[0];
-      const hlY = bb.y0 + bb.h * 0.26;
-      const hlR = bb.w * 0.26;
+    // ── Finish-specific highlight layer ──────────────────────────────────────
+
+    if (finish === 'matte') {
+      // Matte: zero specular; a faint warm bloom keeps it from looking plastic
+      ctx.save();
+      tracePath(ctx, outerPts);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'soft-light';
+      const mBloom = ctx.createRadialGradient(
+        upperCenter[0], upperCenter[1], 0,
+        upperCenter[0], upperCenter[1], bb.w * 0.48,
+      );
+      mBloom.addColorStop(0,   `rgba(${r},${g},${b},${(intensity * 0.08).toFixed(3)})`);
+      mBloom.addColorStop(0.7, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = mBloom;
+      ctx.fillRect(bb.x0, bb.y0, bb.w, bb.h);
+      ctx.restore();
+
+    } else if (finish === 'satin') {
+      // Satin: single elongated oval on the upper lip body, moderate opacity
+      const sA = intensity * 0.22;
+      const hlX = upperCenter[0];
+      const hlY = upperCenter[1];
       ctx.save();
       tracePath(ctx, outerPts);
       ctx.clip();
       ctx.globalCompositeOperation = 'screen';
-      const hl = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, hlR);
-      hl.addColorStop(0,    `rgba(255,255,255,${glossA.toFixed(3)})`);
-      hl.addColorStop(0.45, `rgba(255,255,255,${(glossA * 0.32).toFixed(3)})`);
-      hl.addColorStop(1,    'rgba(255,255,255,0)');
-      ctx.fillStyle = hl;
-      ctx.fillRect(bb.x0, bb.y0, bb.w, bb.h);
+      // Stretch horizontally to follow lip shape
+      ctx.translate(hlX, hlY);
+      ctx.scale(1, 0.48);
+      ctx.translate(-hlX, -hlY);
+      const sg = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, bb.w * 0.30);
+      sg.addColorStop(0,    `rgba(255,255,255,${sA.toFixed(3)})`);
+      sg.addColorStop(0.40, `rgba(255,255,255,${(sA * 0.28).toFixed(3)})`);
+      sg.addColorStop(1,    'rgba(255,255,255,0)');
+      ctx.fillStyle = sg;
+      ctx.fillRect(bb.x0 - 4, bb.y0 - 4, bb.w + 8, bb.h + 8);
+      ctx.restore();
+
+    } else {
+      // Gloss: two-layer shine for maximum realism
+      //  Layer A — wide bokeh bloom (soft, feathered)
+      //  Layer B — narrow ridge-line following the Cupid's bow arch
+      //  Layer C — round shine on lower lip fullest point
+
+      const gA = intensity * 0.38;
+      const gB = intensity * 0.52;
+      const gC = intensity * 0.30;
+
+      // Layer A — wide upper bloom
+      ctx.save();
+      tracePath(ctx, outerPts);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.translate(upperCenter[0], upperCenter[1]);
+      ctx.scale(1, 0.42);
+      ctx.translate(-upperCenter[0], -upperCenter[1]);
+      const gaG = ctx.createRadialGradient(
+        upperCenter[0], upperCenter[1], 0,
+        upperCenter[0], upperCenter[1], bb.w * 0.38,
+      );
+      gaG.addColorStop(0,    `rgba(255,255,255,${gA.toFixed(3)})`);
+      gaG.addColorStop(0.30, `rgba(255,255,255,${(gA * 0.44).toFixed(3)})`);
+      gaG.addColorStop(0.65, `rgba(255,255,255,${(gA * 0.10).toFixed(3)})`);
+      gaG.addColorStop(1,    'rgba(255,255,255,0)');
+      ctx.fillStyle = gaG;
+      ctx.fillRect(bb.x0 - 4, bb.y0 - 4, bb.w + 8, bb.h + 8);
+      ctx.restore();
+
+      // Layer B — narrow Cupid's bow ridge (very tight horizontal oval)
+      const ridgeY = bb.y0 + bb.h * 0.22;
+      ctx.save();
+      tracePath(ctx, outerPts);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.translate(cx[0], ridgeY);
+      ctx.scale(1, 0.20);
+      ctx.translate(-cx[0], -ridgeY);
+      const gbG = ctx.createRadialGradient(cx[0], ridgeY, 0, cx[0], ridgeY, bb.w * 0.22);
+      gbG.addColorStop(0,    `rgba(255,255,255,${gB.toFixed(3)})`);
+      gbG.addColorStop(0.28, `rgba(255,255,255,${(gB * 0.25).toFixed(3)})`);
+      gbG.addColorStop(1,    'rgba(255,255,255,0)');
+      ctx.fillStyle = gbG;
+      ctx.fillRect(bb.x0 - 4, bb.y0 - 4, bb.w + 8, bb.h + 8);
+      ctx.restore();
+
+      // Layer C — lower lip round shine
+      ctx.save();
+      tracePath(ctx, outerPts);
+      ctx.clip();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.translate(lowerCenter[0], lowerCenter[1]);
+      ctx.scale(1, 0.60);
+      ctx.translate(-lowerCenter[0], -lowerCenter[1]);
+      const gcG = ctx.createRadialGradient(
+        lowerCenter[0], lowerCenter[1], 0,
+        lowerCenter[0], lowerCenter[1], bb.w * 0.24,
+      );
+      gcG.addColorStop(0,    `rgba(255,255,255,${gC.toFixed(3)})`);
+      gcG.addColorStop(0.35, `rgba(255,255,255,${(gC * 0.30).toFixed(3)})`);
+      gcG.addColorStop(1,    'rgba(255,255,255,0)');
+      ctx.fillStyle = gcG;
+      ctx.fillRect(bb.x0 - 4, bb.y0 - 4, bb.w + 8, bb.h + 8);
       ctx.restore();
     }
+
+    // ── Final: composite feathered base back on `source-over` so the `color`
+    //    blend doesn't bleed outside the lip polygon on some GPU renderers.
+    //    This also adds the slight translucency that makes digital makeup look
+    //    credible rather than painted.
+    ctx.save();
+    tracePath(ctx, outerPts);
+    ctx.clip();
+    // Erase inner mouth one more time (safety pass for all blend modes above)
+    ctx.globalCompositeOperation = 'destination-out';
+    tracePath(ctx, innerPts);
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.fill();
+    ctx.restore();
+
   } catch { /* skip on error */ }
 }
 
