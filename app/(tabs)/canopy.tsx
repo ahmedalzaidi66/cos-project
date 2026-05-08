@@ -653,9 +653,13 @@ export default function VirtualTryOnScreen() {
         {/* Hero */}
         <View style={styles.hero}>
           <LinearGradient
-            colors={['rgba(255,77,141,0.12)', 'transparent']}
+            colors={['rgba(255,77,141,0.10)', 'rgba(0,224,255,0.04)', 'transparent']}
             style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           />
+
+          {/* Headline row */}
           <View style={styles.heroRow}>
             <View style={styles.heroIcon}>
               <Sparkles size={24} color={Colors.neonBlue} strokeWidth={1.5} />
@@ -667,6 +671,57 @@ export default function VirtualTryOnScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Before / After cards */}
+          <View style={styles.baCardsRow}>
+            {/* BEFORE card */}
+            <View style={styles.baCard}>
+              <Image
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                source={require('@/assets/images/canopy/canopy-before.png')}
+                style={styles.baCardImage}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(5,3,8,0.72)']}
+                style={styles.baCardGradient}
+                pointerEvents="none"
+              />
+              <View style={styles.baLabelWrap}>
+                <Text style={styles.baLabelText}>BEFORE</Text>
+              </View>
+            </View>
+
+            {/* Centre arrow + AI badge */}
+            <View style={styles.baMidCol}>
+              <View style={styles.baMidArrow}>
+                <Text style={styles.baMidArrowText}>{'→'}</Text>
+              </View>
+              <View style={styles.baMidBadge}>
+                <Sparkles size={10} color={Colors.neonBlue} strokeWidth={2} />
+                <Text style={styles.baMidBadgeText}>AI</Text>
+              </View>
+            </View>
+
+            {/* AFTER card */}
+            <View style={[styles.baCard, styles.baCardAfter]}>
+              <Image
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                source={require('@/assets/images/canopy/canopy-after.png')}
+                style={styles.baCardImage}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(5,3,8,0.72)']}
+                style={styles.baCardGradient}
+                pointerEvents="none"
+              />
+              <View style={[styles.baLabelWrap, styles.baLabelAfter]}>
+                <Text style={[styles.baLabelText, styles.baLabelTextAfter]}>AFTER</Text>
+              </View>
+            </View>
+          </View>
+
           {Platform.OS === 'web' && (
             <View style={styles.modelStatus}>
               <View style={[
@@ -1241,8 +1296,9 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 32 },
 
   hero: {
-    paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
+    gap: 16,
   },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   heroIcon: {
@@ -1253,6 +1309,109 @@ const styles = StyleSheet.create({
   heroTextWrap: { flex: 1 },
   heroTitle: { color: Colors.textPrimary, fontSize: FontSize.xl, fontWeight: '900', letterSpacing: -0.5 },
   heroSubtitle: { color: Colors.textMuted, fontSize: FontSize.sm, marginTop: 2 },
+
+  // ── Before / After cards ───────────────────────────────────────────────
+  baCardsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 0,
+    height: 220,
+  },
+  baCard: {
+    flex: 1,
+    height: '100%',
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    position: 'relative',
+    backgroundColor: '#0D0510',
+  },
+  baCardAfter: {
+    borderColor: Colors.neonBlueBorder,
+    shadowColor: Colors.neonBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  baCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  baCardGradient: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: '45%',
+  },
+  baLabelWrap: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    backgroundColor: 'rgba(5,3,8,0.78)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  baLabelAfter: {
+    left: undefined,
+    right: 10,
+    borderColor: Colors.neonBlueBorder,
+    backgroundColor: 'rgba(0,224,255,0.10)',
+  },
+  baLabelText: {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  baLabelTextAfter: {
+    color: Colors.neonBlue,
+  },
+
+  // Centre divider between cards
+  baMidCol: {
+    width: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    zIndex: 2,
+  },
+  baMidArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(5,3,8,0.90)',
+    borderWidth: 1.5,
+    borderColor: Colors.neonBlueBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  baMidArrowText: {
+    color: Colors.neonBlue,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
+  baMidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: Colors.neonBlueGlow,
+    borderRadius: Radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+  },
+  baMidBadgeText: {
+    color: Colors.neonBlue,
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
 
   modelStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingHorizontal: 4 },
   modelDot: { width: 8, height: 8, borderRadius: 4 },
