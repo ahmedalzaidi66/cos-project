@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -118,7 +118,8 @@ export default function ProductsScreen() {
           contentContainerStyle={styles.filterContent}
           renderItem={({ item }) => {
             const active = item === selectedCategory;
-            const label = item === null ? 'All' : (categories.find(c => c.slug === item) ? getCategoryName(categories.find(c => c.slug === item)!, language) : capitalize(item));
+            const cat = item === null ? null : categories.find(c => c.slug === item);
+            const label = item === null ? 'All' : (cat ? getCategoryName(cat, language) : capitalize(item));
             return (
               <TouchableOpacity
                 style={[styles.chip, active && styles.chipActive]}
@@ -179,6 +180,10 @@ export default function ProductsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.grid, { padding: SIDE_PAD, gap: GAP }]}
           columnWrapperStyle={numCols > 1 ? { gap: GAP } : undefined}
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews
           renderItem={({ item }) => (
             <ProductCard
               product={item}
@@ -193,7 +198,7 @@ export default function ProductsScreen() {
   );
 }
 
-function ProductCard({
+const ProductCard = memo(function ProductCard({
   product, cardW, language, onPress,
 }: {
   product: Product; cardW: number; language: string; onPress: () => void;
@@ -202,6 +207,7 @@ function ProductCard({
   const { showCartToast } = useWishlistToast();
   const [justAdded, setJustAdded] = React.useState(false);
   const imgH = Math.round(cardW * 0.62);
+  const imgUri = getProductImage(product) || undefined;
 
   return (
     <TouchableOpacity
@@ -211,7 +217,7 @@ function ProductCard({
     >
       <View style={[styles.cardImageWrap, { height: imgH }]}>
         <Image
-          source={{ uri: getProductImage(product) }}
+          source={imgUri ? { uri: imgUri } : undefined}
           style={styles.cardImage}
           resizeMode="cover"
         />
@@ -251,7 +257,7 @@ function ProductCard({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },

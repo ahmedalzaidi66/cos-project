@@ -335,13 +335,18 @@ export async function fetchProducts(opts?: {
   limit?: number;
 }): Promise<Product[]> {
   const lang = opts?.language ?? 'en';
+  // Select only columns needed for list/card rendering — exclude large blobs
   let query = supabase
     .from('products')
     .select(`
-      *,
-      translation:product_translations!left(id, product_id, language, name, short_description, full_description, meta_title, meta_description)
+      id, name, name_ar, name_es, name_de, price, compare_price,
+      category, category_id, makeup_subcategory, image_url, main_image,
+      rating, review_count, badge, is_featured, featured, stock, status,
+      slug, try_on_type, created_at,
+      translation:product_translations!left(language, name, short_description)
     `)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(opts?.limit ?? 80);
 
   if (opts?.status !== undefined) {
     query = query.eq('status', opts.status);
@@ -351,7 +356,6 @@ export async function fetchProducts(opts?: {
   if (opts?.category) query = query.eq('category', opts.category);
   if (opts?.makeup_subcategory) query = query.eq('makeup_subcategory', opts.makeup_subcategory);
   if (opts?.featured) query = query.eq('is_featured', true);
-  if (opts?.limit) query = query.limit(opts.limit);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -628,18 +632,22 @@ export async function getRelatedProducts(
   language = 'en',
   limit = 4
 ): Promise<Product[]> {
-  // Fetch a broad pool: same category first, then fill with active products
+  // Fetch a smaller pool — same category preferred, slim columns for cards
   const { data: pool, error } = await supabase
     .from('products')
     .select(`
-      *,
-      translation:product_translations!left(id, product_id, language, name, short_description, full_description, meta_title, meta_description)
+      id, name, name_ar, name_es, name_de, price, compare_price,
+      category, category_id, makeup_subcategory, image_url, main_image,
+      rating, review_count, badge, is_featured, featured, stock, status,
+      slug, try_on_type, specifications, created_at,
+      translation:product_translations!left(language, name, short_description)
     `)
     .eq('status', 'active')
+    .eq('category', product.category)
     .neq('id', product.id)
     .order('is_featured', { ascending: false })
     .order('review_count', { ascending: false })
-    .limit(40);
+    .limit(20);
 
   if (error || !pool) return [];
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -411,11 +411,10 @@ function BeautyTryOnHero() {
         <View style={tryOnStyles.faceRow}>
           <View style={tryOnStyles.faceCard}>
             <View style={[tryOnStyles.faceImageWrap, { width: faceSize, height: faceSize }]}>
-              <Image
-                source={{ uri: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400' }}
-                style={tryOnStyles.faceImage}
-                resizeMode="cover"
-              />
+              <LinearGradient colors={['#2a1020', '#3d1830']} style={StyleSheet.absoluteFill} />
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ width: faceSize * 0.45, height: faceSize * 0.45, borderRadius: faceSize * 0.225, backgroundColor: 'rgba(255,77,141,0.12)', borderWidth: 1, borderColor: 'rgba(255,77,141,0.2)' }} />
+              </View>
               <View style={tryOnStyles.faceLabel}>
                 <Text style={tryOnStyles.faceLabelText}>BEFORE</Text>
               </View>
@@ -428,12 +427,11 @@ function BeautyTryOnHero() {
 
           <View style={tryOnStyles.faceCard}>
             <View style={[tryOnStyles.faceImageWrap, tryOnStyles.faceImageWrapAfter, { width: faceSize, height: faceSize }]}>
-              <Image
-                source={{ uri: 'https://images.pexels.com/photos/3373739/pexels-photo-3373739.jpeg?auto=compress&cs=tinysrgb&w=400' }}
-                style={tryOnStyles.faceImage}
-                resizeMode="cover"
-              />
-              <LinearGradient colors={['transparent', 'rgba(255,77,141,0.15)']} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={['#2a1020', '#4a1535']} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={['transparent', 'rgba(255,77,141,0.2)']} style={StyleSheet.absoluteFill} />
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ width: faceSize * 0.45, height: faceSize * 0.45, borderRadius: faceSize * 0.225, backgroundColor: 'rgba(255,77,141,0.22)', borderWidth: 1, borderColor: 'rgba(255,77,141,0.45)' }} />
+              </View>
               <View style={[tryOnStyles.faceLabel, tryOnStyles.faceLabelAfter]}>
                 <Text style={[tryOnStyles.faceLabelText, { color: Colors.neonBlue }]}>AFTER</Text>
               </View>
@@ -508,16 +506,76 @@ const tryOnStyles = StyleSheet.create({
 
 // ─── Homepage Section Row ─────────────────────────────────────────────────────
 
-function HomeSectionRow({ section, language }: { section: HomepageSection; language: string }) {
+// Memoized card so AutoScrollRow content doesn't re-render every parent tick
+const HomeSectionCard = memo(function HomeSectionCard({
+  product,
+  language,
+  justAdded,
+  onPress,
+  onAddToCart,
+  addToCartLabel,
+}: {
+  product: Product;
+  language: string;
+  justAdded: boolean;
+  onPress: () => void;
+  onAddToCart: (e: any) => void;
+  addToCartLabel: string;
+}) {
+  const imgUri = getProductImage(product) || undefined;
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardImageWrap}>
+        <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={styles.cardImageTouchable}>
+          <Image
+            source={imgUri ? { uri: imgUri } : undefined}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+        {product.badge ? (
+          <View style={styles.cardBadge}>
+            <Text style={styles.cardBadgeText}>{product.badge}</Text>
+          </View>
+        ) : null}
+        <WishlistHeart product={product} size={10} variant="card" />
+      </View>
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardName} numberOfLines={2}>
+          {getProductName(product, language)}
+        </Text>
+        <StarRating rating={product.rating} reviewCount={product.review_count} size={8} showCount={false} />
+        <Text style={styles.cardPrice}>{formatPrice(product.price, language)}</Text>
+        <TouchableOpacity
+          style={[styles.cartBtn, justAdded && styles.cartBtnAdded]}
+          activeOpacity={0.85}
+          onPress={onAddToCart}
+        >
+          {justAdded
+            ? <Check size={9} color="#FFFFFF" strokeWidth={2.5} />
+            : <ShoppingBag size={9} color="#FFFFFF" strokeWidth={2.5} />
+          }
+          <Text style={styles.cartBtnText}>
+            {justAdded ? 'ADDED' : addToCartLabel}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
+
+const HomeSectionRow = memo(function HomeSectionRow({ section, language }: { section: HomepageSection; language: string }) {
   const router = useRouter();
   const { addToCart } = useCart();
-  const { t, isRTL } = useLanguage();
+  const { t } = useLanguage();
   const { showCartToast } = useWishlistToast();
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   const title = language === 'ar'
     ? (section.title_ar || section.title_en)
     : (section.title_en || section.title_ar);
+
+  const addToCartLabel = t.addToCart.toUpperCase();
 
   return (
     <View style={styles.sectionWrap}>
@@ -537,63 +595,27 @@ function HomeSectionRow({ section, language }: { section: HomepageSection; langu
 
       <AutoScrollRow contentContainerStyle={styles.rowScrollContent}>
         {section.products.map(product => (
-          <View key={product.id} style={styles.card}>
-            <View style={styles.cardImageWrap}>
-              <TouchableOpacity
-                activeOpacity={0.88}
-                onPress={() => router.push(`/product/${product.id}`)}
-                style={styles.cardImageTouchable}
-              >
-                <Image
-                  source={{ uri: getProductImage(product) }}
-                  style={styles.cardImage}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-              {product.badge ? (
-                <View style={styles.cardBadge}>
-                  <Text style={styles.cardBadgeText}>{product.badge}</Text>
-                </View>
-              ) : null}
-              <WishlistHeart
-                product={product}
-                size={10}
-                variant="card"
-              />
-            </View>
-            <View style={styles.cardInfo}>
-              <Text style={styles.cardName} numberOfLines={2}>
-                {getProductName(product, language)}
-              </Text>
-              <StarRating rating={product.rating} reviewCount={product.review_count} size={8} showCount={false} />
-              <Text style={styles.cardPrice}>{formatPrice(product.price, language)}</Text>
-              <TouchableOpacity
-                style={[styles.cartBtn, justAddedId === product.id && styles.cartBtnAdded]}
-                activeOpacity={0.85}
-                onPress={(e) => {
-                  const nativeEv = e?.nativeEvent as any;
-                  if (nativeEv?.stopPropagation) nativeEv.stopPropagation();
-                  addToCart(product);
-                  showCartToast('Added to cart');
-                  setJustAddedId(product.id);
-                  setTimeout(() => setJustAddedId(null), 1000);
-                }}
-              >
-                {justAddedId === product.id
-                  ? <Check size={9} color="#FFFFFF" strokeWidth={2.5} />
-                  : <ShoppingBag size={9} color="#FFFFFF" strokeWidth={2.5} />
-                }
-                <Text style={styles.cartBtnText}>
-                  {justAddedId === product.id ? 'ADDED' : t.addToCart.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <HomeSectionCard
+            key={product.id}
+            product={product}
+            language={language}
+            justAdded={justAddedId === product.id}
+            onPress={() => router.push(`/product/${product.id}`)}
+            onAddToCart={(e) => {
+              const nativeEv = e?.nativeEvent as any;
+              if (nativeEv?.stopPropagation) nativeEv.stopPropagation();
+              addToCart(product);
+              showCartToast('Added to cart');
+              setJustAddedId(product.id);
+              setTimeout(() => setJustAddedId(null), 1000);
+            }}
+            addToCartLabel={addToCartLabel}
+          />
         ))}
       </AutoScrollRow>
     </View>
   );
-}
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
