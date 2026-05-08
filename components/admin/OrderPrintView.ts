@@ -98,8 +98,20 @@ function paymentLabel(m?: string): string {
 }
 
 function buildQrUrl(text: string): string {
-  // Google Charts QR API — reliable, no JS required, renders as PNG
   return `https://chart.googleapis.com/chart?cht=qr&chs=150x150&chl=${encodeURIComponent(text)}&choe=UTF-8`;
+}
+
+function buildStaticMapUrl(lat: number, lng: number): string {
+  // OpenStreetMap-based static map — no API key required, real coordinates
+  // Uses staticmap.openstreetmap.de with a red marker pin
+  const marker = `${lat},${lng}`;
+  return (
+    `https://staticmap.openstreetmap.de/staticmap.php` +
+    `?center=${lat},${lng}` +
+    `&zoom=15` +
+    `&size=480x220` +
+    `&markers=${marker},red-pushpin`
+  );
 }
 
 function buildHtml(order: PrintOrder, items: PrintOrderItem[]): string {
@@ -147,31 +159,47 @@ function buildHtml(order: PrintOrder, items: PrintOrderItem[]): string {
       </tr>`;
   }).join('');
 
+  const staticMapUrl = hasGps
+    ? buildStaticMapUrl(order.delivery_latitude!, order.delivery_longitude!)
+    : null;
+
   const gpsSection = hasGps ? `
     <div class="section">
       <div class="section-title">الموقع الجغرافي</div>
-      <table class="info-table">
-        <tr>
-          <td class="info-left">
-            <div class="info-row">
-              <span class="label">خط العرض:</span>
-              <span>${order.delivery_latitude}</span>
-            </div>
-            <div class="info-row">
-              <span class="label">خط الطول:</span>
-              <span>${order.delivery_longitude}</span>
-            </div>
-            ${mapsLink ? `<div class="info-row">
-              <span class="label">رابط الخريطة:</span>
-              <a href="${escHtml(mapsLink)}" class="map-link">${escHtml(mapsLink)}</a>
-            </div>` : ''}
-          </td>
-          ${mapsLink ? `<td class="qr-cell">
-            <img src="${buildQrUrl(mapsLink)}" class="qr-img" alt="QR Code للموقع" />
-            <div class="qr-label">امسح للموقع</div>
-          </td>` : ''}
-        </tr>
-      </table>
+
+      <!-- Static map image row -->
+      <div class="map-row">
+        <div class="map-img-wrap" id="map-wrap">
+          <img
+            id="static-map"
+            src="${escHtml(staticMapUrl!)}"
+            class="static-map-img"
+            alt="خريطة موقع التوصيل"
+            onerror="document.getElementById('map-wrap').innerHTML='<div class=\\'map-fallback\\'>تعذّر تحميل الخريطة — انظر رمز QR</div>'"
+          />
+          <div class="map-pin-label">📍 ${escHtml(order.delivery_latitude!.toFixed(5))}, ${escHtml(order.delivery_longitude!.toFixed(5))}</div>
+        </div>
+
+        <div class="map-sidebar">
+          <div class="info-row" style="margin-bottom:8px">
+            <span class="label">خط العرض</span>
+            <span class="value">${order.delivery_latitude}</span>
+          </div>
+          <div class="info-row" style="margin-bottom:8px">
+            <span class="label">خط الطول</span>
+            <span class="value">${order.delivery_longitude}</span>
+          </div>
+          ${mapsLink ? `<div class="info-row" style="margin-bottom:12px">
+            <span class="label">رابط الخريطة</span>
+            <a href="${escHtml(mapsLink)}" class="map-link">${escHtml(mapsLink)}</a>
+          </div>
+          <div class="qr-cell" style="text-align:center">
+            <img src="${buildQrUrl(mapsLink)}" class="qr-img" alt="QR Code للموقع"
+              onerror="this.style.display='none'" />
+            <div class="qr-label">امسح لفتح الموقع</div>
+          </div>` : ''}
+        </div>
+      </div>
     </div>` : '';
 
   return `<!DOCTYPE html>
@@ -383,10 +411,56 @@ function buildHtml(order: PrintOrder, items: PrintOrderItem[]): string {
     .totals-table .total-row td:last-child { color: #FF4D8D; }
     .free-ship { color: #00C853; font-weight: 700; }
 
-    /* ── GPS section ── */
+    /* ── GPS / Map section ── */
+    .map-row {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .map-img-wrap {
+      flex: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1.5px solid #ffe0ec;
+      position: relative;
+      background: #f9f0f4;
+      min-height: 80px;
+    }
+    .static-map-img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+    .map-pin-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255,255,255,0.88);
+      font-size: 10px;
+      font-weight: 700;
+      color: #FF4D8D;
+      padding: 4px 8px;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+    .map-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 80px;
+      font-size: 11px;
+      color: #aaa;
+      background: #f9f0f4;
+    }
+    .map-sidebar {
+      width: 170px;
+      flex-shrink: 0;
+    }
     .info-table { width: 100%; border-collapse: collapse; }
     .info-left { vertical-align: top; padding-left: 20px; }
-    .qr-cell { text-align: center; width: 170px; vertical-align: top; }
+    .qr-cell { text-align: center; vertical-align: top; }
     .qr-img { width: 140px; height: 140px; border: 2px solid #ffe0ec; border-radius: 8px; }
     .qr-label { font-size: 10px; color: #888; margin-top: 4px; }
     .map-link {
@@ -490,6 +564,18 @@ function buildHtml(order: PrintOrder, items: PrintOrderItem[]): string {
       .print-controls { display: none !important; }
       .page { width: 100%; padding: 0; margin: 0; }
       a { color: #FF4D8D !important; }
+      .static-map-img {
+        width: 100% !important;
+        height: 190px !important;
+        object-fit: cover !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .map-img-wrap {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .map-row { break-inside: avoid; page-break-inside: avoid; }
     }
   </style>
 </head>
