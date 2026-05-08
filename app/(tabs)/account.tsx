@@ -10,10 +10,11 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
 import { supabase, Order } from '@/lib/supabase';
+import { useNotifications } from '@/context/NotificationContext';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import AppHeader from '@/components/AppHeader';
@@ -276,10 +277,29 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
+const ORDER_STATUS_COLORS: Record<string, string> = {
+  new:       Colors.neonBlue,
+  confirmed: Colors.success,
+  preparing: Colors.warning,
+  shipped:   '#7C83FF',
+  delivered: Colors.success,
+  cancelled: Colors.error,
+};
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  new:       'New',
+  confirmed: 'Confirmed',
+  preparing: 'Preparing',
+  shipped:   'Shipped',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
+};
+
 function ProfileView() {
   const { user, logout } = useAuth();
   const { t, language } = useLanguage();
   const { count: wishlistCount } = useWishlist();
+  const { unreadCount } = useNotifications();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -372,9 +392,10 @@ function ProfileView() {
             onPress={() => router.push('/(tabs)/wishlist' as any)}
           />
           <QuickTile
-            icon={<MapPin size={18} color={Colors.textSecondary} strokeWidth={1.8} />}
-            label="Addresses"
-            onPress={() => {}}
+            icon={<Bell size={18} color={Colors.warning} strokeWidth={1.8} />}
+            label="Alerts"
+            badge={unreadCount > 0 ? String(unreadCount) : undefined}
+            onPress={() => router.push('/(tabs)/notifications' as any)}
           />
           <QuickTile
             icon={<CreditCard size={18} color={Colors.gold} strokeWidth={1.8} />}
@@ -504,18 +525,15 @@ function OrderCard({ order }: { order: Order }) {
   const date = new Date(order.created_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
-  const statusColor =
-    order.status === 'confirmed' ? Colors.success :
-    order.status === 'pending' ? Colors.warning : Colors.textMuted;
+  const sc = ORDER_STATUS_COLORS[order.status] ?? Colors.textMuted;
+  const sl = ORDER_STATUS_LABELS[order.status] ?? (order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—');
 
   return (
     <View style={styles.orderCard}>
       <View style={styles.orderTopRow}>
         <Text style={styles.orderId}>#{order.id.slice(0, 8).toUpperCase()}</Text>
-        <View style={[styles.statusBadge, { borderColor: statusColor }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—'}
-          </Text>
+        <View style={[styles.statusBadge, { borderColor: sc, backgroundColor: sc + '18' }]}>
+          <Text style={[styles.statusText, { color: sc }]}>{sl}</Text>
         </View>
       </View>
       <View style={styles.orderBottom}>

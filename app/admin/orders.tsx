@@ -22,7 +22,7 @@ import { supabase, adminSupabase } from '@/lib/supabase';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 import { printOrder, type PrintOrder, type PrintOrderItem } from '@/components/admin/OrderPrintView';
-import { sendOrderStatusUpdate, sendShippingUpdate } from '@/lib/email';
+import { sendOrderStatusUpdate, sendShippingUpdate, sendOrderPushNotification } from '@/lib/email';
 
 const WHATSAPP_NUMBER = '9647XXXXXXXX';
 
@@ -171,7 +171,7 @@ function OrderDetailModal({
       setSuccessMsg('تم تحديث الحالة');
       setTimeout(() => setSuccessMsg(''), 2500);
 
-      // Send customer notification emails in background (non-blocking)
+      // Send customer notifications in background (non-blocking)
       const emailOrder = {
         ...order,
         status: newStatus,
@@ -187,6 +187,21 @@ function OrderDetailModal({
         sendShippingUpdate(emailOrder, newStatus);
       } else if (newStatus !== 'new') {
         sendOrderStatusUpdate(emailOrder, newStatus);
+      }
+
+      // Send push notification — look up customer's auth_user_id
+      if (newStatus !== 'new') {
+        supabase
+          .from('customers')
+          .select('auth_user_id')
+          .eq('email', order.customer_email)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data?.auth_user_id) {
+              sendOrderPushNotification(data.auth_user_id, order.id, newStatus);
+            }
+          })
+          .catch(() => {});
       }
     }
   };

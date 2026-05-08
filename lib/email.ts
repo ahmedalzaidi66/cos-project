@@ -135,3 +135,57 @@ export async function sendShippingUpdate(
     console.warn('[email] shipping_update failed:', result.error);
   }
 }
+
+// ── Push notification helper ───────────────────────────────────────────────────
+
+const PUSH_TITLE_BY_STATUS: Record<string, string> = {
+  confirmed: 'Order Confirmed',
+  preparing: 'Order Being Prepared',
+  shipped:   'Order Shipped',
+  delivered: 'Order Delivered',
+  cancelled: 'Order Cancelled',
+};
+
+const PUSH_BODY_BY_STATUS: Record<string, string> = {
+  confirmed: 'Your order has been confirmed.',
+  preparing: "We're preparing your order now.",
+  shipped:   'Your order is on its way!',
+  delivered: 'Your order has been delivered.',
+  cancelled: 'Your order has been cancelled.',
+};
+
+/**
+ * Send an Expo push notification to a user when their order status changes.
+ * Calls the send-push-notification Edge Function which looks up their tokens.
+ */
+export async function sendOrderPushNotification(
+  userId: string,
+  orderId: string,
+  newStatus: string
+): Promise<void> {
+  const title = PUSH_TITLE_BY_STATUS[newStatus];
+  const body  = PUSH_BODY_BY_STATUS[newStatus];
+  if (!title || !userId) return;
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token ?? SUPABASE_ANON_KEY;
+
+    await fetch(edgeFunctionUrl('send-push-notification'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Apikey: SUPABASE_ANON_KEY ?? '',
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        title,
+        body: `${body} Order #${orderId.slice(0, 8).toUpperCase()}`,
+        data: { order_id: orderId, status: newStatus },
+      }),
+    });
+  } catch (e: any) {
+    console.warn('[push] sendOrderPushNotification failed:', e?.message ?? e);
+  }
+}
