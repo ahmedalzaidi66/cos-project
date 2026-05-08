@@ -8,17 +8,33 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { Bell, CheckCheck, Package, Tag, MessageCircle, Sparkles } from 'lucide-react-native';
-import { useNotifications, AppNotification, NotificationType } from '@/context/NotificationContext';
+import { Bell, CheckCheck, Tag, Sparkles, Package, Truck, CircleCheck as CheckCircle, Circle as XCircle, ClipboardList, ShoppingBag } from 'lucide-react-native';
+import {
+  useNotifications,
+  InboxItem,
+  NotificationType,
+  OrderNotificationType,
+} from '@/context/NotificationContext';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import AppHeader from '@/components/AppHeader';
-import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
+import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
-const TYPE_META: Record<NotificationType, { icon: React.ComponentType<any>; color: string; label: string }> = {
-  offer: { icon: Tag, color: Colors.gold, label: 'Offer' },
-  new_product: { icon: Package, color: Colors.neonBlue, label: 'New Product' },
-  custom: { icon: Sparkles, color: Colors.textSecondary, label: 'Update' },
+// ─── Type metadata ────────────────────────────────────────────────────────────
+
+const BROADCAST_META: Record<NotificationType, { icon: React.ComponentType<any>; color: string; label: string }> = {
+  offer:       { icon: Tag,         color: Colors.gold,          label: 'Offer' },
+  new_product: { icon: Package,     color: Colors.neonBlue,      label: 'New Product' },
+  custom:      { icon: Sparkles,    color: Colors.textSecondary, label: 'Update' },
+};
+
+const ORDER_META: Record<OrderNotificationType, { icon: React.ComponentType<any>; color: string; label: string }> = {
+  order_placed:    { icon: ShoppingBag,  color: Colors.neonBlue,  label: 'Order Placed' },
+  order_confirmed: { icon: ClipboardList,color: '#4ADE80',        label: 'Confirmed' },
+  order_preparing: { icon: Package,      color: Colors.warning,   label: 'Preparing' },
+  order_shipped:   { icon: Truck,        color: '#7C83FF',        label: 'Shipped' },
+  order_delivered: { icon: CheckCircle,  color: Colors.success,   label: 'Delivered' },
+  order_cancelled: { icon: XCircle,      color: Colors.error,     label: 'Cancelled' },
 };
 
 function timeAgo(dateStr: string): string {
@@ -33,28 +49,46 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function NotificationItem({ item, onPress }: { item: AppNotification; onPress: (id: string) => void }) {
-  const meta = TYPE_META[item.type] ?? TYPE_META.custom;
+// ─── Inbox item renderer ──────────────────────────────────────────────────────
+
+function NotificationItem({ item, onPress }: { item: InboxItem; onPress: (item: InboxItem) => void }) {
+  const isOrder = item.source === 'order';
+  const isUnread = isOrder ? !item.is_read : !item.isRead;
+
+  let meta: { icon: React.ComponentType<any>; color: string; label: string };
+  let title: string;
+  let message: string;
+
+  if (isOrder) {
+    meta = ORDER_META[item.type as OrderNotificationType] ?? ORDER_META.order_placed;
+    title = item.title;
+    message = item.body;
+  } else {
+    meta = BROADCAST_META[item.type as NotificationType] ?? BROADCAST_META.custom;
+    title = item.title;
+    message = item.message;
+  }
+
   const Icon = meta.icon;
 
   return (
     <TouchableOpacity
-      style={[styles.item, !item.isRead && styles.itemUnread]}
-      onPress={() => onPress(item.id)}
+      style={[styles.item, isUnread && styles.itemUnread]}
+      onPress={() => onPress(item)}
       activeOpacity={0.75}
     >
-      {!item.isRead && <View style={styles.unreadDot} />}
+      {isUnread && <View style={styles.unreadDot} />}
       <View style={[styles.iconWrap, { backgroundColor: meta.color + '20', borderColor: meta.color + '40' }]}>
         <Icon size={18} color={meta.color} strokeWidth={2} />
       </View>
       <View style={styles.itemBody}>
         <View style={styles.itemTopRow}>
-          <Text style={[styles.itemTitle, !item.isRead && styles.itemTitleUnread]} numberOfLines={1}>
-            {item.title}
+          <Text style={[styles.itemTitle, isUnread && styles.itemTitleUnread]} numberOfLines={1}>
+            {title}
           </Text>
-          <Text style={styles.itemTime}>{timeAgo(item.sent_at ?? item.created_at)}</Text>
+          <Text style={styles.itemTime}>{timeAgo(item.created_at)}</Text>
         </View>
-        <Text style={styles.itemMessage} numberOfLines={2}>{item.message}</Text>
+        <Text style={styles.itemMessage} numberOfLines={2}>{message}</Text>
         <View style={[styles.typeBadge, { borderColor: meta.color + '50' }]}>
           <Text style={[styles.typeBadgeText, { color: meta.color }]}>{meta.label}</Text>
         </View>
@@ -70,31 +104,31 @@ function EmptyInbox() {
         <Bell size={40} color={Colors.textMuted} strokeWidth={1.5} />
       </View>
       <Text style={styles.emptyTitle}>All caught up</Text>
-      <Text style={styles.emptySubtitle}>New offers and updates will appear here</Text>
+      <Text style={styles.emptySubtitle}>Order updates and offers will appear here</Text>
     </View>
   );
 }
 
 function GuestView() {
-  const { t } = useLanguage();
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIconWrap}>
         <Bell size={40} color={Colors.textMuted} strokeWidth={1.5} />
       </View>
       <Text style={styles.emptyTitle}>Sign in to see notifications</Text>
-      <Text style={styles.emptySubtitle}>Create an account to receive offers and updates</Text>
+      <Text style={styles.emptySubtitle}>Create an account to receive order updates and offers</Text>
     </View>
   );
 }
 
-export default function NotificationsScreen() {
-  const { notifications, unreadCount, loading, markAsRead, markAllRead, refresh } = useNotifications();
-  const { isAuthenticated } = useAuth();
-  const { t } = useLanguage();
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
-  const handlePress = useCallback((id: string) => {
-    markAsRead(id);
+export default function NotificationsScreen() {
+  const { inboxItems, unreadCount, loading, markAsRead, markAllRead, refresh } = useNotifications();
+  const { isAuthenticated } = useAuth();
+
+  const handlePress = useCallback((item: InboxItem) => {
+    markAsRead(item);
   }, [markAsRead]);
 
   return (
@@ -103,9 +137,7 @@ export default function NotificationsScreen() {
 
       {isAuthenticated && unreadCount > 0 && (
         <View style={styles.topBar}>
-          <Text style={styles.unreadLabel}>
-            {unreadCount} unread
-          </Text>
+          <Text style={styles.unreadLabel}>{unreadCount} unread</Text>
           <TouchableOpacity onPress={markAllRead} style={styles.markAllBtn} activeOpacity={0.7}>
             <CheckCheck size={14} color={Colors.neonBlue} strokeWidth={2} />
             <Text style={styles.markAllText}>Mark all read</Text>
@@ -113,7 +145,7 @@ export default function NotificationsScreen() {
         </View>
       )}
 
-      {loading && notifications.length === 0 ? (
+      {loading && inboxItems.length === 0 ? (
         <View style={styles.loader}>
           <ActivityIndicator size="large" color={Colors.neonBlue} />
         </View>
@@ -121,10 +153,10 @@ export default function NotificationsScreen() {
         <GuestView />
       ) : (
         <FlatList
-          data={notifications}
-          keyExtractor={(item) => item.id}
+          data={inboxItems}
+          keyExtractor={(item) => `${item.source}:${item.id}`}
           renderItem={({ item }) => <NotificationItem item={item} onPress={handlePress} />}
-          contentContainerStyle={[styles.list, notifications.length === 0 && styles.listEmpty]}
+          contentContainerStyle={[styles.list, inboxItems.length === 0 && styles.listEmpty]}
           ListEmptyComponent={<EmptyInbox />}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -141,11 +173,10 @@ export default function NotificationsScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,11 +187,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     backgroundColor: Colors.backgroundSecondary,
   },
-  unreadLabel: {
-    color: Colors.textMuted,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
-  },
+  unreadLabel: { color: Colors.textMuted, fontSize: FontSize.sm, fontWeight: '600' },
   markAllBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -172,23 +199,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.neonBlueBorder,
   },
-  markAllText: {
-    color: Colors.neonBlue,
-    fontSize: FontSize.xs,
-    fontWeight: '700',
-  },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  list: {
-    padding: Spacing.md,
-    gap: Spacing.sm,
-  },
-  listEmpty: {
-    flex: 1,
-  },
+  markAllText: { color: Colors.neonBlue, fontSize: FontSize.xs, fontWeight: '700' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  list: { padding: Spacing.md, gap: Spacing.sm },
+  listEmpty: { flex: 1 },
   item: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -229,10 +243,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexShrink: 0,
   },
-  itemBody: {
-    flex: 1,
-    gap: 4,
-  },
+  itemBody: { flex: 1, gap: 4 },
   itemTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -246,21 +257,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 18,
   },
-  itemTitleUnread: {
-    color: Colors.textPrimary,
-    fontWeight: '700',
-  },
-  itemTime: {
-    color: Colors.textMuted,
-    fontSize: FontSize.xs,
-    flexShrink: 0,
-    marginTop: 1,
-  },
-  itemMessage: {
-    color: Colors.textMuted,
-    fontSize: FontSize.sm,
-    lineHeight: 19,
-  },
+  itemTitleUnread: { color: Colors.textPrimary, fontWeight: '700' },
+  itemTime: { color: Colors.textMuted, fontSize: FontSize.xs, flexShrink: 0, marginTop: 1 },
+  itemMessage: { color: Colors.textMuted, fontSize: FontSize.sm, lineHeight: 19 },
   typeBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 7,
@@ -269,11 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 2,
   },
-  typeBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
+  typeBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   empty: {
     flex: 1,
     justifyContent: 'center',
@@ -292,16 +287,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.sm,
   },
-  emptyTitle: {
-    color: Colors.textSecondary,
-    fontSize: FontSize.lg,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: Colors.textMuted,
-    fontSize: FontSize.md,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+  emptyTitle: { color: Colors.textSecondary, fontSize: FontSize.lg, fontWeight: '700', textAlign: 'center' },
+  emptySubtitle: { color: Colors.textMuted, fontSize: FontSize.md, textAlign: 'center', lineHeight: 22 },
 });

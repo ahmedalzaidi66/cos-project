@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Clipboard,
   Platform,
 } from 'react-native';
-import { Search, X, Phone, MessageCircle, Copy, ChevronRight, CircleAlert as AlertCircle, RefreshCw, ShoppingCart, MapPin, Calendar, CreditCard, CircleCheck as CheckCircle, Printer, FileDown } from 'lucide-react-native';
+import { Search, X, Phone, MessageCircle, Copy, ChevronRight, CircleAlert as AlertCircle, RefreshCw, ShoppingCart, MapPin, Calendar, CreditCard, CircleCheck as CheckCircle, Printer, FileDown, Bell, Check } from 'lucide-react-native';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -329,35 +329,98 @@ function OrderDetailModal({
             </View>
           </View>
 
-          {/* Status changer */}
+          {/* Status timeline + changer */}
           <View style={modal.card}>
-            <Text style={modal.cardTitle}>تغيير الحالة</Text>
+            <Text style={modal.cardTitle}>مسار الحالة</Text>
             {successMsg ? (
               <View style={modal.successBanner}>
                 <CheckCircle size={14} color={Colors.success} strokeWidth={2} />
                 <Text style={modal.successText}>{successMsg}</Text>
               </View>
             ) : null}
-            <View style={modal.statusBtns}>
-              {STATUS_FLOW.map((s) => (
+
+            {/* Timeline */}
+            <View style={modal.timeline}>
+              {STATUS_FLOW.filter((s) => s !== 'cancelled').map((s, idx, arr) => {
+                const currentIdx = STATUS_FLOW.indexOf(currentStatus);
+                const thisIdx   = STATUS_FLOW.indexOf(s);
+                const isDone    = currentStatus !== 'cancelled' && thisIdx < currentIdx;
+                const isActive  = s === currentStatus;
+                const isLast    = idx === arr.length - 1;
+                const color     = isDone || isActive ? statusColor(s) : Colors.border;
+                return (
+                  <View key={s} style={modal.timelineStep}>
+                    <View style={modal.timelineLeft}>
+                      <TouchableOpacity
+                        onPress={() => handleUpdateStatus(s)}
+                        activeOpacity={0.7}
+                        disabled={updatingStatus}
+                        style={[
+                          modal.timelineDot,
+                          { borderColor: color, backgroundColor: isActive ? color + '30' : Colors.backgroundSecondary },
+                        ]}
+                      >
+                        {isDone
+                          ? <Check size={10} color={statusColor(s)} strokeWidth={3} />
+                          : <View style={[modal.timelineDotInner, { backgroundColor: isActive ? color : Colors.border }]} />
+                        }
+                      </TouchableOpacity>
+                      {!isLast && <View style={[modal.timelineConnector, { backgroundColor: isDone ? statusColor(arr[idx]) : Colors.border }]} />}
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleUpdateStatus(s)}
+                      activeOpacity={0.7}
+                      disabled={updatingStatus}
+                      style={modal.timelineLabelWrap}
+                    >
+                      <Text style={[modal.timelineLabel, { color: isActive ? statusColor(s) : isDone ? Colors.textSecondary : Colors.textMuted, fontWeight: isActive ? '800' : '600' }]}>
+                        {statusLabel(s)}
+                      </Text>
+                      {isActive && (
+                        <View style={[modal.timelineActiveBadge, { backgroundColor: statusColor(s) + '20', borderColor: statusColor(s) + '50' }]}>
+                          <Text style={[modal.timelineActiveBadgeText, { color: statusColor(s) }]}>الحالة الحالية</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              {/* Cancelled as separate row */}
+              <View style={modal.timelineStep}>
+                <View style={modal.timelineLeft}>
+                  <TouchableOpacity
+                    onPress={() => handleUpdateStatus('cancelled')}
+                    activeOpacity={0.7}
+                    disabled={updatingStatus}
+                    style={[
+                      modal.timelineDot,
+                      {
+                        borderColor: currentStatus === 'cancelled' ? Colors.error : Colors.border,
+                        backgroundColor: currentStatus === 'cancelled' ? Colors.error + '20' : Colors.backgroundSecondary,
+                      },
+                    ]}
+                  >
+                    <View style={[modal.timelineDotInner, { backgroundColor: currentStatus === 'cancelled' ? Colors.error : Colors.border }]} />
+                  </TouchableOpacity>
+                </View>
                 <TouchableOpacity
-                  key={s}
-                  style={[
-                    modal.statusBtn,
-                    {
-                      backgroundColor: currentStatus === s ? statusColor(s) + '22' : Colors.backgroundSecondary,
-                      borderColor: currentStatus === s ? statusColor(s) : Colors.border,
-                    },
-                  ]}
-                  onPress={() => handleUpdateStatus(s)}
-                  activeOpacity={0.75}
+                  onPress={() => handleUpdateStatus('cancelled')}
+                  activeOpacity={0.7}
                   disabled={updatingStatus}
+                  style={modal.timelineLabelWrap}
                 >
-                  {updatingStatus && currentStatus !== s ? null : null}
-                  <Text style={[modal.statusBtnText, { color: statusColor(s) }]}>{statusLabel(s)}</Text>
+                  <Text style={[modal.timelineLabel, { color: currentStatus === 'cancelled' ? Colors.error : Colors.textMuted, fontWeight: currentStatus === 'cancelled' ? '800' : '600' }]}>
+                    {statusLabel('cancelled')}
+                  </Text>
+                  {currentStatus === 'cancelled' && (
+                    <View style={[modal.timelineActiveBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error + '50' }]}>
+                      <Text style={[modal.timelineActiveBadgeText, { color: Colors.error }]}>الحالة الحالية</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
-              ))}
+              </View>
             </View>
+
             {updatingStatus && <ActivityIndicator color={Colors.neonBlue} style={{ marginTop: 8 }} />}
           </View>
 
@@ -455,6 +518,9 @@ function OrdersContent() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [newOrderAlert, setNewOrderAlert] = useState<number>(0);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const initialLoadDone = useRef(false);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -466,6 +532,7 @@ function OrdersContent() {
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       setOrders(data ?? []);
+      initialLoadDone.current = true;
     } catch (e: any) {
       setLoadError(e?.message ?? 'Failed to load orders');
     } finally {
@@ -476,6 +543,33 @@ function OrdersContent() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Realtime subscription for new orders
+  useEffect(() => {
+    channelRef.current = supabase
+      .channel('admin_orders_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          if (!initialLoadDone.current) return;
+          const newOrder = payload.new as Order;
+          setOrders((prev) => {
+            if (prev.some((o) => o.id === newOrder.id)) return prev;
+            return [newOrder, ...prev];
+          });
+          setNewOrderAlert((c) => c + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, []);
 
   const openOrder = (order: Order) => {
     setSelectedOrder(order);
@@ -522,6 +616,21 @@ function OrdersContent() {
 
   return (
     <View>
+      {/* New order alert */}
+      {newOrderAlert > 0 && (
+        <TouchableOpacity
+          style={styles.newOrderBanner}
+          onPress={() => setNewOrderAlert(0)}
+          activeOpacity={0.8}
+        >
+          <Bell size={15} color={Colors.neonBlue} strokeWidth={2} />
+          <Text style={styles.newOrderBannerText}>
+            {newOrderAlert === 1 ? 'طلب جديد وصل!' : `${newOrderAlert} طلبات جديدة وصلت!`}
+          </Text>
+          <X size={13} color={Colors.neonBlue} strokeWidth={2.5} />
+        </TouchableOpacity>
+      )}
+
       {/* Search */}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
@@ -946,6 +1055,62 @@ const modal = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: Spacing.sm,
   },
+  timeline: {
+    gap: 0,
+    marginTop: 4,
+  },
+  timelineStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    minHeight: 44,
+  },
+  timelineLeft: {
+    alignItems: 'center',
+    width: 28,
+    paddingTop: 2,
+  },
+  timelineDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineDotInner: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  timelineConnector: {
+    width: 2,
+    flex: 1,
+    minHeight: 16,
+    marginVertical: 2,
+    borderRadius: 1,
+  },
+  timelineLabelWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 5,
+    paddingBottom: Spacing.sm,
+  },
+  timelineLabel: {
+    fontSize: FontSize.sm,
+  },
+  timelineActiveBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  timelineActiveBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
 });
 
 // ── List styles ─────────────────────────────────────────────────────────────
@@ -1118,5 +1283,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#25D36620',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  newOrderBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.neonBlueGlow,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 11,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+  },
+  newOrderBannerText: {
+    flex: 1,
+    color: Colors.neonBlue,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
   },
 });
