@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, ShoppingCart, Package, Shield, Star, ChevronRight, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, ShoppingCart, Package, Shield, Star, ChevronRight, Sparkles, Share2 } from 'lucide-react-native';
+import { Share, Clipboard } from 'react-native';
 import {
   fetchProductById,
   fetchProductGallery,
@@ -121,6 +122,46 @@ export default function ProductDetailScreen() {
     setTimeout(() => setAddedFeedback(false), 2000);
   }, [product, selectedShade, addToCart, quantity]);
 
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const handleShare = useCallback(async () => {
+    if (!product) return;
+    const name = getProductName(product, language);
+    const price = formatPrice(product.price, language);
+    const url = typeof window !== 'undefined'
+      ? window.location.href
+      : `https://lazurdebeauty.com/product/${product.id}`;
+
+    const msgEn = `${name} — ${price}\n${url}`;
+    const msgAr = `${name} — ${price}\nاكتشف المنتج: ${url}`;
+    const shareText = language === 'ar' ? msgAr : msgEn;
+
+    try {
+      if (Platform.OS !== 'web') {
+        // Native share sheet (iOS / Android)
+        await Share.share({ message: shareText, url });
+        return;
+      }
+
+      // Web: try navigator.share first (mobile browsers)
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: name, text: `${name} — ${price}`, url });
+        return;
+      }
+
+      // Web fallback: clipboard
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+      } else if (Clipboard?.setString) {
+        Clipboard.setString(shareText);
+      }
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch {
+      // User cancelled or share failed — silent
+    }
+  }, [product, language]);
+
   const inCartQty = items
     .filter((i) => i.product.id === id)
     .reduce((sum, i) => sum + i.quantity, 0);
@@ -164,6 +205,26 @@ export default function ProductDetailScreen() {
       >
         <ArrowLeft size={22} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
+
+      {/* Top-right: Share + Wishlist cluster */}
+      <View style={styles.topRightCluster}>
+        <WishlistHeart product={product} size={20} variant="detail" />
+        <TouchableOpacity
+          style={styles.shareBtn}
+          onPress={handleShare}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Share2 size={18} color={shareCopied ? Colors.success : '#FFFFFF'} strokeWidth={2.2} />
+        </TouchableOpacity>
+      </View>
+      {shareCopied && (
+        <View style={styles.copiedToast} pointerEvents="none">
+          <Text style={styles.copiedToastText}>
+            {language === 'ar' ? 'تم نسخ الرابط' : 'Link copied'}
+          </Text>
+        </View>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false} bounces>
         {/* Image section — plain View so back button is never swallowed */}
@@ -292,8 +353,7 @@ export default function ProductDetailScreen() {
 
         <View style={styles.content}>
           <View style={styles.nameRow}>
-            <Text style={[styles.name, { flex: 1 }]}>{getProductName(product, language)}</Text>
-            <WishlistHeart product={product} size={20} variant="detail" />
+            <Text style={styles.name}>{getProductName(product, language)}</Text>
           </View>
           <View style={styles.ratingRow}>
             <StarRating
@@ -539,9 +599,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 8,
   },
-  badge: {
+  topRightCluster: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 56 : 32,
+    right: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 9999,
+    elevation: 20,
+  },
+  shareBtn: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(5,10,20,0.82)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.18)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  copiedToast: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 116 : 88,
+    right: Spacing.md,
+    backgroundColor: Colors.success,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    zIndex: 9999,
+    elevation: 20,
+  },
+  copiedToastText: {
+    color: '#fff',
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
+  badge: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 114 : 90,
     right: Spacing.md,
     backgroundColor: Colors.neonBlue,
     borderRadius: Radius.sm,
