@@ -20,6 +20,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import GlossyButton from '@/components/GlossyButton';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
+import { sendOrderConfirmation, sendOrderAdminNotification } from '@/lib/email';
 
 const WHATSAPP_NUMBER = '9647XXXXXXXX';
 
@@ -267,6 +268,36 @@ export default function CheckoutScreen() {
       const itemsList = items
         .map((i) => `${i.product.name}${i.shade ? ` (${i.shade.name})` : ''} x${i.quantity}`)
         .join('، ');
+
+      // Build email order payload — fire both emails in background, non-blocking
+      const emailOrder = {
+        id:                   order.id,
+        customer_first_name:  form.firstName.trim(),
+        customer_last_name:   form.lastName.trim(),
+        customer_email:       form.email.trim().toLowerCase(),
+        customer_phone:       form.phone.trim(),
+        street:               form.street.trim(),
+        governorate:          form.governorate.trim(),
+        area:                 form.area.trim(),
+        country:              form.country.trim(),
+        subtotal,
+        shipping:             shippingFee,
+        total,
+        status:               'new',
+        payment_method:       form.paymentMethod,
+        payment_status:       'pending',
+        created_at:           order.created_at ?? new Date().toISOString(),
+        items: items.map((i) => ({
+          product_name: i.product.name,
+          quantity:     i.quantity,
+          unit_price:   i.product.price,
+          shade_name:   i.shade?.name,
+          shade_hex:    i.shade?.color_hex,
+        })),
+      };
+      sendOrderConfirmation(emailOrder);
+      sendOrderAdminNotification(emailOrder);
+
       clearCart();
       setOrderSuccess({
         id:       shortId,

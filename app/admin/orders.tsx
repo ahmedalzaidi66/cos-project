@@ -22,6 +22,7 @@ import { supabase, adminSupabase } from '@/lib/supabase';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 import { printOrder, type PrintOrder, type PrintOrderItem } from '@/components/admin/OrderPrintView';
+import { sendOrderStatusUpdate, sendShippingUpdate } from '@/lib/email';
 
 const WHATSAPP_NUMBER = '9647XXXXXXXX';
 
@@ -163,6 +164,24 @@ function OrderDetailModal({
       onStatusUpdated(order.id, newStatus);
       setSuccessMsg('تم تحديث الحالة');
       setTimeout(() => setSuccessMsg(''), 2500);
+
+      // Send customer notification emails in background (non-blocking)
+      const emailOrder = {
+        ...order,
+        status: newStatus,
+        items: items.map((i) => ({
+          product_name: i.product_name,
+          quantity:     i.quantity,
+          unit_price:   i.unit_price,
+          shade_name:   i.shade_name,
+          shade_hex:    i.shade_hex,
+        })),
+      };
+      if (newStatus === 'shipped' || newStatus === 'delivered') {
+        sendShippingUpdate(emailOrder, newStatus);
+      } else if (newStatus !== 'new') {
+        sendOrderStatusUpdate(emailOrder, newStatus);
+      }
     }
   };
 
