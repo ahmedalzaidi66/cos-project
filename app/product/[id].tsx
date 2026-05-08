@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ShoppingCart, Package, Shield, Star, ChevronRight, Sparkles, Share2 } from 'lucide-react-native';
-import { Share, Clipboard } from 'react-native';
+import { shareContent, buildProductSharePayload } from '@/lib/share';
 import {
   fetchProductById,
   fetchProductGallery,
@@ -122,44 +122,22 @@ export default function ProductDetailScreen() {
     setTimeout(() => setAddedFeedback(false), 2000);
   }, [product, selectedShade, addToCart, quantity]);
 
-  const [shareCopied, setShareCopied] = useState(false);
+  const [shareState, setShareState] = useState<'idle' | 'copied' | 'error'>('idle');
 
   const handleShare = useCallback(async () => {
     if (!product) return;
     const name = getProductName(product, language);
     const price = formatPrice(product.price, language);
-    const url = typeof window !== 'undefined'
-      ? window.location.href
-      : `https://lazurdebeauty.com/product/${product.id}`;
-
-    const msgEn = `${name} — ${price}\n${url}`;
-    const msgAr = `${name} — ${price}\nاكتشف المنتج: ${url}`;
-    const shareText = language === 'ar' ? msgAr : msgEn;
-
-    try {
-      if (Platform.OS !== 'web') {
-        // Native share sheet (iOS / Android)
-        await Share.share({ message: shareText, url });
-        return;
-      }
-
-      // Web: try navigator.share first (mobile browsers)
-      if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: name, text: `${name} — ${price}`, url });
-        return;
-      }
-
-      // Web fallback: clipboard
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(shareText);
-      } else if (Clipboard?.setString) {
-        Clipboard.setString(shareText);
-      }
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2500);
-    } catch {
-      // User cancelled or share failed — silent
+    const payload = buildProductSharePayload(name, price, product.id, language);
+    const result = await shareContent(payload);
+    if (result === 'copied') {
+      setShareState('copied');
+      setTimeout(() => setShareState('idle'), 2500);
+    } else if (result === 'error') {
+      setShareState('error');
+      setTimeout(() => setShareState('idle'), 2500);
     }
+    // 'shared' and 'cancelled' — no toast needed
   }, [product, language]);
 
   const inCartQty = items
@@ -210,18 +188,27 @@ export default function ProductDetailScreen() {
       <View style={styles.topRightCluster}>
         <WishlistHeart product={product} size={20} variant="detail" />
         <TouchableOpacity
-          style={styles.shareBtn}
+          style={[styles.shareBtn, shareState === 'copied' && styles.shareBtnCopied]}
           onPress={handleShare}
           activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Share2 size={18} color={shareCopied ? Colors.success : '#FFFFFF'} strokeWidth={2.2} />
+          <Share2
+            size={18}
+            color={shareState === 'copied' ? Colors.success : shareState === 'error' ? Colors.error : '#FFFFFF'}
+            strokeWidth={2.2}
+          />
         </TouchableOpacity>
       </View>
-      {shareCopied && (
-        <View style={styles.copiedToast} pointerEvents="none">
+      {shareState !== 'idle' && (
+        <View
+          style={[styles.copiedToast, shareState === 'error' && styles.copiedToastError]}
+          pointerEvents="none"
+        >
           <Text style={styles.copiedToastText}>
-            {language === 'ar' ? 'تم نسخ الرابط' : 'Link copied'}
+            {shareState === 'error'
+              ? (language === 'ar' ? 'تعذر المشاركة' : 'Share unavailable')
+              : (language === 'ar' ? 'تم نسخ الرابط' : 'Link copied')}
           </Text>
         </View>
       )}
@@ -608,24 +595,32 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 9999,
     elevation: 20,
+    // Ensure the cluster itself doesn't swallow pointer events on web
+    pointerEvents: 'box-none' as any,
   },
   shareBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     backgroundColor: 'rgba(5,10,20,0.82)',
-    borderRadius: 20,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.22)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    // Explicit pointer events so the button is always clickable on web
+    pointerEvents: 'auto' as any,
+  },
+  shareBtnCopied: {
+    borderColor: Colors.success,
+    backgroundColor: 'rgba(0,200,83,0.18)',
   },
   copiedToast: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 116 : 88,
+    top: Platform.OS === 'ios' ? 112 : 88,
     right: Spacing.md,
     backgroundColor: Colors.success,
     paddingHorizontal: 14,
@@ -634,6 +629,9 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 20,
   },
+  copiedToastError: {
+    backgroundColor: Colors.error,
+  },
   copiedToastText: {
     color: '#fff',
     fontSize: FontSize.xs,
@@ -641,8 +639,8 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 114 : 90,
-    right: Spacing.md,
+    top: Platform.OS === 'ios' ? 110 : 84,
+    left: Spacing.md,
     backgroundColor: Colors.neonBlue,
     borderRadius: Radius.sm,
     paddingHorizontal: 10,
