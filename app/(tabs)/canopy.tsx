@@ -89,9 +89,9 @@ const FINISH_LABELS: Record<FinishType, string> = {
 
 function clamp(v: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, v)); }
 
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace('#', '').padEnd(6, '0');
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+function hexToRgb(hex: string | null | undefined): [number, number, number] {
+  const h = (hex ?? '#CC9988').replace('#', '').padEnd(6, '0');
+  return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
 }
 
 // ─── SVG overlay for a single makeup spot (left or right) ────────────────────
@@ -382,7 +382,7 @@ export default function VirtualTryOnScreen() {
     setModelLoading(true);
     initFaceLandmarker()
       .then(() => { setModelReady(true); setModelLoading(false); })
-      .catch(() => { setModelLoading(false); });
+      .catch((err) => { console.warn('[Canopy] Face model failed to load:', err?.message ?? err); setModelLoading(false); });
   }, []);
 
   // ── Fetch admin model image from DB — re-runs each time screen is focused ─

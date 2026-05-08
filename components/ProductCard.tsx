@@ -35,10 +35,12 @@ export default function ProductCard({ product, onWishlistLoginRequired }: Props)
   const [justAdded, setJustAdded] = useState(false);
 
   useEffect(() => {
-    fetchProductShades(product.id).then((s) => setShades(s));
+    fetchProductShades(product.id)
+      .then((s) => setShades(s ?? []))
+      .catch(() => setShades([]));
   }, [product.id]);
 
-  const displayImage = activeShade?.product_image || getProductImage(product);
+  const displayImage = activeShade?.product_image || getProductImage(product) || undefined;
 
   const imageH = productCardSizes.imageHeight;
   const pad    = productCardSizes.cardPadding;
@@ -80,7 +82,7 @@ export default function ProductCard({ product, onWishlistLoginRequired }: Props)
     >
       <View style={[styles.imageContainer, { height: imageH, borderTopLeftRadius: cardR, borderTopRightRadius: cardR }]}>
         <Image
-          source={{ uri: displayImage }}
+          source={displayImage ? { uri: displayImage } : undefined}
           style={styles.image}
           resizeMode="cover"
         />

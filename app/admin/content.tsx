@@ -643,27 +643,32 @@ function ContentScreen() {
 
     const brandingRows = Object.entries(branding).map(([key, value]) => ({ key, value }));
 
-    const db = adminSupabase();
-    await Promise.all([
-      ...contentRows.map((row) =>
-        db.from('homepage_content').upsert(
-          { section: row.section, key: row.key, value: row.value, language: row.language, updated_at: new Date().toISOString() },
-          { onConflict: 'section,key,language' }
-        )
-      ),
-      ...brandingRows.map((row) =>
-        db.from('site_branding').upsert(
-          { key: row.key, value: row.value, updated_at: new Date().toISOString() },
-          { onConflict: 'key' }
-        )
-      ),
-    ]);
+    try {
+      const db = adminSupabase();
+      await Promise.all([
+        ...contentRows.map((row) =>
+          db.from('homepage_content').upsert(
+            { section: row.section, key: row.key, value: row.value, language: row.language, updated_at: new Date().toISOString() },
+            { onConflict: 'section,key,language' }
+          )
+        ),
+        ...brandingRows.map((row) =>
+          db.from('site_branding').upsert(
+            { key: row.key, value: row.value, updated_at: new Date().toISOString() },
+            { onConflict: 'key' }
+          )
+        ),
+      ]);
 
-    // Refresh global CMS context after save so storefront picks up changes
-    await refreshCMS(language);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+      // Refresh global CMS context after save so storefront picks up changes
+      await refreshCMS(language);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      console.error('[Content] handleSave error:', err?.message ?? err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReset = () => {

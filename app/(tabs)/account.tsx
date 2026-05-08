@@ -297,6 +297,10 @@ function ProfileView() {
       .then(({ data, error }) => {
         if (!error && data) setOrders(data);
         setLoadingOrders(false);
+      })
+      .catch((err) => {
+        console.error('[Account] orders fetch error:', err?.message ?? err);
+        setLoadingOrders(false);
       });
   }, [user]);
 
@@ -510,7 +514,7 @@ function OrderCard({ order }: { order: Order }) {
         <Text style={styles.orderId}>#{order.id.slice(0, 8).toUpperCase()}</Text>
         <View style={[styles.statusBadge, { borderColor: statusColor }]}>
           <Text style={[styles.statusText, { color: statusColor }]}>
-            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+            {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—'}
           </Text>
         </View>
       </View>

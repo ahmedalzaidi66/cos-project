@@ -145,8 +145,14 @@ function OrderDetailModal({
       .from('order_items')
       .select('id, product_name, product_image, quantity, unit_price, shade_name, shade_hex')
       .eq('order_id', order.id)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.error('[AdminOrders] order_items fetch error:', error.message);
         setItems(data ?? []);
+        setLoadingItems(false);
+      })
+      .catch((err) => {
+        console.error('[AdminOrders] order_items unexpected error:', err?.message ?? err);
+        setItems([]);
         setLoadingItems(false);
       });
   }, [visible, order.id, order.status]);

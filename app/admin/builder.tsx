@@ -307,7 +307,7 @@ function BlockList() {
 }
 
 function PreviewBlock({ block }: { block: PageBlock }) {
-  const c = block.content;
+  const c: Record<string, any> = block.content ?? {};
   const [imgErr, setImgErr] = useState(false);
 
   switch (block.type) {

@@ -104,12 +104,12 @@ function CartItemCard({
 }) {
   const { language } = useLanguage();
   const lineTotal = item.product.price * item.quantity;
-  const displayImage = item.shade?.product_image || item.product.image_url;
+  const displayImage = item.shade?.product_image || item.product.image_url || undefined;
 
   return (
     <View style={styles.card}>
       <Image
-        source={{ uri: displayImage }}
+        source={displayImage ? { uri: displayImage } : undefined}
         style={styles.cardImage}
         resizeMode="cover"
       />
