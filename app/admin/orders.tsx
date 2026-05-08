@@ -162,7 +162,7 @@ function OrderDetailModal({
     setUpdatingStatus(true);
     const { error } = await adminSupabase()
       .from('orders')
-      .update({ status: newStatus })
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', order.id);
     setUpdatingStatus(false);
     if (!error) {

@@ -10,11 +10,12 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
 import { supabase, Order } from '@/lib/supabase';
 import { useNotifications } from '@/context/NotificationContext';
+import { useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import AppHeader from '@/components/AppHeader';
@@ -306,23 +307,56 @@ function ProfileView() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [pwModalOpen, setPwModalOpen] = useState(false);
   const [ordersExpanded, setOrdersExpanded] = useState(false);
+  const ordersChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const fetchOrders = React.useCallback(async (email: string) => {
+    setLoadingOrders(true);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, customer_email, customer_first_name, customer_last_name, customer_phone, street, city, state, zip, country, payment_method, subtotal, shipping, total, status, created_at, updated_at')
+        .eq('customer_email', email)
+        .order('created_at', { ascending: false });
+      if (!error && data) setOrders(data);
+    } catch (err: any) {
+      console.error('[Account] orders fetch error:', err?.message ?? err);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user?.email) { setLoadingOrders(false); return; }
-    supabase
-      .from('orders')
-      .select('*')
-      .eq('customer_email', user.email)
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (!error && data) setOrders(data);
-        setLoadingOrders(false);
-      })
-      .catch((err) => {
-        console.error('[Account] orders fetch error:', err?.message ?? err);
-        setLoadingOrders(false);
-      });
-  }, [user]);
+
+    fetchOrders(user.email);
+
+    // Realtime: listen for status updates on this customer's orders
+    const channel = supabase
+      .channel(`customer_orders:${user.email}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_email=eq.${user.email}`,
+        },
+        (payload) => {
+          const updated = payload.new as Order;
+          setOrders((prev) =>
+            prev.map((o) => (o.id === updated.id ? { ...o, status: updated.status, updated_at: updated.updated_at } : o))
+          );
+        }
+      )
+      .subscribe();
+
+    ordersChannelRef.current = channel;
+
+    return () => {
+      channel.unsubscribe();
+      ordersChannelRef.current = null;
+    };
+  }, [user?.email, fetchOrders]);
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || 'ME';
 
@@ -407,7 +441,17 @@ function ProfileView() {
         {/* ── Orders (expandable) ── */}
         {ordersExpanded && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t.orderHistory}</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{t.orderHistory}</Text>
+              <TouchableOpacity
+                onPress={() => user?.email && fetchOrders(user.email)}
+                style={styles.refreshBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <RefreshCw size={13} color={Colors.neonBlue} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
             {loadingOrders ? (
               <Text style={styles.dimText}>{t.loadingOrders}</Text>
             ) : orders.length === 0 ? (
@@ -993,13 +1037,28 @@ const styles = StyleSheet.create({
   section: {
     gap: Spacing.xs,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
   sectionTitle: {
     color: Colors.textSecondary,
     fontSize: FontSize.xs,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    paddingHorizontal: 2,
+  },
+  refreshBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyBlock: {
     alignItems: 'center',
