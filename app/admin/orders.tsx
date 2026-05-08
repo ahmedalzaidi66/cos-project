@@ -21,7 +21,7 @@ import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { supabase, adminSupabase } from '@/lib/supabase';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
-import { printOrder, type PrintOrder, type PrintOrderItem } from '@/components/admin/OrderPrintView';
+import { printOrder, downloadOrderPdf, type PrintOrder, type PrintOrderItem } from '@/components/admin/OrderPrintView';
 import { sendOrderStatusUpdate, sendShippingUpdate, sendOrderPushNotification } from '@/lib/email';
 
 const WHATSAPP_NUMBER = '9647XXXXXXXX';
@@ -224,8 +224,7 @@ function OrderDetailModal({
     Linking.openURL(`https://wa.me/${target}?text=${encodeURIComponent(msg)}`);
   };
 
-  const handlePrint = () => {
-    if (Platform.OS !== 'web') return;
+  const buildPrintData = (): { printData: PrintOrder; printItems: PrintOrderItem[] } => {
     const printItems: PrintOrderItem[] = items.map((i) => ({
       id: i.id,
       product_name: i.product_name,
@@ -261,7 +260,19 @@ function OrderDetailModal({
       delivery_longitude: order.delivery_longitude,
       delivery_location_link: order.delivery_location_link,
     };
+    return { printData, printItems };
+  };
+
+  const handlePrint = () => {
+    if (Platform.OS !== 'web') return;
+    const { printData, printItems } = buildPrintData();
     printOrder(printData, printItems);
+  };
+
+  const handleDownloadPdf = () => {
+    if (Platform.OS !== 'web') return;
+    const { printData, printItems } = buildPrintData();
+    downloadOrderPdf(printData, printItems);
   };
 
   const address = [order.street, order.city, order.country].filter(Boolean).join('، ');
@@ -481,7 +492,7 @@ function OrderDetailModal({
               </TouchableOpacity>
               <TouchableOpacity
                 style={modal.pdfBtn}
-                onPress={handlePrint}
+                onPress={handleDownloadPdf}
                 activeOpacity={0.8}
                 disabled={loadingItems}
               >
