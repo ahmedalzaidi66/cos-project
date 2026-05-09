@@ -480,36 +480,10 @@ function softEllipse(
 //  All alpha values scale linearly with `intensity` so the result blends
 //  smoothly from 20 % (sheer) to 100 % (full pigment).
 
-// Sampling helper: read pixel average from a canvas region to adapt to ambient
-// lighting.  Returns perceived luminance 0–1 (using BT.601 coefficients).
-function sampleLipLuminance(
-  ctx: CanvasRenderingContext2D,
-  pts: Array<[number, number]>,
-  w: number, h: number,
-): number {
-  try {
-    const bb = bbox(pts);
-    const sw = Math.max(1, Math.round(bb.w * 0.5));
-    const sh = Math.max(1, Math.round(bb.h * 0.4));
-    const sx = Math.round(bb.x0 + bb.w * 0.25);
-    const sy = Math.round(bb.y0 + bb.h * 0.30);
-    if (sx < 0 || sy < 0 || sx + sw > w || sy + sh > h) return 0.5;
-    const data = ctx.getImageData(sx, sy, sw, sh).data;
-    let lum = 0, count = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] < 32) continue;
-      lum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      count++;
-    }
-    return count > 0 ? Math.min(1, lum / (count * 255)) : 0.5;
-  } catch {
-    return 0.5;
-  }
-}
-
 function applyLipstick(
   ctx: CanvasRenderingContext2D, lms: LandmarkList,
   hex: string, intensity: number, finish: FinishType, w: number, h: number,
+  img?: HTMLImageElement,
 ) {
   try {
     const outerPts = [
@@ -529,11 +503,9 @@ function applyLipstick(
     const upperCenter: [number, number] = [cx[0], bb.y0 + bb.h * 0.28];
     const lowerCenter: [number, number] = [cx[0], bb.y0 + bb.h * 0.72];
 
-    // Adaptive intensity: very light lips need slightly lower opacity so the
-    // shade stays true-to-swatch without over-saturating.
-    const lipLum   = sampleLipLuminance(ctx, outerPts, w, h);
-    const lumMod   = 0.82 + lipLum * 0.36;   // 0.82 (dark lip) – 1.18 (light lip)
-    const baseA    = Math.min(0.88, intensity * 0.78 * lumMod);
+    // Base opacity: straight source-over so the selected hex renders true-to-swatch.
+    // No adaptive warm-tone correction — that was the source of hue shifting.
+    const baseA = Math.min(0.82, intensity * 0.76);
 
     // ── Offscreen: base color coat ────────────────────────────────────────────
     const off1 = document.createElement('canvas');
@@ -544,13 +516,11 @@ function applyLipstick(
     tracePath(c1, outerPts);
     c1.clip();
 
-    // Flat fill — provides the solid pigment base inside the polygon
+    // Flat fill — solid pigment base inside the lip polygon
     c1.fillStyle = `rgba(${r},${g},${b},${baseA.toFixed(3)})`;
     c1.fillRect(bb.x0, bb.y0, bb.w + 1, bb.h + 1);
 
-    // ── Edge feather: erode alpha within ~12 % of the lip boundary ───────────
-    // Draw an inward radial from bb perimeter using destination-out so the
-    // clip-path edge dissolves into the skin rather than cutting sharply.
+    // ── Edge feather: dissolve alpha near the vermillion border ───────────────
     const featherR = Math.max(bb.w, bb.h) * 0.52;
     const fadeGrad = c1.createRadialGradient(
       cx[0], cx[1], featherR * 0.54,
@@ -572,14 +542,41 @@ function applyLipstick(
 
     c1.restore();
 
-    // Composite base with `color` blend — hue+saturation from us, luminance
-    // from original photo.  This preserves every lip wrinkle, highlight, and
-    // shadow automatically.
+    // Composite base with source-over — preserves exact hex color fidelity.
     ctx.save();
-    ctx.globalCompositeOperation = 'color';
-    ctx.globalAlpha = Math.min(0.94, baseA * 1.08);
+    ctx.globalCompositeOperation = 'source-over';
     ctx.drawImage(off1, 0, 0);
     ctx.restore();
+
+    // ── Texture preservation pass ─────────────────────────────────────────────
+    // Draw original photo's lip pixels at low multiply opacity so wrinkles and
+    // natural shadows show through without altering the product hue.
+    if (img) {
+      const offTex = document.createElement('canvas');
+      offTex.width = w; offTex.height = h;
+      const cTex = offTex.getContext('2d')!;
+      cTex.drawImage(img, 0, 0, w, h);
+      // Clip to outer lip polygon
+      cTex.save();
+      cTex.globalCompositeOperation = 'destination-in';
+      tracePath(cTex, outerPts);
+      cTex.fillStyle = 'rgba(0,0,0,1)';
+      cTex.fill();
+      cTex.restore();
+      // Erase mouth opening
+      cTex.save();
+      cTex.globalCompositeOperation = 'destination-out';
+      tracePath(cTex, innerPts);
+      cTex.fillStyle = 'rgba(0,0,0,1)';
+      cTex.fill();
+      cTex.restore();
+      // Blend back — multiply preserves shadow texture without shifting hue
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.28;
+      ctx.drawImage(offTex, 0, 0);
+      ctx.restore();
+    }
 
     // ── Volume gradient (3-D depth) ───────────────────────────────────────────
     // Upper lip: darker in the philtrum valley, lighter on the body bulge.
@@ -1079,13 +1076,14 @@ function paintLayers(
   lms: LandmarkList,
   visible: MakeupLayer[],
   w: number, h: number,
+  img?: HTMLImageElement,
 ) {
   for (const type of LAYER_ORDER) {
     for (const layer of visible) {
       if (layer.type !== type) continue;
       try {
         switch (type) {
-          case 'lipstick':   applyLipstick(ctx,   lms, layer.color, layer.intensity, layer.finish, w, h); break;
+          case 'lipstick':   applyLipstick(ctx,   lms, layer.color, layer.intensity, layer.finish, w, h, img); break;
           case 'blush':      applyBlush(ctx,       lms, layer.color, layer.intensity, w, h, layer.blushPlacement); break;
           case 'concealer':  applyConcealer(ctx,   lms, layer.color, layer.intensity, w, h, layer.concealerPlacement); break;
           case 'foundation': applyFoundation(ctx,  lms, layer.color, layer.intensity, layer.finish, w, h); break;
@@ -1162,7 +1160,7 @@ export async function renderLayers(
   const lms = await detectLandmarks(landmarker, img, canvas);
   if (!lms) return { success: true, faceDetected: false, error: 'Please upload a clear front-facing photo' };
 
-  paintLayers(ctx, lms, visible, w, h);
+  paintLayers(ctx, lms, visible, w, h, img);
   return { success: true, faceDetected: true };
 }
 
