@@ -12,6 +12,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useRouter } from 'expo-router';
 import {
@@ -31,6 +32,11 @@ import {
   EyeOff,
   Smartphone,
   SlidersHorizontal,
+  Plus,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  Layers,
 } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
@@ -149,6 +155,397 @@ const sliderStyles = StyleSheet.create({
   presetActive: { borderColor: Colors.neonBlue, backgroundColor: 'rgba(255,77,141,0.1)' },
   presetText: { color: Colors.textMuted, fontSize: 11, fontWeight: '600' },
   presetTextActive: { color: Colors.neonBlue },
+});
+
+// ─── Hero Slides Editor ───────────────────────────────────────────────────────
+// Manages multiple slides saved to the hero_slides table.
+
+type SlideFields = {
+  id: string; // uuid or 'new-{n}' for unsaved
+  sort_order: number;
+  is_active: boolean;
+  media_type: 'image' | 'video';
+  image_url: string;
+  video_url: string;
+  badge_text: string;
+  title: string;
+  subtitle: string;
+  cta_text: string;
+  cta_url: string;
+  overlay_opacity: number;
+  _dirty?: boolean;
+};
+
+const EMPTY_SLIDE = (): SlideFields => ({
+  id: `new-${Date.now()}`,
+  sort_order: 0,
+  is_active: true,
+  media_type: 'image',
+  image_url: '',
+  video_url: '',
+  badge_text: '',
+  title: '',
+  subtitle: '',
+  cta_text: 'Shop Now',
+  cta_url: '/(tabs)/products',
+  overlay_opacity: 0.55,
+  _dirty: true,
+});
+
+function HeroSlidesEditor() {
+  const [slides, setSlides] = useState<SlideFields[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from('hero_slides')
+      .select('*')
+      .order('sort_order', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) { console.error('[HeroSlidesEditor]', error); setLoading(false); return; }
+        const rows = (data ?? []) as SlideFields[];
+        setSlides(rows.length > 0 ? rows : [EMPTY_SLIDE()]);
+        setLoading(false);
+      });
+  }, []);
+
+  function updateSlide(idx: number, patch: Partial<SlideFields>) {
+    setSlides(prev => prev.map((s, i) => i === idx ? { ...s, ...patch, _dirty: true } : s));
+  }
+
+  function addSlide() {
+    setSlides(prev => {
+      const newSlide = { ...EMPTY_SLIDE(), sort_order: prev.length };
+      setSelectedIdx(prev.length);
+      return [...prev, newSlide];
+    });
+  }
+
+  function removeSlide(idx: number) {
+    setSlides(prev => {
+      const next = prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, sort_order: i }));
+      setSelectedIdx(Math.max(0, Math.min(idx, next.length - 1)));
+      return next.length > 0 ? next : [EMPTY_SLIDE()];
+    });
+  }
+
+  function moveSlide(idx: number, dir: -1 | 1) {
+    const target = idx + dir;
+    if (target < 0 || target >= slides.length) return;
+    setSlides(prev => {
+      const next = [...prev];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next.map((s, i) => ({ ...s, sort_order: i, _dirty: true }));
+    });
+    setSelectedIdx(target);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    const db = adminSupabase();
+
+    // Delete all existing slides then re-insert to preserve order simply
+    const { error: delErr } = await db.from('hero_slides').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (delErr) { setSaveError(delErr.message); setSaving(false); return; }
+
+    const toInsert = slides.map((s, i) => ({
+      sort_order: i,
+      is_active: s.is_active,
+      media_type: s.media_type,
+      image_url: s.image_url ?? '',
+      video_url: s.video_url ?? '',
+      badge_text: s.badge_text ?? '',
+      title: s.title ?? '',
+      subtitle: s.subtitle ?? '',
+      cta_text: s.cta_text ?? '',
+      cta_url: s.cta_url ?? '',
+      overlay_opacity: s.overlay_opacity ?? 0.55,
+      language: 'en',
+    }));
+
+    const { data: inserted, error: insErr } = await db.from('hero_slides').insert(toInsert).select();
+    if (insErr) { setSaveError(insErr.message); setSaving(false); return; }
+
+    // Refresh local state with new server ids
+    if (inserted) setSlides(inserted as SlideFields[]);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  if (loading) return <View style={{ padding: 40, alignItems: 'center' }}><ActivityIndicator color={Colors.neonBlue} /></View>;
+
+  const slide = slides[selectedIdx] ?? slides[0];
+  if (!slide) return null;
+
+  const previewOverlay = `rgba(0,0,0,${(slide.overlay_opacity ?? 0.55).toFixed(2)})`;
+
+  return (
+    <View>
+      {/* ── Live preview ─────────────────────────────────────────────── */}
+      <View style={slideStyles.previewWrap}>
+        <View style={slideStyles.previewHero}>
+          {slide.image_url ? (
+            <Image source={{ uri: slide.image_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#140A10', justifyContent: 'center', alignItems: 'center' }]}>
+              <ImageIcon size={28} color={Colors.textMuted} strokeWidth={1.5} />
+            </View>
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: previewOverlay }]} pointerEvents="none" />
+          <LinearGradient
+            colors={['transparent', 'rgba(5,3,4,0.65)', 'rgba(5,3,4,0.95)']}
+            locations={[0.3, 0.65, 1]}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <View style={slideStyles.previewContent}>
+            {!!slide.badge_text && (
+              <View style={slideStyles.previewBadge}>
+                <Text style={slideStyles.previewBadgeText}>{slide.badge_text.toUpperCase()}</Text>
+              </View>
+            )}
+            <Text style={slideStyles.previewTitle} numberOfLines={2}>{slide.title || 'Slide Title'}</Text>
+            {!!slide.subtitle && <Text style={slideStyles.previewSubtitle} numberOfLines={1}>{slide.subtitle}</Text>}
+            {!!slide.cta_text && (
+              <View style={slideStyles.previewCta}><Text style={slideStyles.previewCtaText}>{slide.cta_text.toUpperCase()}</Text></View>
+            )}
+          </View>
+          {/* Slide counter badge */}
+          <View style={slideStyles.slideCounter}>
+            <Text style={slideStyles.slideCounterText}>{selectedIdx + 1} / {slides.length}</Text>
+          </View>
+        </View>
+
+        {/* Dot indicators */}
+        <View style={slideStyles.previewDots}>
+          {slides.map((_, i) => (
+            <TouchableOpacity key={i} onPress={() => setSelectedIdx(i)} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <View style={[slideStyles.dot, i === selectedIdx && slideStyles.dotActive]} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        {/* Top actions */}
+        <View style={slideStyles.topRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Layers size={18} color={Colors.neonBlue} strokeWidth={2} />
+            <Text style={styles.sectionTitle}>Hero Slides ({slides.length})</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={slideStyles.addBtn} onPress={addSlide} activeOpacity={0.8}>
+              <Plus size={13} color={Colors.neonBlue} strokeWidth={2.5} />
+              <Text style={slideStyles.addBtnText}>Add Slide</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+              onPress={handleSave} disabled={saving} activeOpacity={0.8}
+            >
+              {saving ? <ActivityIndicator color={Colors.background} size="small" />
+                : saved ? <><CheckCircle size={13} color={Colors.background} strokeWidth={2.5} /><Text style={styles.saveBtnText}>Saved!</Text></>
+                : <><Save size={13} color={Colors.background} strokeWidth={2.5} /><Text style={styles.saveBtnText}>Save All</Text></>}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {saveError && (
+          <View style={heroStyles.errorBox}><Text style={heroStyles.errorText}>Save failed: {saveError}</Text></View>
+        )}
+
+        {/* Slide tabs */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.lg }}>
+          <View style={{ flexDirection: 'row', gap: 6, paddingRight: 8 }}>
+            {slides.map((s, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[slideStyles.slideTab, i === selectedIdx && slideStyles.slideTabActive]}
+                onPress={() => setSelectedIdx(i)}
+                activeOpacity={0.8}
+              >
+                <Text style={[slideStyles.slideTabText, i === selectedIdx && slideStyles.slideTabTextActive]}>
+                  Slide {i + 1}
+                </Text>
+                {!s.is_active && <View style={slideStyles.hiddenDot} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Slide actions */}
+        <View style={slideStyles.slideActionsRow}>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            <TouchableOpacity
+              style={[slideStyles.iconBtn, selectedIdx === 0 && slideStyles.iconBtnDisabled]}
+              onPress={() => moveSlide(selectedIdx, -1)}
+              disabled={selectedIdx === 0} activeOpacity={0.8}
+            >
+              <ChevronUp size={14} color={selectedIdx === 0 ? Colors.textMuted : Colors.textSecondary} strokeWidth={2.5} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[slideStyles.iconBtn, selectedIdx === slides.length - 1 && slideStyles.iconBtnDisabled]}
+              onPress={() => moveSlide(selectedIdx, 1)}
+              disabled={selectedIdx === slides.length - 1} activeOpacity={0.8}
+            >
+              <ChevronDown size={14} color={selectedIdx === slides.length - 1 ? Colors.textMuted : Colors.textSecondary} strokeWidth={2.5} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[slideStyles.toggleActiveBtn, slide.is_active && slideStyles.toggleActiveBtnOn]}
+            onPress={() => updateSlide(selectedIdx, { is_active: !slide.is_active })}
+            activeOpacity={0.8}
+          >
+            {slide.is_active
+              ? <><Eye size={12} color={Colors.neonBlue} strokeWidth={2} /><Text style={[slideStyles.toggleActiveBtnText, { color: Colors.neonBlue }]}>Visible</Text></>
+              : <><EyeOff size={12} color={Colors.textMuted} strokeWidth={2} /><Text style={slideStyles.toggleActiveBtnText}>Hidden</Text></>
+            }
+          </TouchableOpacity>
+          {slides.length > 1 && (
+            <TouchableOpacity
+              style={slideStyles.removeBtn}
+              onPress={() => removeSlide(selectedIdx)}
+              activeOpacity={0.8}
+            >
+              <Trash2 size={13} color={Colors.error} strokeWidth={2} />
+              <Text style={slideStyles.removeBtnText}>Remove</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Media type */}
+        <View style={heroStyles.mediaToggle}>
+          <Text style={heroStyles.mediaToggleLabel}>Media Type</Text>
+          <View style={heroStyles.mediaToggleBtns}>
+            {(['image', 'video'] as const).map(type => (
+              <TouchableOpacity
+                key={type}
+                style={[heroStyles.mediaBtn, slide.media_type === type && heroStyles.mediaBtnActive]}
+                onPress={() => updateSlide(selectedIdx, { media_type: type })}
+                activeOpacity={0.8}
+              >
+                {type === 'image'
+                  ? <ImageIcon size={13} color={slide.media_type === type ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
+                  : <Video size={13} color={slide.media_type === type ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />}
+                <Text style={[heroStyles.mediaBtnText, slide.media_type === type && heroStyles.mediaBtnTextActive]}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Media inputs */}
+        {slide.media_type === 'video' ? (
+          <>
+            <View style={heroStyles.videoField}>
+              <Text style={heroStyles.videoLabel}>Video URL</Text>
+              <Text style={heroStyles.videoHint}>Direct MP4 or WebM URL. Autoplays muted.</Text>
+              <TextInput
+                style={heroStyles.videoInput}
+                value={slide.video_url}
+                onChangeText={(v) => updateSlide(selectedIdx, { video_url: v })}
+                placeholder="https://example.com/video.mp4"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none" autoCorrect={false}
+              />
+            </View>
+            <View style={{ height: 8 }} />
+            <ImageUploader
+              label="Fallback Image (shown if video fails)"
+              value={slide.image_url}
+              onChange={(v) => updateSlide(selectedIdx, { image_url: v })}
+              folder="cms" previewHeight={100} hint="Required — shown when autoplay is blocked." allowUrl editorPreset="hero"
+            />
+          </>
+        ) : (
+          <ImageUploader
+            label="Background Image"
+            value={slide.image_url}
+            onChange={(v) => updateSlide(selectedIdx, { image_url: v })}
+            folder="cms" previewHeight={130} hint="Upload or paste a URL." allowUrl editorPreset="hero"
+          />
+        )}
+
+        <View style={styles.divider} />
+
+        {/* Overlay */}
+        <View style={heroStyles.overlayRow}>
+          <View style={heroStyles.overlayLabelRow}>
+            <SlidersHorizontal size={14} color={Colors.neonBlue} strokeWidth={2} />
+            <Text style={heroStyles.overlayLabel}>Overlay Darkness</Text>
+            <View style={[heroStyles.overlayChip, { backgroundColor: previewOverlay, borderColor: Colors.border }]}>
+              <Text style={heroStyles.overlayChipText}>{Math.round((slide.overlay_opacity ?? 0.55) * 100)}%</Text>
+            </View>
+          </View>
+          <OverlaySlider
+            value={slide.overlay_opacity ?? 0.55}
+            onChange={(v) => updateSlide(selectedIdx, { overlay_opacity: v })}
+          />
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Text */}
+        <SectionHeader icon={<Type size={16} color={Colors.neonBlue} strokeWidth={2} />} title="Text Content" />
+        <ContentField label="Badge Text" value={slide.badge_text} onChange={(v) => updateSlide(selectedIdx, { badge_text: v })} placeholder="NEW COLLECTION" />
+        <ContentField label="Title" value={slide.title} onChange={(v) => updateSlide(selectedIdx, { title: v })} placeholder="Beauty That Makes You Shine" multiline />
+        <ContentField label="Subtitle" value={slide.subtitle} onChange={(v) => updateSlide(selectedIdx, { subtitle: v })} placeholder="Premium cosmetics loved worldwide" multiline />
+
+        <View style={styles.divider} />
+
+        {/* CTA */}
+        <SectionHeader icon={<MousePointerClick size={16} color={Colors.neonBlue} strokeWidth={2} />} title="Button" />
+        <ContentField label="Button Label" value={slide.cta_text} onChange={(v) => updateSlide(selectedIdx, { cta_text: v })} placeholder="Shop Now" />
+        <ContentField label="Button URL / Path" value={slide.cta_url} onChange={(v) => updateSlide(selectedIdx, { cta_url: v })} placeholder="/(tabs)/products" hint="Use app paths like /(tabs)/products or full URLs." />
+      </View>
+    </View>
+  );
+}
+
+const slideStyles = StyleSheet.create({
+  previewWrap: { marginBottom: Spacing.lg, borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
+  previewHero: { height: 180, position: 'relative', overflow: 'hidden', backgroundColor: '#0A0507' },
+  previewContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, alignItems: 'flex-start' },
+  previewBadge: { borderWidth: 1, borderColor: 'rgba(255,77,141,0.45)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, marginBottom: 6, backgroundColor: 'rgba(255,77,141,0.08)' },
+  previewBadgeText: { color: '#FF4D8D', fontSize: 8, fontWeight: '700', letterSpacing: 2 },
+  previewTitle: { color: '#FFF', fontSize: 16, fontWeight: '900', fontStyle: 'italic', marginBottom: 4, textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
+  previewSubtitle: { color: 'rgba(255,255,255,0.72)', fontSize: 10, marginBottom: 8 },
+  previewCta: { backgroundColor: '#FF4D8D', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5 },
+  previewCtaText: { color: '#FFF', fontSize: 9, fontWeight: '900', letterSpacing: 2 },
+  slideCounter: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  slideCounterText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
+  previewDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 10, backgroundColor: Colors.backgroundCard },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.border },
+  dotActive: { width: 16, height: 6, borderRadius: 3, backgroundColor: Colors.neonBlue },
+
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg, flexWrap: 'wrap', gap: 8 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.neonBlueBorder, backgroundColor: Colors.neonBlueGlow },
+  addBtnText: { color: Colors.neonBlue, fontSize: FontSize.sm, fontWeight: '700' },
+
+  slideTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.backgroundSecondary, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  slideTabActive: { borderColor: Colors.neonBlue, backgroundColor: Colors.neonBlueGlow },
+  slideTabText: { color: Colors.textMuted, fontSize: FontSize.sm, fontWeight: '600' },
+  slideTabTextActive: { color: Colors.neonBlue },
+  hiddenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textMuted },
+
+  slideActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.lg, flexWrap: 'wrap' },
+  iconBtn: { width: 32, height: 32, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.backgroundCard, justifyContent: 'center', alignItems: 'center' },
+  iconBtnDisabled: { opacity: 0.4 },
+  toggleActiveBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.backgroundCard },
+  toggleActiveBtnOn: { borderColor: Colors.neonBlueBorder, backgroundColor: Colors.neonBlueGlow },
+  toggleActiveBtnText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '700' },
+  removeBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.error + '40', backgroundColor: Colors.errorDim },
+  removeBtnText: { color: Colors.error, fontSize: FontSize.xs, fontWeight: '700' },
 });
 
 // ─── Hero Editor Section ──────────────────────────────────────────────────────
@@ -808,10 +1205,7 @@ function ContentScreen() {
 
       {/* === HERO === */}
       {activeTab === 'hero' && (
-        <HeroEditorSection
-          language={language}
-          onSaved={() => {}}
-        />
+        <HeroSlidesEditor />
       )}
 
       {/* === FEATURED === */}
@@ -900,7 +1294,7 @@ function ContentScreen() {
         <View style={styles.phoneNotch} />
         <ScrollView style={styles.phoneScreen} showsVerticalScrollIndicator={false}>
           {activeTab === 'branding' && <BrandingPreview branding={branding} />}
-          {activeTab === 'hero' && <HeroPreview hero={hero} />}
+          {activeTab === 'hero' && <HeroPreview hero={hero} note="Edit slides in the editor panel on the left." />}
           {activeTab === 'featured' && <FeaturedPreview featured={featured} />}
           {activeTab === 'canopy' && <CanopyPreview canopy={canopy} />}
           {activeTab === 'testimonials' && <TestimonialsPreview testimonials={testimonials} />}
@@ -971,7 +1365,7 @@ function BrandingPreview({ branding }: { branding: BrandingMap }) {
   );
 }
 
-function HeroPreview({ hero }: { hero: Record<string, string> }) {
+function HeroPreview({ hero, note }: { hero: Record<string, string>; note?: string }) {
   const [imgErr, setImgErr] = useState(false);
   const imageUrl = hero.image_url || '';
   const overlay = hero.overlay_color || 'rgba(5,10,20,0.55)';
@@ -1008,6 +1402,7 @@ function HeroPreview({ hero }: { hero: Record<string, string> }) {
           ) : null}
         </View>
       </View>
+      {note && <View style={pv.body}><Text style={pv.bodyMuted}>{note}</Text></View>}
     </View>
   );
 }

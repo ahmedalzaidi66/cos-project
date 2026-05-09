@@ -29,7 +29,7 @@ import { useLayout, SectionId, SpacingBreakpoint } from '@/context/LayoutContext
 import { Colors, Radius, Spacing, FontSize } from '@/constants/theme';
 import { useAppColors, useThemeMode } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
-import HeroVideo from '@/components/HeroVideo';
+import HeroSlider, { HeroSlide } from '@/components/HeroSlider';
 import { getProductName, getProductImage } from '@/lib/supabase';
 import StarRating from '@/components/StarRating';
 import { useCart } from '@/context/CartContext';
@@ -79,6 +79,7 @@ export default function ShopScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [sectionMap, setSectionMap] = useState<SectionMap>(new Map());
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const committedLanguage = useRef(language);
@@ -154,14 +155,18 @@ export default function ShopScreen() {
   // ── Fetch everything ──────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async (fetchLang: string) => {
-    const [layoutRes, categoriesRes] = await Promise.allSettled([
+    const [layoutRes, categoriesRes, slidesRes] = await Promise.allSettled([
       supabase.from('page_layouts').select('id').eq('page', 'home').maybeSingle(),
       fetchCategories(fetchLang),
+      supabase.from('hero_slides').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
     ]);
 
     if (committedLanguage.current !== fetchLang) return;
 
     if (categoriesRes.status === 'fulfilled') setCategories(categoriesRes.value);
+    if (slidesRes.status === 'fulfilled' && slidesRes.value.data) {
+      setHeroSlides(slidesRes.value.data as HeroSlide[]);
+    }
 
     if (layoutRes.status === 'fulfilled' && layoutRes.value.data) {
       const { data: blocksData } = await supabase
@@ -209,7 +214,7 @@ export default function ShopScreen() {
 
     switch (block.type) {
       case 'hero':
-        return <HeroVideo key={block.id} heroContent={heroContent} />;
+        return <HeroSlider key={block.id} slides={heroSlides} heroContent={heroContent} />;
       case 'categories':
         return <ShopByCategorySection key={block.id} categories={categories} language={language} />;
       case 'canopy':
@@ -252,7 +257,7 @@ export default function ShopScreen() {
           ? visibleBlocks.map(block => renderBlock(block))
           : (
             <>
-              <HeroVideo heroContent={heroContent} />
+              <HeroSlider slides={heroSlides} heroContent={heroContent} />
               <ShopByCategorySection categories={categories} language={language} />
               <BeautyTryOnHero />
             </>
