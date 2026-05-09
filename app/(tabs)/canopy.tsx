@@ -343,7 +343,6 @@ export default function VirtualTryOnScreen() {
   const [selectedProduct, setSelectedProduct] = useState<TryOnProduct>(PLACEHOLDER_PRODUCT);
   const [selectedShade, setSelectedShade] = useState<ShadeOption>(PLACEHOLDER_SHADE);
   const [showOriginal, setShowOriginal] = useState(false);
-  const [intensity, setIntensity] = useState(0.5);
   const [hasRendered, setHasRendered] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [modelReady, setModelReady] = useState(isFaceLandmarkerReady());
@@ -439,7 +438,7 @@ export default function VirtualTryOnScreen() {
         imgRef.current,
         selectedProduct.category,
         selectedShade?.hex || '#CC9988',
-        intensity,
+        0.55,
         selectedProduct.finish,
       );
       if (id !== renderIdRef.current) return;
@@ -462,12 +461,12 @@ export default function VirtualTryOnScreen() {
         }
       }
     }
-  }, [selectedProduct, selectedShade, intensity, modelReady]);
+  }, [selectedProduct, selectedShade, modelReady]);
 
   useEffect(() => {
     if (!imageUri || showOriginal) return;
     doRender();
-  }, [imageUri, selectedShade, selectedProduct, intensity, showOriginal, doRender]);
+  }, [imageUri, selectedShade, selectedProduct, showOriginal, doRender]);
 
   // ── Photo controls ─────────────────────────────────────────────────────
   const handlePickImage = useCallback(() => {
@@ -900,28 +899,6 @@ export default function VirtualTryOnScreen() {
                   </Text>
                 </View>
               </View>
-
-              {!showOriginal && (
-                <View style={styles.intensityRow}>
-                  <Text style={styles.intensityLabel}>Intensity</Text>
-                  <View style={styles.intensityTrack}>
-                    {[0.25, 0.35, 0.45, 0.55, 0.65, 0.75].map((val) => (
-                      <TouchableOpacity
-                        key={val}
-                        style={[styles.intensityDot, Math.abs(intensity - val) < 0.06 && styles.intensityDotActive]}
-                        onPress={() => setIntensity(val)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[
-                          styles.intensityDotInner,
-                          { opacity: val },
-                          Math.abs(intensity - val) < 0.06 && styles.intensityDotInnerActive,
-                        ]} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
 
               {/* Overlay placement controls — shown for blush / concealer */}
               {OverlayControls}
@@ -1487,18 +1464,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,77,141,0.3)',
   },
   modeLabelText: { color: Colors.neonBlue, fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-
-  intensityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 4 },
-  intensityLabel: { color: Colors.textMuted, fontSize: 11, fontWeight: '700', width: 60 },
-  intensityTrack: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  intensityDot: {
-    width: 28, height: 28, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,77,141,0.15)',
-  },
-  intensityDotActive: { borderColor: Colors.neonBlue, borderWidth: 2 },
-  intensityDotInner: { width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.neonBlue },
-  intensityDotInnerActive: { width: 18, height: 18, borderRadius: 9 },
 
   // ── Overlay panel ──────────────────────────────────────────────────────
   overlayPanel: {
