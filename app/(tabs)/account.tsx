@@ -1324,62 +1324,41 @@ function AccountFooter() {
       {/* divider */}
       <View style={footerStyles.divider} />
 
-      {/* ── Quick links row ── */}
-      <View style={footerStyles.quickRow}>
-        <TouchableOpacity
-          style={footerStyles.quickBtn}
-          activeOpacity={0.8}
-          onPress={() => router.push('/(tabs)/about' as any)}
-        >
-          <Store size={15} color={Colors.neonBlue} strokeWidth={2} />
-          <Text style={footerStyles.quickBtnText}>Stores</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={footerStyles.quickBtn}
-          activeOpacity={0.8}
-          onPress={openWhatsApp}
-        >
-          <MessageCircle size={15} color={Colors.neonBlue} strokeWidth={2} />
-          <Text style={footerStyles.quickBtnText}>Contact Us</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* ── Social icons ── */}
-      {hasSocials ? (
-        <View style={footerStyles.socialSection}>
-          <Text style={footerStyles.sectionLabel}>FOLLOW US</Text>
-          <View style={footerStyles.socialRow}>
-            {contact.instagram ? (
-              <TouchableOpacity
-                style={footerStyles.socialBtn}
-                activeOpacity={0.8}
-                onPress={() => openUrl(contact.instagram)}
-              >
-                <Instagram size={18} color={Colors.neonBlue} strokeWidth={1.8} />
-              </TouchableOpacity>
-            ) : null}
-            {contact.tiktok ? (
-              <TouchableOpacity
-                style={footerStyles.socialBtn}
-                activeOpacity={0.8}
-                onPress={() => openUrl(contact.tiktok)}
-              >
-                <Music2 size={18} color={Colors.neonBlue} strokeWidth={1.8} />
-              </TouchableOpacity>
-            ) : null}
-            {contact.facebook ? (
-              <TouchableOpacity
-                style={footerStyles.socialBtn}
-                activeOpacity={0.8}
-                onPress={() => openUrl(contact.facebook)}
-              >
-                <Facebook size={18} color={Colors.neonBlue} strokeWidth={1.8} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+      <View style={footerStyles.socialSection}>
+        <Text style={footerStyles.sectionLabel}>FOLLOW US</Text>
+        <View style={footerStyles.socialRow}>
+          <TouchableOpacity
+            style={footerStyles.socialBtn}
+            activeOpacity={0.75}
+            onPress={() => openUrl(contact.tiktok || 'https://www.tiktok.com')}
+          >
+            <View style={footerStyles.socialGlow} />
+            <Music2 size={26} color={Colors.neonBlue} strokeWidth={1.6} />
+            <Text style={footerStyles.socialLabel}>TikTok</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={footerStyles.socialBtn}
+            activeOpacity={0.75}
+            onPress={() => openUrl(contact.instagram || 'https://www.instagram.com')}
+          >
+            <View style={footerStyles.socialGlow} />
+            <Instagram size={26} color={Colors.neonBlue} strokeWidth={1.6} />
+            <Text style={footerStyles.socialLabel}>Instagram</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={footerStyles.socialBtn}
+            activeOpacity={0.75}
+            onPress={() => openUrl(contact.facebook || 'https://www.facebook.com')}
+          >
+            <View style={footerStyles.socialGlow} />
+            <Facebook size={26} color={Colors.neonBlue} strokeWidth={1.6} />
+            <Text style={footerStyles.socialLabel}>Facebook</Text>
+          </TouchableOpacity>
         </View>
-      ) : null}
+      </View>
 
       {/* ── Customer service ── */}
       {hasPhone ? (
@@ -1412,38 +1391,15 @@ function AccountFooter() {
 const footerStyles = StyleSheet.create({
   root: {
     marginTop: Spacing.lg,
-    gap: Spacing.md,
+    gap: Spacing.lg,
   },
   divider: {
     height: 1,
     backgroundColor: Colors.border,
   },
-  quickRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  quickBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingVertical: Spacing.sm + 4,
-    paddingHorizontal: Spacing.md,
-  },
-  quickBtnText: {
-    color: Colors.textPrimary,
-    fontSize: FontSize.sm,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
   socialSection: {
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   sectionLabel: {
     color: Colors.textMuted,
@@ -1454,17 +1410,36 @@ const footerStyles = StyleSheet.create({
   },
   socialRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    justifyContent: 'center',
+    gap: Spacing.lg,
   },
   socialBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.lg,
+    width: 80,
+    height: 80,
+    borderRadius: 24,
     backgroundColor: Colors.backgroundCard,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.neonBlueBorder,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 6,
+    overflow: 'hidden',
+  },
+  socialGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.neonBlueGlow,
+    borderRadius: 24,
+  },
+  socialLabel: {
+    color: Colors.textMuted,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   serviceSection: {
     alignItems: 'center',
