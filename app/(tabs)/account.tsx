@@ -43,10 +43,16 @@ function AuthView() {
   const { t } = useLanguage();
 
   const meta = {
-    login:    { icon: <User size={34} color={Colors.neonBlue} strokeWidth={1.5} />,          title: t.welcomeBack,    subtitle: t.signInSubtitle },
-    register: { icon: <User size={34} color={Colors.neonBlue} strokeWidth={1.5} />,          title: t.createAccount,  subtitle: t.registerSubtitle },
-    phone:    { icon: <SmartphoneNfc size={34} color={Colors.neonBlue} strokeWidth={1.5} />, title: 'Phone Login',    subtitle: 'Enter your number to receive a verification code' },
+    login:    { title: t.welcomeBack,   subtitle: t.signInSubtitle },
+    register: { title: t.createAccount, subtitle: t.registerSubtitle },
+    phone:    { title: 'Phone Login',   subtitle: 'Verify with your phone number' },
   }[tab];
+
+  const TAB_ICONS: Record<AuthTab, React.ReactNode> = {
+    login:    <Lock    size={13} color={tab === 'login'    ? Colors.neonBlue : Colors.textMuted} strokeWidth={2.5} />,
+    register: <User   size={13} color={tab === 'register' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2.5} />,
+    phone:    <SmartphoneNfc size={13} color={tab === 'phone' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2.5} />,
+  };
 
   return (
     <KeyboardAvoidingView
@@ -55,47 +61,59 @@ function AuthView() {
     >
       <AppHeader title={t.account} />
       <ScrollView
-        contentContainerStyle={styles.authContent}
+        contentContainerStyle={authViewStyles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Brand header ── */}
-        <View style={styles.authHeader}>
-          <View style={authViewStyles.iconRing}>
-            {meta.icon}
+        {/* ── Brand wordmark ── */}
+        <View style={authViewStyles.brandBlock}>
+          <View style={authViewStyles.logoRing}>
+            <View style={authViewStyles.logoInner}>
+              <Text style={authViewStyles.logoLetter}>L</Text>
+            </View>
           </View>
-          <Text style={styles.authTitle}>{meta.title}</Text>
-          <Text style={styles.authSubtitle}>{meta.subtitle}</Text>
+          <Text style={authViewStyles.brandName}>LAZURDE</Text>
+          <Text style={authViewStyles.brandTagline}>Luxury Beauty & Cosmetics</Text>
         </View>
 
-        {/* ── Tab selector ── */}
-        <View style={authViewStyles.tabBar}>
-          {(['login', 'register', 'phone'] as AuthTab[]).map(t2 => {
-            const active = tab === t2;
-            const label = t2 === 'login' ? t.login : t2 === 'register' ? t.register : 'Phone';
-            return (
-              <TouchableOpacity
-                key={t2}
-                style={[authViewStyles.tabItem, active && authViewStyles.tabItemActive]}
-                onPress={() => setTab(t2)}
-                activeOpacity={0.8}
-              >
-                {t2 === 'phone' && (
-                  <SmartphoneNfc size={11} color={active ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
-                )}
-                <Text style={[authViewStyles.tabLabel, active && authViewStyles.tabLabelActive]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {/* ── Main card ── */}
+        <View style={authViewStyles.card}>
+          {/* Card header */}
+          <View style={authViewStyles.cardHeader}>
+            <Text style={authViewStyles.cardTitle}>{meta.title}</Text>
+            <Text style={authViewStyles.cardSubtitle}>{meta.subtitle}</Text>
+          </View>
 
-        {/* ── Form panel ── */}
-        <View style={authViewStyles.panel}>
-          {tab === 'login'    ? <LoginForm /> : null}
-          {tab === 'register' ? <RegisterForm onSuccess={() => setTab('login')} /> : null}
-          {tab === 'phone'    ? <PhoneLoginForm /> : null}
+          {/* Tab selector */}
+          <View style={authViewStyles.tabBar}>
+            {(['login', 'register', 'phone'] as AuthTab[]).map(t2 => {
+              const active = tab === t2;
+              const label = t2 === 'login' ? t.login : t2 === 'register' ? t.register : 'Phone';
+              return (
+                <TouchableOpacity
+                  key={t2}
+                  style={[authViewStyles.tabItem, active && authViewStyles.tabItemActive]}
+                  onPress={() => setTab(t2)}
+                  activeOpacity={0.75}
+                >
+                  {TAB_ICONS[t2]}
+                  <Text style={[authViewStyles.tabLabel, active && authViewStyles.tabLabelActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Thin divider */}
+          <View style={authViewStyles.cardDivider} />
+
+          {/* Form */}
+          <View style={authViewStyles.formArea}>
+            {tab === 'login'    ? <LoginForm /> : null}
+            {tab === 'register' ? <RegisterForm onSuccess={() => setTab('login')} /> : null}
+            {tab === 'phone'    ? <PhoneLoginForm /> : null}
+          </View>
         </View>
 
         <AccountFooter />
@@ -105,26 +123,121 @@ function AuthView() {
 }
 
 const authViewStyles = StyleSheet.create({
-  iconRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.neonBlueGlow,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 40,
+    gap: 20,
+  },
+
+  // ── Brand block ──
+  brandBlock: {
+    alignItems: 'center',
+    paddingTop: 16,
+    gap: 6,
+  },
+  logoRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     borderWidth: 1.5,
     borderColor: Colors.neonBlueBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
+    backgroundColor: 'rgba(255,77,141,0.06)',
+    shadowColor: Colors.neonBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 8,
   },
+  logoInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoLetter: {
+    color: Colors.neonBlue,
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: -1,
+  },
+  brandName: {
+    color: Colors.textPrimary,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 6,
+    textTransform: 'uppercase',
+    marginTop: 4,
+  },
+  brandTagline: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+
+  // ── Card ──
+  card: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    shadowColor: Colors.neonBlue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    gap: 6,
+  },
+  cardTitle: {
+    color: Colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  cardSubtitle: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 16,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: 0,
+  },
+  formArea: {
+    padding: 24,
+    gap: 14,
+  },
+
+  // ── Tab bar ──
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.lg,
+    backgroundColor: Colors.backgroundSecondary,
+    marginHorizontal: 24,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.border,
     padding: 4,
     gap: 3,
-    marginBottom: Spacing.md,
   },
   tabItem: {
     flex: 1,
@@ -132,38 +245,27 @@ const authViewStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 10,
-    borderRadius: Radius.md,
+    paddingVertical: 11,
+    borderRadius: 10,
   },
   tabItemActive: {
-    backgroundColor: Colors.background,
+    backgroundColor: 'rgba(255,77,141,0.14)',
     borderWidth: 1,
     borderColor: Colors.neonBlueBorder,
     shadowColor: Colors.neonBlue,
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    elevation: 4,
   },
   tabLabel: {
-    fontSize: FontSize.xs,
+    fontSize: 11,
     fontWeight: '700',
     color: Colors.textMuted,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   tabLabelActive: {
     color: Colors.neonBlue,
-  },
-  panel: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-    ...Shadow.card,
-    marginBottom: Spacing.md,
   },
 });
 
@@ -247,8 +349,8 @@ function LoginForm() {
         onPress={handleLogin}
         loading={loading}
         fullWidth
-        size="xs"
-        style={{ marginTop: 4 }}
+        size="md"
+        style={{ marginTop: 8 }}
       />
     </>
   );
@@ -389,8 +491,8 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         onPress={handleRegister}
         loading={loading}
         fullWidth
-        size="xs"
-        style={{ marginTop: 4 }}
+        size="md"
+        style={{ marginTop: 8 }}
       />
     </>
   );
@@ -620,8 +722,8 @@ function PhoneLoginForm() {
           onPress={handleRequestOtp}
           loading={loading}
           fullWidth
-          size="xs"
-          style={{ marginTop: 4 }}
+          size="md"
+          style={{ marginTop: 8 }}
         />
       </>
     );
@@ -649,8 +751,8 @@ function PhoneLoginForm() {
           onPress={handleVerifyOtp}
           loading={loading}
           fullWidth
-          size="xs"
-          style={{ marginTop: 4 }}
+          size="md"
+          style={{ marginTop: 8 }}
         />
         <TouchableOpacity
           onPress={handleResend}
@@ -719,8 +821,8 @@ function PhoneLoginForm() {
         onPress={handleSaveProfile}
         loading={saving}
         fullWidth
-        size="xs"
-        style={{ marginTop: 4 }}
+        size="md"
+        style={{ marginTop: 8 }}
       />
     </>
   );
@@ -729,134 +831,134 @@ function PhoneLoginForm() {
 const phoneStyles = StyleSheet.create({
   fieldLabel: {
     color: Colors.textSecondary,
-    fontSize: FontSize.xs,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '600',
     letterSpacing: 0.5,
-    marginBottom: 6,
-    textTransform: 'uppercase',
+    marginBottom: 8,
+    paddingLeft: 2,
   },
   phoneRow: {
     flexDirection: 'row',
-    gap: Spacing.xs,
+    gap: 10,
     alignItems: 'stretch',
   },
   ccBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.md,
-    borderWidth: 1,
+    gap: 6,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: Colors.border,
-    paddingHorizontal: Spacing.sm + 2,
-    paddingVertical: 11,
-    minWidth: 88,
+    paddingHorizontal: 14,
+    minHeight: 52,
+    minWidth: 96,
   },
   ccFlag: {
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 18,
+    lineHeight: 22,
   },
   ccCode: {
     color: Colors.textPrimary,
-    fontSize: FontSize.sm,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   localInputWrap: {
     flex: 1,
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.md,
-    borderWidth: 1,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: Colors.border,
     justifyContent: 'center',
+    minHeight: 52,
   },
   localInput: {
     color: Colors.textPrimary,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 11,
+    fontSize: 14,
+    fontWeight: '500',
+    paddingHorizontal: 16,
+    paddingVertical: 0,
   },
   // ── Picker modal ──
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
   },
   pickerSheet: {
-    backgroundColor: Colors.backgroundCard,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
+    backgroundColor: '#1A0D16',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xxl,
-    paddingHorizontal: Spacing.lg,
+    paddingTop: 24,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
     gap: 4,
   },
   pickerTitle: {
     color: Colors.textPrimary,
-    fontSize: FontSize.md,
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: Spacing.sm,
+    letterSpacing: 0.3,
+    marginBottom: 12,
     textAlign: 'center',
   },
   pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: 12,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.md,
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 12,
   },
   pickerRowActive: {
-    backgroundColor: Colors.neonBlueGlow,
+    backgroundColor: 'rgba(255,77,141,0.1)',
     borderWidth: 1,
     borderColor: Colors.neonBlueBorder,
   },
   pickerFlag: {
-    fontSize: 22,
-    lineHeight: 28,
-    width: 32,
+    fontSize: 24,
+    lineHeight: 30,
+    width: 34,
     textAlign: 'center',
   },
   pickerLabel: {
     flex: 1,
     color: Colors.textPrimary,
-    fontSize: FontSize.sm,
+    fontSize: 14,
     fontWeight: '600',
   },
   pickerCode: {
     color: Colors.textMuted,
-    fontSize: FontSize.sm,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,230,118,0.10)',
-    borderRadius: Radius.full,
+    backgroundColor: 'rgba(0,230,118,0.08)',
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(0,230,118,0.25)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   verifiedBadgeText: {
     color: Colors.success,
-    fontSize: FontSize.xs,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     letterSpacing: 0.3,
   },
   profilePrompt: {
-    color: Colors.textSecondary,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '400',
     textAlign: 'center',
-    marginBottom: 2,
   },
 });
 
@@ -955,67 +1057,75 @@ function PhoneSignupGate() {
     >
       <AppHeader title={t.account} />
       <ScrollView
-        contentContainerStyle={styles.authContent}
+        contentContainerStyle={gateStyles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Header */}
-        <View style={styles.authHeader}>
-          <View style={gateStyles.iconRing}>
-            <User size={28} color={Colors.neonBlue} strokeWidth={1.5} />
-          </View>
-          <Text style={styles.authTitle}>Complete Your Profile</Text>
-          <Text style={styles.authSubtitle}>
-            Please fill in your details to continue
-          </Text>
-        </View>
-
-        {/* Phone badge */}
-        {user?.phone ? (
-          <View style={gateStyles.phoneBadge}>
-            <SmartphoneNfc size={13} color={Colors.success} strokeWidth={2} />
-            <Text style={gateStyles.phoneBadgeText}>{user.phone}</Text>
-            <View style={gateStyles.verifiedDot} />
-          </View>
-        ) : null}
-
-        {/* Form card */}
-        <View style={gateStyles.card}>
-          {error ? <ErrorBanner message={error} /> : null}
-
-          <AuthField
-            label="Full Name"
-            value={fullName}
-            onChange={setFullName}
-            icon={<User size={13} color={Colors.textMuted} />}
-            placeholder="First Last"
-          />
-
-          <View>
-            <AuthField
-              label="Date of Birth"
-              value={dob}
-              onChange={v => setDob(formatDobInput(v))}
-              icon={<CalendarDays size={13} color={Colors.textMuted} />}
-              placeholder="DD/MM/YYYY"
-              keyboardType="number-pad"
-            />
-            <View style={gateStyles.dobHintRow}>
-              <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
-              <Text style={gateStyles.dobHintText}>
-                ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
-              </Text>
+        {/* Brand block */}
+        <View style={gateStyles.brandBlock}>
+          <View style={gateStyles.logoRing}>
+            <View style={gateStyles.logoInner}>
+              <Text style={gateStyles.logoLetter}>L</Text>
             </View>
           </View>
+          <Text style={gateStyles.brandName}>LAZURDE</Text>
+        </View>
 
-          <GlossyButton
-            title={saving ? 'Saving...' : 'Continue'}
-            onPress={handleSave}
-            loading={saving}
-            fullWidth
-            size="xs"
-            style={{ marginTop: 4 }}
-          />
+        {/* Card */}
+        <View style={gateStyles.card}>
+          <View style={gateStyles.cardHeader}>
+            <Text style={gateStyles.cardTitle}>Complete Your Profile</Text>
+            <Text style={gateStyles.cardSubtitle}>Please fill in your details to continue</Text>
+          </View>
+
+          {/* Phone badge */}
+          {user?.phone ? (
+            <View style={gateStyles.phoneBadge}>
+              <SmartphoneNfc size={13} color={Colors.success} strokeWidth={2} />
+              <Text style={gateStyles.phoneBadgeText}>{user.phone}</Text>
+              <View style={gateStyles.verifiedDot} />
+            </View>
+          ) : null}
+
+          <View style={gateStyles.cardDivider} />
+
+          <View style={gateStyles.formArea}>
+            {error ? <ErrorBanner message={error} /> : null}
+
+            <AuthField
+              label="Full Name"
+              value={fullName}
+              onChange={setFullName}
+              icon={<User size={13} color={Colors.textMuted} />}
+              placeholder="First Last"
+            />
+
+            <View>
+              <AuthField
+                label="Date of Birth"
+                value={dob}
+                onChange={v => setDob(formatDobInput(v))}
+                icon={<CalendarDays size={13} color={Colors.textMuted} />}
+                placeholder="DD/MM/YYYY"
+                keyboardType="number-pad"
+              />
+              <View style={gateStyles.dobHintRow}>
+                <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
+                <Text style={gateStyles.dobHintText}>
+                  ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
+                </Text>
+              </View>
+            </View>
+
+            <GlossyButton
+              title={saving ? 'Saving...' : 'Continue'}
+              onPress={handleSave}
+              loading={saving}
+              fullWidth
+              size="md"
+              style={{ marginTop: 8 }}
+            />
+          </View>
         </View>
 
         {/* Sign out link */}
@@ -1033,34 +1143,102 @@ function PhoneSignupGate() {
 }
 
 const gateStyles = StyleSheet.create({
-  iconRing: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.neonBlueGlow,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
+    gap: 20,
+  },
+  brandBlock: {
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 8,
+  },
+  logoRing: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 1.5,
     borderColor: Colors.neonBlueBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
+    backgroundColor: 'rgba(255,77,141,0.06)',
+    shadowColor: Colors.neonBlue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  logoInner: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoLetter: {
+    color: Colors.neonBlue,
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  brandName: {
+    color: Colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 5,
+    textTransform: 'uppercase',
+  },
+  card: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    shadowColor: Colors.neonBlue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    gap: 6,
+  },
+  cardTitle: {
+    color: Colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  cardSubtitle: {
+    color: Colors.textMuted,
+    fontSize: 12,
+    fontWeight: '400',
+    textAlign: 'center',
   },
   phoneBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: 8,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,230,118,0.10)',
-    borderRadius: Radius.full,
+    backgroundColor: 'rgba(0,230,118,0.08)',
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(0,230,118,0.25)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    marginBottom: Spacing.xs,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 4,
   },
   phoneBadgeText: {
     color: Colors.success,
-    fontSize: FontSize.sm,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     letterSpacing: 0.3,
   },
   verifiedDot: {
@@ -1069,40 +1247,40 @@ const gateStyles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: Colors.success,
   },
-  card: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-    ...Shadow.card,
+  cardDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  formArea: {
+    padding: 24,
+    gap: 14,
   },
   dobHintRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 6,
-    paddingHorizontal: 2,
+    gap: 6,
+    marginTop: 7,
+    paddingHorizontal: 4,
   },
   dobHintText: {
     color: Colors.neonBlue,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '500',
     flex: 1,
     textAlign: 'right',
+    writingDirection: 'rtl' as any,
   },
   signOutRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
+    gap: 6,
+    paddingVertical: 8,
   },
   signOutText: {
     color: Colors.textMuted,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 
@@ -1900,13 +2078,14 @@ function AuthField({
   secureTextEntry?: boolean;
   right?: React.ReactNode;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
-    <View style={styles.fieldWrapper}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.fieldRow}>
-        {icon && <View style={{ marginRight: 5 }}>{icon}</View>}
+    <View style={fieldStyles.wrapper}>
+      <Text style={fieldStyles.label}>{label}</Text>
+      <View style={[fieldStyles.row, focused && fieldStyles.rowFocused]}>
+        {icon && <View style={fieldStyles.iconWrap}>{icon}</View>}
         <TextInput
-          style={styles.fieldInput}
+          style={fieldStyles.input}
           value={value}
           onChangeText={onChange}
           keyboardType={keyboardType}
@@ -1915,28 +2094,122 @@ function AuthField({
           secureTextEntry={secureTextEntry}
           autoCapitalize="none"
           autoCorrect={false}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
         />
-        {right}
+        {right && <View style={fieldStyles.right}>{right}</View>}
       </View>
     </View>
   );
 }
 
+const fieldStyles = StyleSheet.create({
+  wrapper: {
+    gap: 7,
+  },
+  label: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    paddingLeft: 2,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'web' ? 12 : 13,
+    minHeight: 52,
+  },
+  rowFocused: {
+    borderColor: Colors.neonBlueBorder,
+    backgroundColor: 'rgba(255,77,141,0.05)',
+  },
+  iconWrap: {
+    marginRight: 10,
+    opacity: 0.8,
+  },
+  input: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '500',
+    padding: 0,
+  },
+  right: {
+    marginLeft: 8,
+    padding: 4,
+  },
+});
+
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <View style={styles.errorBanner}>
-      <Text style={styles.errorText}>{message}</Text>
+    <View style={bannerStyles.error}>
+      <View style={bannerStyles.errorDot} />
+      <Text style={bannerStyles.errorText}>{message}</Text>
     </View>
   );
 }
 
 function SuccessBanner({ message }: { message: string }) {
   return (
-    <View style={styles.successBanner}>
-      <Text style={styles.successText}>{message}</Text>
+    <View style={bannerStyles.success}>
+      <CheckCircle size={13} color="#4ade80" strokeWidth={2} />
+      <Text style={bannerStyles.successText}>{message}</Text>
     </View>
   );
 }
+
+const bannerStyles = StyleSheet.create({
+  error: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(255,68,68,0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,68,68,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  errorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.error,
+    marginTop: 4,
+    flexShrink: 0,
+  },
+  errorText: {
+    flex: 1,
+    color: '#ff8080',
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  success: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(74,222,128,0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(74,222,128,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  successText: {
+    flex: 1,
+    color: '#4ade80',
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+});
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -1968,65 +2241,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 15,
   },
-  tabRow: {
-    flexDirection: 'row',
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 3,
-  },
-  authTab: {
-    flex: 1,
-    paddingVertical: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    borderRadius: Radius.full,
-  },
-  authTabActive: {
-    backgroundColor: Colors.neonBlue,
-  },
-  authTabText: {
-    color: Colors.textMuted,
-    fontSize: FontSize.xs,
-    fontWeight: '700',
-  },
-  authTabTextActive: {
-    color: Colors.white,
-  },
   form: {
     gap: Spacing.xs,
   },
   nameRow: {
     flexDirection: 'row',
-    gap: Spacing.xs,
+    gap: 10,
   },
   phoneHint: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.sm,
+    gap: 8,
+    backgroundColor: 'rgba(255,77,141,0.06)',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
   phoneHintText: {
     color: Colors.textSecondary,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',
   },
   resendRow: {
     alignItems: 'center',
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   resendText: {
     color: Colors.neonBlue,
-    fontSize: FontSize.xs,
+    fontSize: 12,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   resendTextDim: {
     color: Colors.textMuted,
@@ -2062,14 +2308,14 @@ const styles = StyleSheet.create({
   dobHintRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 4,
-    paddingHorizontal: 2,
+    gap: 6,
+    marginTop: 7,
+    paddingHorizontal: 4,
   },
   dobHintText: {
     color: Colors.neonBlue,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '500',
     flex: 1,
     textAlign: 'right',
     writingDirection: 'rtl' as any,
@@ -2397,58 +2643,69 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // ── Form helpers ──
+  // ── Form helpers (used by EditProfileModal / ChangePasswordModal) ──
   fieldWrapper: {
-    gap: 2,
+    gap: 7,
   },
   fieldLabel: {
-    color: Colors.textMuted,
-    fontSize: 9,
-    fontWeight: '700',
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    paddingLeft: 2,
   },
   fieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundInput,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: Colors.border,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 5,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'web' ? 12 : 13,
+    minHeight: 52,
   },
   fieldInput: {
     flex: 1,
     color: Colors.textPrimary,
-    fontSize: FontSize.sm,
+    fontSize: 14,
+    fontWeight: '500',
     padding: 0,
   },
   errorBanner: {
-    backgroundColor: Colors.errorDim,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(255,68,68,0.08)',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.error,
+    borderColor: 'rgba(255,68,68,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   errorText: {
-    color: Colors.error,
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    textAlign: 'center',
+    flex: 1,
+    color: '#ff8080',
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
   },
   successBanner: {
-    backgroundColor: 'rgba(26,122,69,0.15)',
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(74,222,128,0.08)',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(26,122,69,0.5)',
+    borderColor: 'rgba(74,222,128,0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   successText: {
+    flex: 1,
     color: '#4ade80',
-    fontSize: FontSize.xs,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '500',
     lineHeight: 18,
   },
 });
