@@ -55,8 +55,16 @@ async function callEmployeeAuthFn(
   const token = getAdminToken();
   if (!token) return { error: 'Not authenticated as admin' };
 
+  const url = `${SUPABASE_URL}/functions/v1/manage-employee-auth`;
+  // Log request — omit password value for safety
+  const loggablePayload = { action, ...payload };
+  if ('password' in loggablePayload) loggablePayload.password = '[REDACTED]';
+  console.log('[callEmployeeAuthFn] REQUEST url:', url);
+  console.log('[callEmployeeAuthFn] REQUEST payload:', JSON.stringify(loggablePayload));
+  console.log('[callEmployeeAuthFn] SUPABASE_URL defined:', !!SUPABASE_URL, '| ANON_KEY defined:', !!SUPABASE_ANON_KEY, '| token defined:', !!token);
+
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-employee-auth`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,17 +73,32 @@ async function callEmployeeAuthFn(
       },
       body: JSON.stringify({ action, ...payload }),
     });
+
+    console.log('[callEmployeeAuthFn] RESPONSE status:', res.status, res.statusText);
+
     let json: any;
+    let rawText = '';
     try {
-      json = await res.json();
-    } catch {
-      // Gateway returned non-JSON (e.g. HTML error page)
-      return { error: `Server error (HTTP ${res.status}). Check edge function deployment.` };
+      rawText = await res.text();
+      console.log('[callEmployeeAuthFn] RESPONSE body (raw):', rawText);
+      json = JSON.parse(rawText);
+    } catch (parseErr) {
+      // Gateway returned non-JSON (e.g. HTML error page or empty body)
+      const msg = `HTTP ${res.status} — non-JSON response: ${rawText.slice(0, 300)}`;
+      console.error('[callEmployeeAuthFn] JSON parse failed:', parseErr, '| raw body:', rawText);
+      return { error: msg };
     }
-    if (!res.ok) return { error: json?.error ?? `Request failed (${res.status})` };
+
+    if (!res.ok) {
+      const errMsg = json?.error ?? json?.message ?? `Request failed (${res.status})`;
+      console.error('[callEmployeeAuthFn] RESPONSE error:', errMsg, '| full json:', JSON.stringify(json));
+      return { error: errMsg };
+    }
     return { data: json };
   } catch (e: any) {
-    return { error: e?.message ?? 'Network error — check your connection' };
+    // Network-level failure (DNS, CORS, no internet, etc.)
+    console.error('[callEmployeeAuthFn] FETCH THREW:', e?.name, e?.message, e?.stack);
+    return { error: `${e?.name ?? 'Error'}: ${e?.message ?? 'Network error — check your connection'}` };
   }
 }
 
