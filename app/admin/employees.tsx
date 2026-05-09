@@ -65,11 +65,17 @@ async function callEmployeeAuthFn(
       },
       body: JSON.stringify({ action, ...payload }),
     });
-    const json = await res.json();
-    if (!res.ok) return { error: json.error ?? 'Request failed' };
+    let json: any;
+    try {
+      json = await res.json();
+    } catch {
+      // Gateway returned non-JSON (e.g. HTML error page)
+      return { error: `Server error (HTTP ${res.status}). Check edge function deployment.` };
+    }
+    if (!res.ok) return { error: json?.error ?? `Request failed (${res.status})` };
     return { data: json };
   } catch (e: any) {
-    return { error: e?.message ?? 'Network error' };
+    return { error: e?.message ?? 'Network error — check your connection' };
   }
 }
 
@@ -105,7 +111,7 @@ function EmployeesScreen() {
   }, [isAdminAuthenticated]);
 
   const fetchEmployees = async () => {
-    const { data } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
+    const { data } = await adminSupabase().from('employees').select('*').order('created_at', { ascending: false });
     setEmployees(data ?? []);
     setLoading(false);
   };
