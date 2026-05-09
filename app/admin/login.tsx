@@ -33,15 +33,15 @@ export default function AdminLoginScreen() {
     }
     setError('');
     setLoading(true);
-    const success = await adminLogin(email.trim(), password);
-    console.log('[AdminLogin] adminLogin returned:', success);
+    const destination = await adminLogin(email.trim(), password);
+    console.log('[AdminLogin] adminLogin returned destination:', destination);
     setLoading(false);
-    if (success) {
-      console.log('[AdminLogin] Redirecting to /admin/dashboard');
-      router.replace('/admin/dashboard');
-    } else {
-      console.log('[AdminLogin] Login failed, showing error');
+    if (destination === null) {
       setError('Invalid email or password');
+    } else if (destination === '') {
+      setError('Your account has no admin access. Contact your administrator.');
+    } else {
+      router.replace(destination as any);
     }
   };
 

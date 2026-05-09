@@ -80,10 +80,24 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   '/admin/permissions': 'manage_permissions',
 };
 
+/** Ordered list used to pick the first permitted route after employee login. */
+export const EMPLOYEE_DEFAULT_ROUTES: { permission: string; route: string }[] = [
+  { permission: 'view_dashboard',   route: '/admin/dashboard' },
+  { permission: 'manage_products',  route: '/admin/products' },
+  { permission: 'manage_orders',    route: '/admin/orders' },
+  { permission: 'manage_customers', route: '/admin/customers' },
+  { permission: 'manage_employees', route: '/admin/employees' },
+  { permission: 'manage_reviews',   route: '/admin/reviews' },
+  { permission: 'manage_coupons',   route: '/admin/coupons' },
+  { permission: 'manage_cms',       route: '/admin/content' },
+  { permission: 'manage_settings',  route: '/admin/settings' },
+];
+
 type AdminContextType = {
   admin: AdminUser | null;
   isAdminAuthenticated: boolean;
-  adminLogin: (email: string, password: string) => Promise<boolean>;
+  /** Returns the route to redirect to on success, '' if no permitted route, null on auth failure. */
+  adminLogin: (email: string, password: string) => Promise<string | null>;
   adminLogout: () => void | Promise<void>;
   hydrated: boolean;
 };
@@ -130,7 +144,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     setHydrated(true);
   }, []);
 
-  const adminLogin = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const adminLogin = useCallback(async (email: string, password: string): Promise<string | null> => {
     const emailLower = email.trim().toLowerCase();
     console.log('[AdminContext] Login attempt:', emailLower);
 
@@ -142,7 +156,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       setAdminSessionToken('fixed-admin-token');
       storageSet(STORAGE_KEY, 'true');
       storageSet(STORAGE_USER_KEY, JSON.stringify(user));
-      return true;
+      return '/admin/dashboard';
     }
 
     // ── Path 2: Supabase Auth employee account ─────────────────────────────────
@@ -154,7 +168,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
     if (authError || !authData.user) {
       console.log('[AdminContext] Supabase Auth failed:', authError?.message);
-      return false;
+      return null;
     }
 
     // Look up the employees row linked to this auth user
@@ -167,9 +181,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
     if (empError || !empRow) {
       console.log('[AdminContext] No active employee row for auth user:', authData.user.id, empError?.message);
-      // Sign them back out — they have an auth account but no active employee record
       await supabase.auth.signOut();
-      return false;
+      return null;
     }
 
     console.log('[AdminContext] Employee found:', empRow.email, 'role:', empRow.role);
@@ -196,8 +209,13 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     setAdminSessionToken('fixed-admin-token');
     storageSet(STORAGE_KEY, 'true');
     storageSet(STORAGE_USER_KEY, JSON.stringify(user));
-    console.log('[AdminContext] Employee login successful');
-    return true;
+
+    // Pick the first route the employee is permitted to access.
+    // Returns '' (empty string) if authenticated but no permitted route exists.
+    const destination =
+      EMPLOYEE_DEFAULT_ROUTES.find((r) => permissions.includes(r.permission))?.route ?? '';
+    console.log('[AdminContext] Employee login successful, destination:', destination || '(none)');
+    return destination;
   }, []);
 
   const adminLogout = useCallback(async () => {
