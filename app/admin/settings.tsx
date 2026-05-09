@@ -321,8 +321,10 @@ const SETTING_GROUPS = [
     fields: [
       { key: 'social_instagram', label: 'Instagram URL', placeholder: 'https://instagram.com/...' },
       { key: 'social_facebook', label: 'Facebook URL', placeholder: 'https://facebook.com/...' },
+      { key: 'social_tiktok', label: 'TikTok URL', placeholder: 'https://tiktok.com/@...' },
       { key: 'social_twitter', label: 'X / Twitter URL', placeholder: 'https://x.com/...' },
       { key: 'social_youtube', label: 'YouTube URL', placeholder: 'https://youtube.com/...' },
+      { key: 'social_whatsapp', label: 'WhatsApp Number', placeholder: '+964 770 000 0000', keyboardType: 'phone-pad' as const },
     ],
   },
   {

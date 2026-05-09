@@ -9,8 +9,10 @@ import {
   KeyboardAvoidingView,
   Modal,
   TextInput,
+  Linking,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store } from 'lucide-react-native';
+import { Music2 } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
 import { supabase, Order } from '@/lib/supabase';
@@ -77,6 +79,7 @@ function AuthView() {
         </View>
 
         {tab === 'login' ? <LoginForm /> : <RegisterForm onSuccess={() => setTab('login')} />}
+        <AccountFooter />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -489,6 +492,7 @@ function ProfileView() {
           />
         </View>
 
+        <AccountFooter />
         <View style={{ height: Spacing.xxl }} />
       </ScrollView>
 
@@ -719,6 +723,242 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
     </Modal>
   );
 }
+
+// ─── Account Footer ───────────────────────────────────────────────────────────
+
+type ContactSettings = {
+  phone: string;
+  whatsapp: string;
+  instagram: string;
+  facebook: string;
+  tiktok: string;
+};
+
+function AccountFooter() {
+  const router = useRouter();
+  const [contact, setContact] = useState<ContactSettings>({
+    phone: '', whatsapp: '', instagram: '', facebook: '', tiktok: '',
+  });
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('site_settings')
+        .select('key, value')
+        .in('key', ['contact_phone', 'social_whatsapp', 'social_instagram', 'social_facebook', 'social_tiktok']);
+      if (!data) return;
+      const map: Record<string, string> = {};
+      data.forEach((row: { key: string; value: string }) => { map[row.key] = row.value; });
+      setContact({
+        phone:     map['contact_phone']    ?? '',
+        whatsapp:  map['social_whatsapp']  ?? '',
+        instagram: map['social_instagram'] ?? '',
+        facebook:  map['social_facebook']  ?? '',
+        tiktok:    map['social_tiktok']    ?? '',
+      });
+    })();
+  }, []);
+
+  function openUrl(url: string) {
+    if (!url) return;
+    const full = url.startsWith('http') ? url : `https://${url}`;
+    Linking.openURL(full).catch(() => {});
+  }
+
+  function openWhatsApp() {
+    const num = (contact.whatsapp || contact.phone).replace(/\D/g, '');
+    if (!num) return;
+    Linking.openURL(`https://wa.me/${num}`).catch(() => {});
+  }
+
+  function callPhone() {
+    if (!contact.phone) return;
+    Linking.openURL(`tel:${contact.phone}`).catch(() => {});
+  }
+
+  const hasSocials = contact.instagram || contact.facebook || contact.tiktok;
+  const hasPhone   = !!(contact.phone || contact.whatsapp);
+
+  return (
+    <View style={footerStyles.root}>
+      {/* divider */}
+      <View style={footerStyles.divider} />
+
+      {/* ── Quick links row ── */}
+      <View style={footerStyles.quickRow}>
+        <TouchableOpacity
+          style={footerStyles.quickBtn}
+          activeOpacity={0.8}
+          onPress={() => router.push('/(tabs)/about' as any)}
+        >
+          <Store size={15} color={Colors.neonBlue} strokeWidth={2} />
+          <Text style={footerStyles.quickBtnText}>Stores</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={footerStyles.quickBtn}
+          activeOpacity={0.8}
+          onPress={openWhatsApp}
+        >
+          <MessageCircle size={15} color={Colors.neonBlue} strokeWidth={2} />
+          <Text style={footerStyles.quickBtnText}>Contact Us</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Social icons ── */}
+      {hasSocials ? (
+        <View style={footerStyles.socialSection}>
+          <Text style={footerStyles.sectionLabel}>FOLLOW US</Text>
+          <View style={footerStyles.socialRow}>
+            {contact.instagram ? (
+              <TouchableOpacity
+                style={footerStyles.socialBtn}
+                activeOpacity={0.8}
+                onPress={() => openUrl(contact.instagram)}
+              >
+                <Instagram size={18} color={Colors.neonBlue} strokeWidth={1.8} />
+              </TouchableOpacity>
+            ) : null}
+            {contact.tiktok ? (
+              <TouchableOpacity
+                style={footerStyles.socialBtn}
+                activeOpacity={0.8}
+                onPress={() => openUrl(contact.tiktok)}
+              >
+                <Music2 size={18} color={Colors.neonBlue} strokeWidth={1.8} />
+              </TouchableOpacity>
+            ) : null}
+            {contact.facebook ? (
+              <TouchableOpacity
+                style={footerStyles.socialBtn}
+                activeOpacity={0.8}
+                onPress={() => openUrl(contact.facebook)}
+              >
+                <Facebook size={18} color={Colors.neonBlue} strokeWidth={1.8} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {/* ── Customer service ── */}
+      {hasPhone ? (
+        <View style={footerStyles.serviceSection}>
+          <Text style={footerStyles.sectionLabel}>CUSTOMER SERVICE</Text>
+          {contact.phone ? (
+            <TouchableOpacity
+              style={footerStyles.phoneRow}
+              activeOpacity={0.8}
+              onPress={callPhone}
+            >
+              <Phone size={13} color={Colors.textSecondary} strokeWidth={2} />
+              <Text style={footerStyles.phoneText}>{contact.phone}</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            style={footerStyles.waBtn}
+            activeOpacity={0.8}
+            onPress={openWhatsApp}
+          >
+            <MessageCircle size={14} color='#25D366' strokeWidth={2} />
+            <Text style={footerStyles.waBtnText}>WhatsApp Us</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const footerStyles = StyleSheet.create({
+  root: {
+    marginTop: Spacing.lg,
+    gap: Spacing.md,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  quickBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingVertical: Spacing.sm + 4,
+    paddingHorizontal: Spacing.md,
+  },
+  quickBtnText: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  socialSection: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  sectionLabel: {
+    color: Colors.textMuted,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  socialBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.backgroundCard,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  serviceSection: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  phoneText: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  waBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: 'rgba(37,211,102,0.1)',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(37,211,102,0.3)',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  waBtnText: {
+    color: '#25D366',
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+  },
+});
 
 // ─── Shared form helpers ──────────────────────────────────────────────────────
 
