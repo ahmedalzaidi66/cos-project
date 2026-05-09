@@ -37,6 +37,7 @@ import { useCart } from '@/context/CartContext';
 import { useCMS } from '@/context/CMSContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { fetchCategories, getCategoryName, Category } from '@/lib/supabase';
 
@@ -115,6 +116,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
   const { branding } = useCMS();
   const { language, t } = useLanguage();
   const isRTL = I18nManager.isRTL;
+  const C = useAppColors();
   const MAIN_NAV = getMainNav(t);
 
   const [productsOpen, setProductsOpen] = useState(false);
@@ -211,7 +213,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
       statusBarTranslucent
     >
       <Pressable style={overlayStyle} onPress={onClose}>
-        <Pressable style={drawerStyle} onPress={e => e.stopPropagation()}>
+        <Pressable style={[styles.drawer, isRTL && styles.drawerRTL, { backgroundColor: C.backgroundSecondary, borderRightColor: C.border, borderLeftColor: C.border }]} onPress={e => e.stopPropagation()}>
           <SafeAreaView style={styles.safeArea}>
 
             {/* ── Header ─────────────────────────────────────────────── */}
@@ -224,16 +226,16 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                 />
               ) : (
                 <View>
-                  <Text style={styles.brandName}>{branding.app_name || 'LAZURDE'}</Text>
+                  <Text style={[styles.brandName, { color: C.textPrimary }]}>{branding.app_name || 'LAZURDE'}</Text>
                   <Text style={styles.brandTagline}>{branding.app_tagline || 'MAKEUP'}</Text>
                 </View>
               )}
-              <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-                <X size={20} color={Colors.textPrimary} strokeWidth={2} />
+              <TouchableOpacity style={[styles.closeBtn, { backgroundColor: C.backgroundCard }]} onPress={onClose} activeOpacity={0.7}>
+                <X size={20} color={C.textPrimary} strokeWidth={2} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: C.border }]} />
 
             <ScrollView
               style={styles.scroll}
@@ -247,7 +249,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                   <NavRow
                     key={route}
                     label={label}
-                    icon={<Icon size={20} color={active ? Colors.neonBlue : Colors.textSecondary} strokeWidth={2} />}
+                    icon={<Icon size={20} color={active ? Colors.neonBlue : C.textSecondary} strokeWidth={2} />}
                     active={active}
                     isRTL={isRTL}
                     onPress={() => handleNav(route)}
@@ -270,13 +272,15 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                 )}
                 <ShoppingBag
                   size={20}
-                  color={(isProductsActive || productsOpen) ? Colors.neonBlue : Colors.textSecondary}
+                  color={(isProductsActive || productsOpen) ? Colors.neonBlue : C.textSecondary}
                   strokeWidth={2}
                 />
                 <Text
                   style={[
                     styles.navLabel,
+                    { color: C.textSecondary },
                     (isProductsActive || productsOpen) && styles.navLabelActive,
+                    (isProductsActive || productsOpen) && { color: C.textPrimary },
                     { flex: 1, textAlign: isRTL ? 'right' : 'left' },
                   ]}
                 >
@@ -285,7 +289,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                 <Animated.View style={{ transform: [{ rotate: chevronRotate }] }}>
                   <ChevronDown
                     size={16}
-                    color={(isProductsActive || productsOpen) ? Colors.neonBlue : Colors.textMuted}
+                    color={(isProductsActive || productsOpen) ? Colors.neonBlue : C.textMuted}
                     strokeWidth={2.5}
                   />
                 </Animated.View>
@@ -293,12 +297,13 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
 
               {/* ── Accordion body ────────────────────────────────────── */}
               <Accordion expanded={productsOpen} maxHeight={accordionMaxH}>
-                <View style={styles.accordionBody}>
+                <View style={[styles.accordionBody, { backgroundColor: C.background, borderColor: C.border }]}>
 
                   {/* All Products row */}
                   <TouchableOpacity
                     style={[
                       styles.categoryRow,
+                      { borderBottomColor: C.borderLight },
                       !selectedCategory && isProductsActive && styles.categoryRowActive,
                       isRTL && styles.categoryRowRTL,
                     ]}
@@ -307,12 +312,13 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                   >
                     <Package
                       size={16}
-                      color={!selectedCategory && isProductsActive ? Colors.neonBlue : Colors.textSecondary}
+                      color={!selectedCategory && isProductsActive ? Colors.neonBlue : C.textSecondary}
                       strokeWidth={1.8}
                     />
                     <Text
                       style={[
                         styles.categoryLabel,
+                        { color: C.textSecondary },
                         !selectedCategory && isProductsActive && styles.categoryLabelActive,
                         { flex: 1, textAlign: isRTL ? 'right' : 'left' },
                       ]}
@@ -321,7 +327,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                     </Text>
                     <ChevronRight
                       size={13}
-                      color={Colors.textMuted}
+                      color={C.textMuted}
                       strokeWidth={2}
                       style={{ transform: isRTL ? [{ scaleX: -1 }] : [] }}
                     />
@@ -336,6 +342,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                         key={cat.id}
                         style={[
                           styles.categoryRow,
+                          { borderBottomColor: C.borderLight },
                           catActive && styles.categoryRowActive,
                           isRTL && styles.categoryRowRTL,
                         ]}
@@ -345,11 +352,12 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                         <CategoryIcon
                           slug={cat.slug}
                           size={16}
-                          color={catActive ? Colors.neonBlue : Colors.textSecondary}
+                          color={catActive ? Colors.neonBlue : C.textSecondary}
                         />
                         <Text
                           style={[
                             styles.categoryLabel,
+                            { color: C.textSecondary },
                             catActive && styles.categoryLabelActive,
                             { flex: 1, textAlign: isRTL ? 'right' : 'left' },
                           ]}
@@ -375,7 +383,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                   <NavRow
                     key={route}
                     label={label}
-                    icon={<Icon size={20} color={active ? Colors.neonBlue : Colors.textSecondary} strokeWidth={2} />}
+                    icon={<Icon size={20} color={active ? Colors.neonBlue : C.textSecondary} strokeWidth={2} />}
                     active={active}
                     isRTL={isRTL}
                     onPress={() => handleNav(route)}
@@ -390,7 +398,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                   <View style={{ position: 'relative' }}>
                     <ShoppingCart
                       size={20}
-                      color={isRouteActive('/(tabs)/cart') ? Colors.neonBlue : Colors.textSecondary}
+                      color={isRouteActive('/(tabs)/cart') ? Colors.neonBlue : C.textSecondary}
                       strokeWidth={2}
                     />
                     {totalItems > 0 && (
@@ -407,7 +415,7 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                 onPress={() => handleNav('/(tabs)/cart')}
               />
 
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: C.border }]} />
 
               {/* ── Admin ─────────────────────────────────────────────── */}
               <TouchableOpacity
@@ -445,6 +453,7 @@ function NavRow({
   isRTL: boolean;
   onPress: () => void;
 }) {
+  const C = useAppColors();
   return (
     <TouchableOpacity
       style={[styles.navRow, active && styles.navRowActive, isRTL && styles.navRowRTL]}
@@ -456,7 +465,9 @@ function NavRow({
       <Text
         style={[
           styles.navLabel,
+          { color: C.textSecondary },
           active && styles.navLabelActive,
+          active && { color: C.textPrimary },
           { flex: 1, textAlign: isRTL ? 'right' : 'left' },
         ]}
       >

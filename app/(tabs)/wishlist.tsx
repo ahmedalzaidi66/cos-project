@@ -237,12 +237,13 @@ function WishlistCard({
             styles.actionBtn,
             styles.cartBtn,
             product.stock === 0 && styles.actionBtnDisabled,
+            product.stock === 0 && { backgroundColor: C.backgroundSecondary, borderColor: C.border },
           ]}
           onPress={handleCartMove}
           disabled={product.stock === 0}
           activeOpacity={0.8}
         >
-          <ShoppingCart size={16} color={product.stock === 0 ? Colors.textMuted : Colors.background} strokeWidth={2} />
+          <ShoppingCart size={16} color={product.stock === 0 ? Colors.textMuted : '#FFFFFF'} strokeWidth={2} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, styles.removeBtn]}

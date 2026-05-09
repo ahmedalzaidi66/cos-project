@@ -36,7 +36,7 @@ import WishlistHeart from '@/components/WishlistHeart';
 import VirtualTryOnModal from '@/components/VirtualTryOnModal';
 import ImageViewerModal from '@/components/ImageViewerModal';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
-import { useAppColors } from '@/context/ThemeContext';
+import { useAppColors, useThemeMode } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 
 export default function ProductDetailScreen() {
@@ -46,6 +46,7 @@ export default function ProductDetailScreen() {
   const { addToCart, items } = useCart();
   const { t, language } = useLanguage();
   const C = useAppColors();
+  const themeMode = useThemeMode();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -232,7 +233,9 @@ export default function ProductDetailScreen() {
               resizeMode="contain"
             />
             <LinearGradient
-              colors={['rgba(5,10,20,0.4)', 'transparent', 'rgba(5,10,20,0.9)']}
+              colors={themeMode === 'light'
+                ? ['rgba(255,255,255,0.1)', 'transparent', 'rgba(255,255,255,0.3)']
+                : ['rgba(5,10,20,0.4)', 'transparent', 'rgba(5,10,20,0.9)']}
               style={StyleSheet.absoluteFillObject}
             />
           </TouchableOpacity>
