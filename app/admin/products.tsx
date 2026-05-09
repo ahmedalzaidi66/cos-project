@@ -39,7 +39,7 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import Toast from '@/components/admin/Toast';
 import ImageUploader from '@/components/admin/ImageUploader';
 import ProductImageGallery from '@/components/admin/ProductImageGallery';
-import { supabase, adminSupabase, Product, Category, getProductName } from '@/lib/supabase';
+import { supabase, adminSupabase, getAdminToken, Product, Category, getProductName } from '@/lib/supabase';
 import { adminSendNotification } from '@/context/NotificationContext';
 import { extractDominantColor } from '@/lib/colorExtract';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
@@ -705,13 +705,28 @@ function WebProductsScreen() {
 
   const toggleInStock = async (productId: string, current: boolean) => {
     const next = !current;
-    const { error } = await adminSupabase().from('products').update({ in_stock: next }).eq('id', productId);
+    const token = getAdminToken();
+    console.log('[toggleInStock] admin token present:', !!token, '| productId:', productId, '| setting in_stock →', next);
+
+    const { error, count } = await adminSupabase()
+      .from('products')
+      .update({ in_stock: next }, { count: 'exact' })
+      .eq('id', productId);
+
+    console.log('[toggleInStock] result — error:', error, '| rows updated:', count);
+
     if (error) {
       showToast('Failed to update availability: ' + error.message, 'error');
-    } else {
-      setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, in_stock: next } : p));
-      showToast(next ? 'Product marked as Available' : 'Product marked as Out of Stock');
+      return;
     }
+    if (count === 0) {
+      // RLS blocked the update silently — no error but 0 rows affected
+      showToast('Update blocked: insufficient permissions or invalid session. Please re-login as admin.', 'error');
+      return;
+    }
+    // Only update UI after confirmed DB success
+    setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, in_stock: next } : p));
+    showToast(next ? 'Product marked as Available' : 'Product marked as Out of Stock');
   };
 
   const allCategories = dbCategories.length > 0
