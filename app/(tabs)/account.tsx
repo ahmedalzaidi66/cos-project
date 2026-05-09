@@ -11,7 +11,7 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake } from 'lucide-react-native';
 import { Music2 } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
@@ -453,7 +453,7 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 };
 
 function ProfileView() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const { t, language } = useLanguage();
   const { count: wishlistCount } = useWishlist();
   const { unreadCount } = useNotifications();
@@ -464,6 +464,9 @@ function ProfileView() {
   const [pwModalOpen, setPwModalOpen] = useState(false);
   const [ordersExpanded, setOrdersExpanded] = useState(false);
   const ordersChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const isPhoneUser = user?.isPhoneUser ?? false;
+  const profileIncomplete = isPhoneUser && (!user?.firstName || !user?.lastName);
 
   const fetchOrders = React.useCallback(async (email: string) => {
     setLoadingOrders(true);
@@ -541,10 +544,19 @@ function ProfileView() {
           </View>
 
           <View style={styles.heroInfo}>
-            <Text style={styles.heroName}>{user?.firstName} {user?.lastName}</Text>
+            <Text style={styles.heroName}>
+              {(user?.firstName || user?.lastName)
+                ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
+                : isPhoneUser ? 'Phone User' : ''}
+            </Text>
 
             <View style={styles.heroBadgeRow}>
-              {user?.emailVerified ? (
+              {isPhoneUser ? (
+                <View style={styles.verifiedBadge}>
+                  <SmartphoneNfc size={11} color={Colors.success} strokeWidth={2.5} />
+                  <Text style={styles.verifiedText}>Phone Verified</Text>
+                </View>
+              ) : user?.emailVerified ? (
                 <View style={styles.verifiedBadge}>
                   <CheckCircle size={11} color={Colors.success} strokeWidth={2.5} />
                   <Text style={styles.verifiedText}>Verified</Text>
@@ -559,13 +571,35 @@ function ProfileView() {
               ) : null}
             </View>
 
-            <Text style={styles.heroEmail}>{user?.email}</Text>
+            <Text style={styles.heroEmail}>
+              {isPhoneUser
+                ? (user?.phone ? user.phone : (user?.profileEmail || ''))
+                : user?.email}
+            </Text>
           </View>
 
           <TouchableOpacity onPress={logout} style={styles.logoutBtn} activeOpacity={0.8}>
             <LogOut size={16} color={Colors.error} strokeWidth={2} />
           </TouchableOpacity>
         </View>
+
+        {/* ── Profile completion nudge (phone users only) ── */}
+        {profileIncomplete && (
+          <TouchableOpacity
+            style={styles.completionCard}
+            activeOpacity={0.85}
+            onPress={() => setEditModalOpen(true)}
+          >
+            <View style={styles.completionLeft}>
+              <Pencil size={14} color={Colors.neonBlue} strokeWidth={2} />
+              <View>
+                <Text style={styles.completionTitle}>Complete your profile</Text>
+                <Text style={styles.completionSub}>Add your name, email and birthday</Text>
+              </View>
+            </View>
+            <ChevronRight size={15} color={Colors.neonBlue} strokeWidth={2} />
+          </TouchableOpacity>
+        )}
 
         {/* ── Quick actions row ── */}
         <View style={styles.quickRow}>
@@ -652,9 +686,13 @@ function ProfileView() {
       {/* ── Edit Profile Modal ── */}
       <EditProfileModal
         open={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
+        onClose={() => { setEditModalOpen(false); refreshUser(); }}
         currentFirst={user?.firstName ?? ''}
         currentLast={user?.lastName ?? ''}
+        currentProfileEmail={user?.profileEmail ?? ''}
+        currentDob={user?.dateOfBirth ?? ''}
+        userId={user?.id ?? ''}
+        isPhoneUser={isPhoneUser}
       />
 
       {/* ── Change Password Modal ── */}
@@ -748,33 +786,91 @@ function OrderCard({ order }: { order: Order }) {
 // ─── Edit Profile Modal ───────────────────────────────────────────────────────
 
 function EditProfileModal({
-  open, onClose, currentFirst, currentLast,
+  open, onClose, currentFirst, currentLast, currentProfileEmail, currentDob, userId, isPhoneUser,
 }: {
   open: boolean;
   onClose: () => void;
   currentFirst: string;
   currentLast: string;
+  currentProfileEmail: string;
+  currentDob: string;
+  userId: string;
+  isPhoneUser: boolean;
 }) {
   const [firstName, setFirstName] = useState(currentFirst);
   const [lastName, setLastName] = useState(currentLast);
+  const [profileEmail, setProfileEmail] = useState(currentProfileEmail);
+  const [dob, setDob] = useState(currentDob);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    if (open) { setFirstName(currentFirst); setLastName(currentLast); setError(''); setSuccess(''); }
-  }, [open]);
+    if (open) {
+      setFirstName(currentFirst);
+      setLastName(currentLast);
+      setProfileEmail(currentProfileEmail);
+      setDob(currentDob);
+      setError('');
+      setSuccess('');
+    }
+  }, [open, currentFirst, currentLast, currentProfileEmail, currentDob]);
+
+  // Validate date format YYYY-MM-DD or DD/MM/YYYY
+  function normaliseDob(raw: string): string {
+    const clean = raw.trim();
+    if (!clean) return '';
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+    // DD/MM/YYYY or DD-MM-YYYY
+    const m = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+    return clean;
+  }
 
   const handleSave = async () => {
-    if (!firstName.trim() || !lastName.trim()) { setError('Name fields are required.'); return; }
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('First and last name are required.');
+      return;
+    }
+    if (profileEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    const normDob = normaliseDob(dob);
+    if (normDob && !/^\d{4}-\d{2}-\d{2}$/.test(normDob)) {
+      setError('Date of birth format: DD/MM/YYYY');
+      return;
+    }
     setSaving(true);
     setError('');
-    const { error: err } = await supabase.auth.updateUser({
+
+    // Always update auth user_metadata for name (works for both user types)
+    const { error: authErr } = await supabase.auth.updateUser({
       data: { first_name: firstName.trim(), last_name: lastName.trim() },
     });
+    if (authErr) { setSaving(false); setError(authErr.message); return; }
+
+    // Upsert customer_profiles with all fields
+    if (userId) {
+      const upsertData: Record<string, any> = {
+        id: userId,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        updated_at: new Date().toISOString(),
+      };
+      if (profileEmail.trim()) upsertData.email = profileEmail.trim().toLowerCase();
+      if (normDob) upsertData.date_of_birth = normDob;
+
+      const { error: cpErr } = await supabase
+        .from('customer_profiles')
+        .upsert(upsertData, { onConflict: 'id' });
+      if (cpErr) { setSaving(false); setError(cpErr.message); return; }
+    }
+
     setSaving(false);
-    if (err) setError(err.message);
-    else { setSuccess('Profile updated.'); setTimeout(onClose, 800); }
+    setSuccess('Profile updated.');
+    setTimeout(onClose, 800);
   };
 
   return (
@@ -789,8 +885,47 @@ function EditProfileModal({
           </View>
           {error ? <ErrorBanner message={error} /> : null}
           {success ? <SuccessBanner message={success} /> : null}
-          <AuthField label="First Name" value={firstName} onChange={setFirstName} placeholder="First name" />
-          <AuthField label="Last Name" value={lastName} onChange={setLastName} placeholder="Last name" />
+
+          <AuthField
+            label="First Name"
+            value={firstName}
+            onChange={setFirstName}
+            placeholder="First name"
+          />
+          <AuthField
+            label="Last Name"
+            value={lastName}
+            onChange={setLastName}
+            placeholder="Last name"
+          />
+
+          {/* Email — optional for phone users, shown for all */}
+          <AuthField
+            label={isPhoneUser ? 'Email (optional)' : 'Email'}
+            value={profileEmail}
+            onChange={setProfileEmail}
+            icon={<Mail size={13} color={Colors.textMuted} />}
+            keyboardType="email-address"
+            placeholder="your@email.com"
+          />
+
+          {/* Date of Birth */}
+          <View style={styles.fieldWrapper}>
+            <AuthField
+              label="Date of Birth"
+              value={dob}
+              onChange={v => setDob(v)}
+              icon={<CalendarDays size={13} color={Colors.textMuted} />}
+              placeholder="DD/MM/YYYY"
+            />
+            <View style={styles.dobHintRow}>
+              <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
+              <Text style={styles.dobHintText}>
+                ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
+              </Text>
+            </View>
+          </View>
+
           <GlossyButton
             title={saving ? 'Saving...' : 'Save Changes'}
             onPress={handleSave}
@@ -1257,6 +1392,49 @@ const styles = StyleSheet.create({
   },
   resendTextDim: {
     color: Colors.textMuted,
+  },
+
+  // ── Profile completion nudge ──
+  completionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.neonBlueGlow,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+  },
+  completionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
+  },
+  completionTitle: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+  },
+  completionSub: {
+    color: Colors.textMuted,
+    fontSize: FontSize.xs,
+  },
+  dobHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  dobHintText: {
+    color: Colors.neonBlue,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+    writingDirection: 'rtl' as any,
   },
 
   // ── Profile ──

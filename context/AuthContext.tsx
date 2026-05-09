@@ -8,6 +8,13 @@ export type UserProfile = {
   lastName: string;
   emailVerified: boolean;
   createdAt: string;
+  /** Set for phone-OTP users; empty string for email-login users */
+  phone: string;
+  /** True when the user authenticated via phone OTP (synthetic internal email) */
+  isPhoneUser: boolean;
+  /** From customer_profiles — may differ from auth email for phone users */
+  profileEmail: string;
+  dateOfBirth: string;
 };
 
 type AuthContextType = {
@@ -27,36 +34,68 @@ type AuthContextType = {
   requestOtp: (phone: string) => Promise<{ success: boolean; error?: string; cooldownSeconds?: number }>;
   /** Phone OTP — verify the code and sign the user in */
   verifyOtp: (phone: string, code: string) => Promise<{ success: boolean; error?: string; attemptsLeft?: number }>;
+  /** Re-fetch the current user's profile (e.g. after saving customer_profiles) */
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function buildProfile(supabaseUser: any): UserProfile {
+const PHONE_OTP_EMAIL_SUFFIX = '@otp.lazurde.internal';
+
+function isPhoneOtpEmail(email: string): boolean {
+  return email.endsWith(PHONE_OTP_EMAIL_SUFFIX);
+}
+
+function buildProfile(supabaseUser: any, cp?: any): UserProfile {
   const meta = supabaseUser.user_metadata ?? {};
+  const authEmail = supabaseUser.email ?? '';
+  const isPhoneUser = isPhoneOtpEmail(authEmail);
+
   return {
     id: supabaseUser.id,
-    email: supabaseUser.email ?? '',
-    firstName: meta.first_name ?? '',
-    lastName: meta.last_name ?? '',
-    emailVerified: !!supabaseUser.email_confirmed_at,
+    email: isPhoneUser ? '' : authEmail,
+    firstName: cp?.first_name ?? meta.first_name ?? '',
+    lastName: cp?.last_name ?? meta.last_name ?? '',
+    emailVerified: isPhoneUser ? false : !!supabaseUser.email_confirmed_at,
     createdAt: supabaseUser.created_at ?? '',
+    phone: cp?.phone ?? meta.phone ?? '',
+    isPhoneUser,
+    profileEmail: cp?.email ?? '',
+    dateOfBirth: cp?.date_of_birth ?? '',
   };
+}
+
+async function fetchCustomerProfile(userId: string) {
+  const { data } = await supabase
+    .from('customer_profiles')
+    .select('phone, phone_verified_at, email, date_of_birth, first_name, last_name')
+    .eq('id', userId)
+    .maybeSingle();
+  return data;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const buildAndSetUser = useCallback(async (supabaseUser: any) => {
+    const cp = await fetchCustomerProfile(supabaseUser.id);
+    setUser(buildProfile(supabaseUser, cp));
+  }, []);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) setUser(buildProfile(data.session.user));
-      setLoading(false);
+      if (data.session?.user) {
+        buildAndSetUser(data.session.user).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       (async () => {
         if (session?.user) {
-          setUser(buildProfile(session.user));
+          await buildAndSetUser(session.user);
         } else {
           setUser(null);
         }
@@ -64,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [buildAndSetUser]);
 
   const login = useCallback(async (
     email: string,
@@ -75,9 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
     });
     if (error) return { success: false, error: error.message };
-    if (data.user) setUser(buildProfile(data.user));
+    if (data.user) await buildAndSetUser(data.user);
     return { success: true };
-  }, []);
+  }, [buildAndSetUser]);
 
   const register = useCallback(async (
     firstName: string,
@@ -117,6 +156,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
   }, []);
+
+  const refreshUser = useCallback(async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) await buildAndSetUser(data.user);
+  }, [buildAndSetUser]);
 
   // ── Phone OTP helpers ────────────────────────────────────────────────────────
   const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
@@ -172,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [SUPABASE_URL, SUPABASE_ANON_KEY]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, resendVerificationEmail, logout, isAuthenticated: !!user, requestOtp, verifyOtp }}>
+    <AuthContext.Provider value={{ user, loading, login, register, resendVerificationEmail, logout, isAuthenticated: !!user, requestOtp, verifyOtp, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
