@@ -916,21 +916,40 @@ export function ChatFloatingButton({ onPress, chatOpen }: { onPress: () => void;
   const { language } = useLanguage();
   const label = FAB_LABELS[language] ?? FAB_LABELS.en;
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const shown = !chatOpen;
+  // Dismissed state persists for the session only (resets on refresh/reopen)
+  const [bubbleDismissed, setBubbleDismissed] = useState(false);
+
+  const showBubble = !chatOpen && !bubbleDismissed;
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
-      toValue: shown ? 1 : 0,
-      duration: 200,
+      toValue: showBubble ? 1 : 0,
+      duration: 220,
       useNativeDriver: true,
     }).start();
-  }, [shown, fadeAnim]);
+  }, [showBubble, fadeAnim]);
+
+  const handleDismiss = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setBubbleDismissed(true));
+  };
 
   return (
     <View style={s.fabRow}>
-      {shown && (
+      {!bubbleDismissed && !chatOpen && (
         <Animated.View style={[s.fabLabel, { opacity: fadeAnim }]}>
           <Text style={s.fabLabelText} numberOfLines={1}>{label}</Text>
+          <TouchableOpacity
+            onPress={handleDismiss}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            style={s.fabLabelClose}
+          >
+            <X size={10} color="rgba(255,77,141,0.7)" strokeWidth={2.5} />
+          </TouchableOpacity>
         </Animated.View>
       )}
       <TouchableOpacity style={s.fab} onPress={onPress} activeOpacity={0.85}>
@@ -1098,10 +1117,21 @@ const s = StyleSheet.create({
     gap: 8,
   },
   fabLabel: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
     backgroundColor: 'rgba(30,30,35,0.92)', paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,77,141,0.25)', maxWidth: 180,
+    borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,77,141,0.25)', maxWidth: 200,
   },
-  fabLabelText: { color: '#FF4D8D', fontSize: 10, fontWeight: '600' as const, letterSpacing: 0.2, textAlign: 'left' as const },
+  fabLabelText: { color: '#FF4D8D', fontSize: 10, fontWeight: '600' as const, letterSpacing: 0.2, textAlign: 'left' as const, flexShrink: 1 },
+  fabLabelClose: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,77,141,0.12)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
   fab: {
     width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.neonBlue,
     justifyContent: 'center', alignItems: 'center', shadowColor: '#FF4D8D',
