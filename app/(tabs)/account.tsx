@@ -1923,7 +1923,7 @@ function AccountFooter() {
             onPress={() => openUrl(contact.tiktok || 'https://www.tiktok.com')}
           >
             <View style={footerStyles.socialGlow} />
-            <Music2 size={26} color={Colors.neonBlue} strokeWidth={1.6} />
+            <Music2 size={16} color={Colors.neonBlue} strokeWidth={1.8} />
             <Text style={footerStyles.socialLabel}>TikTok</Text>
           </TouchableOpacity>
 
@@ -1933,7 +1933,7 @@ function AccountFooter() {
             onPress={() => openUrl(contact.instagram || 'https://www.instagram.com')}
           >
             <View style={footerStyles.socialGlow} />
-            <Instagram size={26} color={Colors.neonBlue} strokeWidth={1.6} />
+            <Instagram size={16} color={Colors.neonBlue} strokeWidth={1.8} />
             <Text style={footerStyles.socialLabel}>Instagram</Text>
           </TouchableOpacity>
 
@@ -1943,7 +1943,7 @@ function AccountFooter() {
             onPress={() => openUrl(contact.facebook || 'https://www.facebook.com')}
           >
             <View style={footerStyles.socialGlow} />
-            <Facebook size={26} color={Colors.neonBlue} strokeWidth={1.6} />
+            <Facebook size={16} color={Colors.neonBlue} strokeWidth={1.8} />
             <Text style={footerStyles.socialLabel}>Facebook</Text>
           </TouchableOpacity>
         </View>
@@ -2000,18 +2000,18 @@ const footerStyles = StyleSheet.create({
   socialRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: Spacing.lg,
+    gap: Spacing.md,
   },
   socialBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: Colors.backgroundCard,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: Colors.neonBlueBorder,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     overflow: 'hidden',
   },
   socialGlow: {
@@ -2021,13 +2021,13 @@ const footerStyles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: Colors.neonBlueGlow,
-    borderRadius: 24,
+    borderRadius: 14,
   },
   socialLabel: {
     color: Colors.textMuted,
-    fontSize: 9,
+    fontSize: 7,
     fontWeight: '700',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   serviceSection: {
