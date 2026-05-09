@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Platform } from 'react-native';
-import { setAdminSessionToken } from '@/lib/supabase';
+import { setAdminSessionToken, supabase } from '@/lib/supabase';
 
 export type AdminRole = 'super_admin' | 'admin' | 'employee' | 'product_manager' | 'order_manager' | 'customer_support' | 'content_editor';
 
@@ -84,7 +84,7 @@ type AdminContextType = {
   admin: AdminUser | null;
   isAdminAuthenticated: boolean;
   adminLogin: (email: string, password: string) => Promise<boolean>;
-  adminLogout: () => void;
+  adminLogout: () => void | Promise<void>;
   hydrated: boolean;
 };
 
@@ -114,12 +114,18 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('[AdminContext] Hydrating from localStorage...');
     const stored = storageGet(STORAGE_KEY);
+    const storedUser = storageGet(STORAGE_USER_KEY);
     console.log('[AdminContext] localStorage isAdminLoggedIn =', stored);
-    if (stored === 'true') {
-      const user = buildAdminUser();
-      setAdmin(user);
-      setAdminSessionToken('fixed-admin-token');
-      console.log('[AdminContext] Restored admin session from localStorage');
+    if (stored === 'true' && storedUser) {
+      try {
+        const user: AdminUser = JSON.parse(storedUser);
+        setAdmin(user);
+        setAdminSessionToken('fixed-admin-token');
+        console.log('[AdminContext] Restored session for:', user.email, 'role:', user.role);
+      } catch {
+        storageRemove(STORAGE_KEY);
+        storageRemove(STORAGE_USER_KEY);
+      }
     }
     setHydrated(true);
   }, []);
@@ -128,28 +134,77 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     const emailLower = email.trim().toLowerCase();
     console.log('[AdminContext] Login attempt:', emailLower);
 
+    // ── Path 1: hardcoded super-admin ──────────────────────────────────────────
     if (emailLower === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      console.log('[AdminContext] Credentials match. Logging in...');
+      console.log('[AdminContext] Hardcoded super-admin match');
       const user = buildAdminUser();
       setAdmin(user);
       setAdminSessionToken('fixed-admin-token');
       storageSet(STORAGE_KEY, 'true');
       storageSet(STORAGE_USER_KEY, JSON.stringify(user));
-      console.log('[AdminContext] Login successful, localStorage saved');
       return true;
     }
 
-    console.log('[AdminContext] Invalid credentials');
-    return false;
+    // ── Path 2: Supabase Auth employee account ─────────────────────────────────
+    console.log('[AdminContext] Trying Supabase Auth sign-in...');
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: emailLower,
+      password,
+    });
+
+    if (authError || !authData.user) {
+      console.log('[AdminContext] Supabase Auth failed:', authError?.message);
+      return false;
+    }
+
+    // Look up the employees row linked to this auth user
+    const { data: empRow, error: empError } = await supabase
+      .from('employees')
+      .select('id, full_name, email, role, permissions, is_active, custom_permissions')
+      .eq('auth_user_id', authData.user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (empError || !empRow) {
+      console.log('[AdminContext] No active employee row for auth user:', authData.user.id, empError?.message);
+      // Sign them back out — they have an auth account but no active employee record
+      await supabase.auth.signOut();
+      return false;
+    }
+
+    console.log('[AdminContext] Employee found:', empRow.email, 'role:', empRow.role);
+
+    const permissions: string[] =
+      empRow.role === 'admin' || empRow.role === 'super_admin'
+        ? ALL_PERMISSIONS
+        : Array.isArray(empRow.permissions)
+        ? empRow.permissions
+        : [];
+
+    const user: AdminUser = {
+      id: empRow.id,
+      email: empRow.email,
+      name: empRow.full_name,
+      role: empRow.role as AdminRole,
+      permissions,
+    };
+
+    setAdmin(user);
+    setAdminSessionToken('fixed-admin-token');
+    storageSet(STORAGE_KEY, 'true');
+    storageSet(STORAGE_USER_KEY, JSON.stringify(user));
+    console.log('[AdminContext] Employee login successful');
+    return true;
   }, []);
 
-  const adminLogout = useCallback(() => {
+  const adminLogout = useCallback(async () => {
     console.log('[AdminContext] Logging out...');
     setAdmin(null);
     setAdminSessionToken(null);
     storageRemove(STORAGE_KEY);
     storageRemove(STORAGE_USER_KEY);
-    console.log('[AdminContext] Logged out, localStorage cleared');
+    await supabase.auth.signOut();
+    console.log('[AdminContext] Logged out');
   }, []);
 
   return (
