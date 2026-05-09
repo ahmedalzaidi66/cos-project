@@ -27,14 +27,7 @@ const PAGE_SIZE = 24;
 
 type MakeupSubcategory = 'lips' | 'face' | 'eye' | 'nail';
 
-const MAKEUP_SUBCATEGORY_LABELS: Record<MakeupSubcategory, string> = {
-  lips: 'Lips',
-  face: 'Face',
-  eye: 'Eye',
-  nail: 'Nail',
-};
-
-const MAKEUP_SUBCATEGORIES = Object.keys(MAKEUP_SUBCATEGORY_LABELS) as MakeupSubcategory[];
+const MAKEUP_SUBCATEGORIES: MakeupSubcategory[] = ['lips', 'face', 'eye', 'nail'];
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -74,9 +67,9 @@ const skStyles = StyleSheet.create({
 // ─── Product card (inline, memoized) ─────────────────────────────────────────
 
 const ProductCard = memo(function ProductCard({
-  product, cardW, language, onPress,
+  product, cardW, language, t, onPress,
 }: {
-  product: Product; cardW: number; language: string; onPress: () => void;
+  product: Product; cardW: number; language: string; t: any; onPress: () => void;
 }) {
   const { addToCart } = useCart();
   const { showCartToast } = useWishlistToast();
@@ -100,7 +93,7 @@ const ProductCard = memo(function ProductCard({
         />
         {isOOS ? (
           <View style={[styles.badge, styles.oosBadge]}>
-            <Text style={styles.badgeText}>Out of Stock</Text>
+            <Text style={styles.badgeText}>{t.outOfStock2}</Text>
           </View>
         ) : product.badge ? (
           <View style={styles.badge}>
@@ -123,9 +116,9 @@ const ProductCard = memo(function ProductCard({
               const nativeEv = e?.nativeEvent as any;
               if (nativeEv?.stopPropagation) nativeEv.stopPropagation();
               if (nativeEv?.preventDefault) nativeEv.preventDefault();
-              if (isOOS) { showCartToast('Out of stock'); return; }
+              if (isOOS) { showCartToast(t.outOfStockToast); return; }
               addToCart(product);
-              showCartToast('Added to cart');
+              showCartToast(t.addedToCartToast);
               setJustAdded(true);
               setTimeout(() => setJustAdded(false), 1000);
             }}
@@ -240,10 +233,10 @@ export default function ProductsScreen() {
   }, [loadingMore, hasMore, loading, loadPage]);
 
   const activeLabel = useMemo(() => {
-    if (!selectedCategory) return 'All Products';
+    if (!selectedCategory) return t.allProducts;
     const cat = categories.find(c => c.slug === selectedCategory);
     return cat ? getCategoryName(cat, language) : capitalize(selectedCategory);
-  }, [selectedCategory, categories, language]);
+  }, [selectedCategory, categories, language, t]);
 
   const skeletonData = useMemo(
     () => Array.from({ length: PAGE_SIZE }, (_, i) => `__sk_${i}`),
@@ -274,7 +267,7 @@ export default function ProductsScreen() {
           renderItem={({ item }) => {
             const active = item === selectedCategory;
             const cat = item === null ? null : categories.find(c => c.slug === item);
-            const label = item === null ? 'All' : (cat ? getCategoryName(cat, language) : capitalize(item ?? ''));
+            const label = item === null ? t.allLabel : (cat ? getCategoryName(cat, language) : capitalize(item ?? ''));
             return (
               <TouchableOpacity
                 style={[styles.chip, active && styles.chipActive]}
@@ -299,20 +292,28 @@ export default function ProductsScreen() {
               onPress={() => setSelectedMakeupSub(null)}
               activeOpacity={0.75}
             >
-              <Text style={[styles.subChipText, selectedMakeupSub === null && styles.subChipTextActive]}>All</Text>
+              <Text style={[styles.subChipText, selectedMakeupSub === null && styles.subChipTextActive]}>{t.allLabel}</Text>
             </TouchableOpacity>
-            {MAKEUP_SUBCATEGORIES.map(sub => (
-              <TouchableOpacity
-                key={sub}
-                style={[styles.subChip, selectedMakeupSub === sub && styles.subChipActive]}
-                onPress={() => setSelectedMakeupSub(sub)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.subChipText, selectedMakeupSub === sub && styles.subChipTextActive]}>
-                  {MAKEUP_SUBCATEGORY_LABELS[sub]}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {MAKEUP_SUBCATEGORIES.map(sub => {
+              const subLabel: Record<MakeupSubcategory, string> = {
+                lips: t.subCatLips,
+                face: t.subCatFace,
+                eye:  t.subCatEye,
+                nail: t.subCatNail,
+              };
+              return (
+                <TouchableOpacity
+                  key={sub}
+                  style={[styles.subChip, selectedMakeupSub === sub && styles.subChipActive]}
+                  onPress={() => setSelectedMakeupSub(sub)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.subChipText, selectedMakeupSub === sub && styles.subChipTextActive]}>
+                    {subLabel[sub]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         )}
       </View>
@@ -332,7 +333,7 @@ export default function ProductsScreen() {
       ) : products.length === 0 ? (
         <View style={styles.emptyWrap}>
           <ShoppingBag size={52} color={Colors.textMuted} strokeWidth={1.5} />
-          <Text style={styles.emptyText}>No products found</Text>
+          <Text style={styles.emptyText}>{t.noProductsFound2}</Text>
         </View>
       ) : (
         <FlatList
@@ -355,6 +356,7 @@ export default function ProductsScreen() {
               product={item}
               cardW={cardW}
               language={language}
+              t={t}
               onPress={() => router.push(`/product/${item.id}`)}
             />
           )}

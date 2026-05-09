@@ -122,7 +122,7 @@ export default function CheckoutScreen() {
   const { t, language } = useLanguage();
 
   const PAYMENT_METHODS = [
-    { id: 'cod',    label: 'الدفع عند الاستلام', sublabel: 'الدفع يتم عند استلام الطلب', icon: Banknote },
+    { id: 'cod',    label: t.checkoutCodLabel,   sublabel: t.checkoutCodDesc,             icon: Banknote },
     { id: 'card',   label: t.creditCard,           sublabel: null,                          icon: CreditCard },
     { id: 'paypal', label: t.paypal,               sublabel: null,                          icon: Globe },
     { id: 'apple',  label: t.applePay,             sublabel: null,                          icon: Smartphone },
@@ -475,16 +475,16 @@ export default function CheckoutScreen() {
             <Text style={styles.summaryValue}>{formatPrice(subtotal, language)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>رسوم الشحن</Text>
+            <Text style={styles.summaryLabel}>{t.checkoutShippingFee}</Text>
             <Text style={[
               styles.summaryValue,
               shippingState.status === 'free' && { color: Colors.success },
               shippingState.status === 'unavailable' && { color: Colors.error },
             ]}>
-              {shippingState.status === 'idle'     ? '—' :
-               shippingState.status === 'loading'  ? '...' :
-               shippingState.status === 'free'     ? 'الشحن مجاني' :
-               shippingState.status === 'unavailable' ? 'الشحن غير متوفر' :
+              {shippingState.status === 'idle'        ? '—' :
+               shippingState.status === 'loading'     ? '...' :
+               shippingState.status === 'free'        ? t.checkoutFreeShipping :
+               shippingState.status === 'unavailable' ? t.checkoutShippingUnavailable :
                formatPrice(shippingState.fee, language)}
             </Text>
           </View>
@@ -495,7 +495,7 @@ export default function CheckoutScreen() {
         </View>
 
         <GlossyButton
-          title={shippingState.status === 'unavailable' ? 'الشحن غير متوفر لهذه المنطقة' : t.placeOrder}
+          title={shippingState.status === 'unavailable' ? t.checkoutNoShipping : t.placeOrder}
           onPress={handlePlaceOrder}
           loading={loading}
           fullWidth
@@ -509,12 +509,13 @@ export default function CheckoutScreen() {
 }
 
 function ShippingBanner({ state, subtotal, language }: { state: ShippingState; subtotal: number; language: string }) {
+  const { t } = useLanguage();
   if (state.status === 'idle') return null;
   if (state.status === 'loading') {
     return (
       <View style={[bannerStyles.wrap, bannerStyles.neutral]}>
         <ActivityIndicator size="small" color={Colors.neonBlue} />
-        <Text style={bannerStyles.neutralText}>جاري حساب رسوم الشحن...</Text>
+        <Text style={bannerStyles.neutralText}>{t.checkoutCalcShipping}</Text>
       </View>
     );
   }
@@ -522,7 +523,7 @@ function ShippingBanner({ state, subtotal, language }: { state: ShippingState; s
     return (
       <View style={[bannerStyles.wrap, bannerStyles.error]}>
         <AlertCircle size={16} color={Colors.error} strokeWidth={2} />
-        <Text style={bannerStyles.errorText}>الشحن غير متوفر لهذه المنطقة</Text>
+        <Text style={bannerStyles.errorText}>{t.checkoutShippingError}</Text>
       </View>
     );
   }
@@ -530,7 +531,7 @@ function ShippingBanner({ state, subtotal, language }: { state: ShippingState; s
     return (
       <View style={[bannerStyles.wrap, bannerStyles.success]}>
         <Truck size={16} color={Colors.success} strokeWidth={2} />
-        <Text style={bannerStyles.successText}>الشحن مجاني لهذا الطلب</Text>
+        <Text style={bannerStyles.successText}>{t.checkoutFreeShippingMsg}</Text>
       </View>
     );
   }
@@ -538,7 +539,7 @@ function ShippingBanner({ state, subtotal, language }: { state: ShippingState; s
     <View style={[bannerStyles.wrap, bannerStyles.info]}>
       <Truck size={16} color={Colors.neonBlue} strokeWidth={2} />
       <Text style={bannerStyles.infoText}>
-        رسوم الشحن: {formatPrice(state.fee, language)}
+        {t.checkoutShippingFeeMsg}{formatPrice(state.fee, language)}
       </Text>
     </View>
   );
@@ -635,6 +636,7 @@ function LocationFields({
   onGovernorateChange: (v: string) => void;
   onAreaChange: (v: string) => void;
 }) {
+  const { t } = useLanguage();
   // Derive available countries from rules (exclude wildcard-only country entries)
   const availableCountries = React.useMemo(() => {
     const seen = new Set<string>();
@@ -675,7 +677,7 @@ function LocationFields({
     <>
       {/* Country selector */}
       <View style={styles.fieldWrapper}>
-        <Text style={styles.fieldLabel}>الدولة *</Text>
+        <Text style={styles.fieldLabel}>{t.checkoutCountryLabel}</Text>
         {availableCountries.length > 0 ? (
           <View style={locationStyles.pillRow}>
             {availableCountries.map((c) => {
@@ -698,7 +700,7 @@ function LocationFields({
               style={styles.fieldInput}
               value={country}
               onChangeText={onCountryChange}
-              placeholder="مثال: العراق"
+              placeholder={t.checkoutCountryPlaceholder}
               placeholderTextColor={Colors.textMuted}
               autoCapitalize="words"
               autoCorrect={false}
@@ -711,7 +713,7 @@ function LocationFields({
       {/* Governorate */}
       {country ? (
         <View style={styles.fieldWrapper}>
-          <Text style={styles.fieldLabel}>المحافظة *</Text>
+          <Text style={styles.fieldLabel}>{t.checkoutGovernorateLabel}</Text>
           {availableGovernorates.length > 0 ? (
             <>
               <View style={locationStyles.pillRow}>
@@ -734,7 +736,7 @@ function LocationFields({
                       style={styles.fieldInput}
                       value={governorate}
                       onChangeText={onGovernorateChange}
-                      placeholder="أو اكتب محافظتك"
+                      placeholder={t.checkoutGovernorateOrType}
                       placeholderTextColor={Colors.textMuted}
                       autoCapitalize="words"
                       autoCorrect={false}
@@ -749,7 +751,7 @@ function LocationFields({
                 style={styles.fieldInput}
                 value={governorate}
                 onChangeText={onGovernorateChange}
-                placeholder="مثال: بغداد"
+                placeholder={t.checkoutGovernoratePlaceholder}
                 placeholderTextColor={Colors.textMuted}
                 autoCapitalize="words"
                 autoCorrect={false}
@@ -763,13 +765,13 @@ function LocationFields({
       {/* Area (optional) — only show after governorate is filled */}
       {country && governorate ? (
         <View style={styles.fieldWrapper}>
-          <Text style={styles.fieldLabel}>المنطقة / الحي (اختياري)</Text>
+          <Text style={styles.fieldLabel}>{t.checkoutAreaLabel}</Text>
           <View style={styles.fieldRow}>
             <TextInput
               style={styles.fieldInput}
               value={area}
               onChangeText={onAreaChange}
-              placeholder="مثال: الكرادة"
+              placeholder={t.checkoutAreaPlaceholder}
               placeholderTextColor={Colors.textMuted}
               autoCapitalize="words"
               autoCorrect={false}
@@ -837,7 +839,7 @@ function OrderSuccessScreen({
       {isCOD ? (
         <View style={styles.codBanner}>
           <Banknote size={18} color={Colors.success} strokeWidth={2} />
-          <Text style={styles.codBannerText}>تم استلام طلبك، سنتواصل معك قريباً</Text>
+          <Text style={styles.codBannerText}>{t.checkoutCodSuccess}</Text>
         </View>
       ) : (
         <Text style={styles.successSubtitle}>{t.orderPlacedSubtitle}</Text>
@@ -848,7 +850,7 @@ function OrderSuccessScreen({
       </View>
       <View style={styles.successActions}>
         <TouchableOpacity style={styles.whatsappBtn} onPress={handleWhatsApp} activeOpacity={0.8}>
-          <Text style={styles.whatsappBtnText}>التواصل عبر واتساب</Text>
+          <Text style={styles.whatsappBtnText}>{t.checkoutWhatsappBtn}</Text>
         </TouchableOpacity>
         <GlossyButton title={t.continueShopping} onPress={onContinue} fullWidth />
       </View>

@@ -45,7 +45,7 @@ function AuthView() {
   const meta = {
     login:    { title: t.welcomeBack,   subtitle: t.signInSubtitle },
     register: { title: t.createAccount, subtitle: t.registerSubtitle },
-    phone:    { title: 'Phone Login',   subtitle: 'Verify with your phone number' },
+    phone:    { title: t.phoneTabLabel,  subtitle: t.phoneTabSubtitle },
   }[tab];
 
   const TAB_ICONS: Record<AuthTab, React.ReactNode> = {
@@ -73,7 +73,7 @@ function AuthView() {
             </View>
           </View>
           <Text style={authViewStyles.brandName}>LAZURDE</Text>
-          <Text style={authViewStyles.brandTagline}>Luxury Beauty & Cosmetics</Text>
+          <Text style={authViewStyles.brandTagline}>{t.authBrandTagline}</Text>
         </View>
 
         {/* ── Main card ── */}
@@ -88,7 +88,7 @@ function AuthView() {
           <View style={authViewStyles.tabBar}>
             {(['login', 'register', 'phone'] as AuthTab[]).map(t2 => {
               const active = tab === t2;
-              const label = t2 === 'login' ? t.login : t2 === 'register' ? t.register : 'Phone';
+              const label = t2 === 'login' ? t.login : t2 === 'register' ? t.register : t.phoneTabLabel;
               return (
                 <TouchableOpacity
                   key={t2}
@@ -378,9 +378,9 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
     if (!email.trim() || !email.includes('@')) { setError(t.validEmailRequired); return; }
     if (password.length < 6) { setError(t.passwordMinLength); return; }
     if (password !== confirm) { setError(t.passwordsNoMatch); return; }
-    if (!dob.trim()) { setError('Date of birth is required.'); return; }
+    if (!dob.trim()) { setError(t.phoneDobRequired); return; }
     const normDob = normaliseDob(dob);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) { setError('Please use DD/MM/YYYY format.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) { setError(t.phoneDobFormat); return; }
 
     setLoading(true);
     setError('');
@@ -472,7 +472,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       />
       <View>
         <AuthField
-          label="Date of Birth"
+          label={t.dobLabel ?? 'Date of Birth'}
           value={dob}
           onChange={v => setDob(formatDobInput(v))}
           icon={<CalendarDays size={13} color={Colors.textMuted} />}
@@ -481,9 +481,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         />
         <View style={styles.dobHintRow}>
           <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
-          <Text style={styles.dobHintText}>
-            ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
-          </Text>
+          <Text style={styles.dobHintText}>{t.dobHint}</Text>
         </View>
       </View>
       <GlossyButton
@@ -526,6 +524,7 @@ function CountryCodePicker({
   onSelect: (c: CountryEntry) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <View>
@@ -551,7 +550,7 @@ function CountryCodePicker({
           onPress={() => setOpen(false)}
         >
           <View style={phoneStyles.pickerSheet}>
-            <Text style={phoneStyles.pickerTitle}>Select Country</Text>
+            <Text style={phoneStyles.pickerTitle}>{t.phoneSelectCountry}</Text>
             {COUNTRY_CODES.map(c => (
               <TouchableOpacity
                 key={c.code}
@@ -581,6 +580,7 @@ type PhoneStep = 'enter_phone' | 'enter_code' | 'complete_profile';
 
 function PhoneLoginForm() {
   const { requestOtp, verifyOtp, refreshUser } = useAuth();
+  const { t } = useLanguage();
   const [country, setCountry] = useState<CountryEntry>(COUNTRY_CODES[0]);
   const [localPhone, setLocalPhone] = useState('');
   const [fullPhone, setFullPhone] = useState('');
@@ -603,7 +603,7 @@ function PhoneLoginForm() {
 
   const handleRequestOtp = async () => {
     const digits = localPhone.replace(/\D/g, '');
-    if (digits.length < 7) { setError('Please enter a valid phone number.'); return; }
+    if (digits.length < 7) { setError(t.phoneInvalidNumber); return; }
     const e164 = buildE164(country.code, localPhone);
     setLoading(true);
     setError('');
@@ -620,7 +620,7 @@ function PhoneLoginForm() {
   };
 
   const handleVerifyOtp = async () => {
-    if (code.length !== 6) { setError('Enter the 6-digit code'); return; }
+    if (code.length !== 6) { setError(t.phoneEnter6Digit); return; }
     setLoading(true);
     setError('');
     const result = await verifyOtp(fullPhone, code.trim());
@@ -659,11 +659,11 @@ function PhoneLoginForm() {
   const handleSaveProfile = async () => {
     const nameParts = fullName.trim().split(/\s+/);
     if (nameParts.length < 2 || !nameParts[0] || !nameParts[1]) {
-      setError('Please enter your full name (first and last).'); return;
+      setError(t.phoneFullNameRequired); return;
     }
-    if (!dob.trim()) { setError('Date of birth is required.'); return; }
+    if (!dob.trim()) { setError(t.phoneDobRequired); return; }
     const normDob = normaliseDob(dob);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) { setError('Please use DD/MM/YYYY format.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) { setError(t.phoneDobFormat); return; }
 
     setSaving(true);
     setError('');
@@ -701,7 +701,7 @@ function PhoneLoginForm() {
       <>
         {error ? <ErrorBanner message={error} /> : null}
         <View>
-          <Text style={phoneStyles.fieldLabel}>Phone Number</Text>
+          <Text style={phoneStyles.fieldLabel}>{t.phoneNumberLabel}</Text>
           <View style={phoneStyles.phoneRow}>
             <CountryCodePicker selected={country} onSelect={setCountry} />
             <View style={phoneStyles.localInputWrap}>
@@ -710,7 +710,7 @@ function PhoneLoginForm() {
                 value={localPhone}
                 onChangeText={v => setLocalPhone(v.replace(/[^\d\s\-]/g, ''))}
                 keyboardType="phone-pad"
-                placeholder="770 000 0000"
+                placeholder={t.phoneNumberPlaceholder}
                 placeholderTextColor={Colors.textMuted}
                 maxLength={15}
               />
@@ -718,7 +718,7 @@ function PhoneLoginForm() {
           </View>
         </View>
         <GlossyButton
-          title={loading ? 'Sending...' : 'Send Code'}
+          title={loading ? t.phoneSending : t.phoneSendCode}
           onPress={handleRequestOtp}
           loading={loading}
           fullWidth
@@ -736,18 +736,18 @@ function PhoneLoginForm() {
         {error ? <ErrorBanner message={error} /> : null}
         <View style={styles.phoneHint}>
           <SmartphoneNfc size={13} color={Colors.textSecondary} strokeWidth={2} />
-          <Text style={styles.phoneHintText}>Code sent to {fullPhone}</Text>
+          <Text style={styles.phoneHintText}>{(t.phoneCodeSentTo as string).replace('{{phone}}', fullPhone)}</Text>
         </View>
         <AuthField
-          label="Verification Code"
+          label={t.phoneVerificationCode}
           value={code}
           onChange={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
           icon={<Lock size={13} color={Colors.textMuted} />}
           keyboardType="number-pad"
-          placeholder="6-digit code"
+          placeholder={t.phone6DigitPlaceholder}
         />
         <GlossyButton
-          title={loading ? 'Verifying...' : 'Verify Code'}
+          title={loading ? t.phoneVerifying : t.phoneVerifyCode}
           onPress={handleVerifyOtp}
           loading={loading}
           fullWidth
@@ -761,7 +761,9 @@ function PhoneLoginForm() {
           activeOpacity={0.7}
         >
           <Text style={[styles.resendText, cooldown > 0 && styles.resendTextDim]}>
-            {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+            {cooldown > 0
+              ? (t.phoneResendIn as string).replace('{{n}}', String(cooldown))
+              : t.phoneResend}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -769,7 +771,7 @@ function PhoneLoginForm() {
           style={styles.resendRow}
           activeOpacity={0.7}
         >
-          <Text style={styles.resendText}>Change number</Text>
+          <Text style={styles.resendText}>{t.phoneChangeNumber}</Text>
         </TouchableOpacity>
       </>
     );
@@ -782,18 +784,18 @@ function PhoneLoginForm() {
       {/* Verified phone badge */}
       <View style={phoneStyles.verifiedBadge}>
         <CheckCircle size={13} color={Colors.success} strokeWidth={2} />
-        <Text style={phoneStyles.verifiedBadgeText}>{fullPhone} verified</Text>
+        <Text style={phoneStyles.verifiedBadgeText}>{(t.phoneVerified as string).replace('{{phone}}', fullPhone)}</Text>
       </View>
-      <Text style={phoneStyles.profilePrompt}>Complete your profile to continue</Text>
+      <Text style={phoneStyles.profilePrompt}>{t.phoneCompleteProfile}</Text>
       <AuthField
-        label="Full Name"
+        label={t.phoneFullName}
         value={fullName}
         onChange={setFullName}
         icon={<User size={13} color={Colors.textMuted} />}
-        placeholder="First Last"
+        placeholder={t.phoneFullNamePlaceholder}
       />
       <AuthField
-        label="Email (optional)"
+        label={t.phoneEmailOptional}
         value={profileEmail}
         onChange={setProfileEmail}
         icon={<Mail size={13} color={Colors.textMuted} />}
@@ -802,7 +804,7 @@ function PhoneLoginForm() {
       />
       <View>
         <AuthField
-          label="Date of Birth"
+          label={t.dobLabel ?? 'Date of Birth'}
           value={dob}
           onChange={v => setDob(formatDobInput(v))}
           icon={<CalendarDays size={13} color={Colors.textMuted} />}
@@ -811,13 +813,11 @@ function PhoneLoginForm() {
         />
         <View style={styles.dobHintRow}>
           <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
-          <Text style={styles.dobHintText}>
-            ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
-          </Text>
+          <Text style={styles.dobHintText}>{t.dobHint}</Text>
         </View>
       </View>
       <GlossyButton
-        title={saving ? 'Saving...' : 'Continue'}
+        title={saving ? t.phoneSaving : t.phoneContinue}
         onPress={handleSaveProfile}
         loading={saving}
         fullWidth
@@ -1003,16 +1003,16 @@ function PhoneSignupGate() {
   const handleSave = async () => {
     const nameParts = fullName.trim().split(/\s+/);
     if (nameParts.length < 2 || !nameParts[0] || !nameParts[1]) {
-      setError('Please enter your full name (first and last).');
+      setError(t.phoneFullNameRequired);
       return;
     }
     if (!dob.trim()) {
-      setError('Date of birth is required.');
+      setError(t.phoneDobRequired);
       return;
     }
     const normDob = normaliseDob(dob);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) {
-      setError('Please use DD/MM/YYYY format.');
+      setError(t.phoneDobFormat);
       return;
     }
 
@@ -1074,8 +1074,8 @@ function PhoneSignupGate() {
         {/* Card */}
         <View style={gateStyles.card}>
           <View style={gateStyles.cardHeader}>
-            <Text style={gateStyles.cardTitle}>Complete Your Profile</Text>
-            <Text style={gateStyles.cardSubtitle}>Please fill in your details to continue</Text>
+            <Text style={gateStyles.cardTitle}>{t.phoneCompleteProfile}</Text>
+            <Text style={gateStyles.cardSubtitle}>{t.phoneTabSubtitle}</Text>
           </View>
 
           {/* Phone badge */}
@@ -1093,16 +1093,16 @@ function PhoneSignupGate() {
             {error ? <ErrorBanner message={error} /> : null}
 
             <AuthField
-              label="Full Name"
+              label={t.phoneFullName}
               value={fullName}
               onChange={setFullName}
               icon={<User size={13} color={Colors.textMuted} />}
-              placeholder="First Last"
+              placeholder={t.phoneFullNamePlaceholder}
             />
 
             <View>
               <AuthField
-                label="Date of Birth"
+                label={t.dobLabel ?? 'Date of Birth'}
                 value={dob}
                 onChange={v => setDob(formatDobInput(v))}
                 icon={<CalendarDays size={13} color={Colors.textMuted} />}
@@ -1111,14 +1111,12 @@ function PhoneSignupGate() {
               />
               <View style={gateStyles.dobHintRow}>
                 <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
-                <Text style={gateStyles.dobHintText}>
-                  ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
-                </Text>
+                <Text style={gateStyles.dobHintText}>{t.dobHint}</Text>
               </View>
             </View>
 
             <GlossyButton
-              title={saving ? 'Saving...' : 'Continue'}
+              title={saving ? t.phoneSaving : t.phoneContinue}
               onPress={handleSave}
               loading={saving}
               fullWidth
@@ -1135,7 +1133,7 @@ function PhoneSignupGate() {
           activeOpacity={0.7}
         >
           <LogOut size={13} color={Colors.textMuted} strokeWidth={2} />
-          <Text style={gateStyles.signOutText}>Sign out</Text>
+          <Text style={gateStyles.signOutText}>{t.signOut}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -1406,20 +1404,20 @@ function ProfileView() {
               {isPhoneUser ? (
                 <View style={styles.verifiedBadge}>
                   <SmartphoneNfc size={11} color={Colors.success} strokeWidth={2.5} />
-                  <Text style={styles.verifiedText}>Phone Verified</Text>
+                  <Text style={styles.verifiedText}>{t.phoneVerifiedBadge}</Text>
                 </View>
               ) : user?.emailVerified ? (
                 <View style={styles.verifiedBadge}>
                   <CheckCircle size={11} color={Colors.success} strokeWidth={2.5} />
-                  <Text style={styles.verifiedText}>Verified</Text>
+                  <Text style={styles.verifiedText}>{t.verifiedBadge}</Text>
                 </View>
               ) : (
                 <View style={styles.unverifiedBadge}>
-                  <Text style={styles.unverifiedText}>Unverified</Text>
+                  <Text style={styles.unverifiedText}>{t.unverifiedBadge}</Text>
                 </View>
               )}
               {memberSince ? (
-                <Text style={styles.memberSince}>Member since {memberSince}</Text>
+                <Text style={styles.memberSince}>{t.memberSince} {memberSince}</Text>
               ) : null}
             </View>
 
@@ -1445,8 +1443,8 @@ function ProfileView() {
             <View style={styles.completionLeft}>
               <Pencil size={14} color={Colors.neonBlue} strokeWidth={2} />
               <View>
-                <Text style={styles.completionTitle}>Complete your profile</Text>
-                <Text style={styles.completionSub}>Add your name, email and birthday</Text>
+                <Text style={styles.completionTitle}>{t.completeProfileTitle}</Text>
+                <Text style={styles.completionSub}>{t.completeProfileSub}</Text>
               </View>
             </View>
             <ChevronRight size={15} color={Colors.neonBlue} strokeWidth={2} />
@@ -1469,13 +1467,13 @@ function ProfileView() {
           />
           <QuickTile
             icon={<Bell size={18} color={Colors.warning} strokeWidth={1.8} />}
-            label="Alerts"
+            label={t.alertsLabel}
             badge={unreadCount > 0 ? String(unreadCount) : undefined}
             onPress={() => router.push('/(tabs)/notifications' as any)}
           />
           <QuickTile
             icon={<CreditCard size={18} color={Colors.gold} strokeWidth={1.8} />}
-            label="Payment"
+            label={t.paymentLabel}
             onPress={() => {}}
           />
         </View>
@@ -1519,13 +1517,13 @@ function ProfileView() {
           <View style={styles.divider} />
           <MenuRow
             icon={<KeyRound size={16} color={Colors.textSecondary} strokeWidth={2} />}
-            label="Change Password"
+            label={t.changePassword}
             onPress={() => setPwModalOpen(true)}
           />
           <View style={styles.divider} />
           <MenuRow
             icon={<LogOut size={16} color={Colors.error} strokeWidth={2} />}
-            label="Sign Out"
+            label={t.signOut}
             labelColor={Colors.error}
             onPress={logout}
           />
@@ -1649,6 +1647,7 @@ function EditProfileModal({
   userId: string;
   isPhoneUser: boolean;
 }) {
+  const { t } = useLanguage();
   const [firstName, setFirstName] = useState(currentFirst);
   const [lastName, setLastName] = useState(currentLast);
   const [profileEmail, setProfileEmail] = useState(currentProfileEmail);
@@ -1670,16 +1669,16 @@ function EditProfileModal({
 
   const handleSave = async () => {
     if (!firstName.trim() || !lastName.trim()) {
-      setError('First and last name are required.');
+      setError(t.firstLastNameRequired);
       return;
     }
     if (profileEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim())) {
-      setError('Please enter a valid email address.');
+      setError(t.validEmailAddress);
       return;
     }
     const normDob = normaliseDob(dob);
     if (normDob && !/^\d{4}-\d{2}-\d{2}$/.test(normDob)) {
-      setError('Date of birth format: DD/MM/YYYY');
+      setError(t.dobFormatHint);
       return;
     }
     setSaving(true);
@@ -1709,7 +1708,7 @@ function EditProfileModal({
     }
 
     setSaving(false);
-    setSuccess('Profile updated.');
+    setSuccess(t.profileUpdated);
     setTimeout(onClose, 800);
   };
 
@@ -1718,7 +1717,7 @@ function EditProfileModal({
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <Text style={styles.modalTitle}>{t.editProfileTitle}</Text>
             <TouchableOpacity onPress={onClose} style={styles.modalClose}>
               <X size={18} color={Colors.textMuted} strokeWidth={2} />
             </TouchableOpacity>
@@ -1727,21 +1726,21 @@ function EditProfileModal({
           {success ? <SuccessBanner message={success} /> : null}
 
           <AuthField
-            label="First Name"
+            label={t.firstName}
             value={firstName}
             onChange={setFirstName}
-            placeholder="First name"
+            placeholder={t.firstName}
           />
           <AuthField
-            label="Last Name"
+            label={t.lastName}
             value={lastName}
             onChange={setLastName}
-            placeholder="Last name"
+            placeholder={t.lastName}
           />
 
           {/* Email — optional for phone users, shown for all */}
           <AuthField
-            label={isPhoneUser ? 'Email (optional)' : 'Email'}
+            label={isPhoneUser ? t.phoneEmailOptional : t.emailLabel}
             value={profileEmail}
             onChange={setProfileEmail}
             icon={<Mail size={13} color={Colors.textMuted} />}
@@ -1752,7 +1751,7 @@ function EditProfileModal({
           {/* Date of Birth */}
           <View style={styles.fieldWrapper}>
             <AuthField
-              label="Date of Birth"
+              label={t.dobLabel}
               value={dob}
               onChange={v => setDob(formatDobInput(v))}
               icon={<CalendarDays size={13} color={Colors.textMuted} />}
@@ -1761,14 +1760,12 @@ function EditProfileModal({
             />
             <View style={styles.dobHintRow}>
               <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
-              <Text style={styles.dobHintText}>
-                ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
-              </Text>
+              <Text style={styles.dobHintText}>{t.dobHint}</Text>
             </View>
           </View>
 
           <GlossyButton
-            title={saving ? 'Saving...' : 'Save Changes'}
+            title={saving ? t.phoneSaving : t.saveChangesBtn}
             onPress={handleSave}
             loading={saving}
             fullWidth
@@ -1784,6 +1781,7 @@ function EditProfileModal({
 // ─── Change Password Modal ────────────────────────────────────────────────────
 
 function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useLanguage();
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -1796,14 +1794,14 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   }, [open]);
 
   const handleSave = async () => {
-    if (newPw.length < 6) { setError('Password must be at least 6 characters.'); return; }
-    if (newPw !== confirmPw) { setError('Passwords do not match.'); return; }
+    if (newPw.length < 6) { setError(t.passwordMinLength); return; }
+    if (newPw !== confirmPw) { setError(t.passwordsNoMatch); return; }
     setSaving(true);
     setError('');
     const { error: err } = await supabase.auth.updateUser({ password: newPw });
     setSaving(false);
     if (err) setError(err.message);
-    else { setSuccess('Password updated successfully.'); setTimeout(onClose, 900); }
+    else { setSuccess(t.passwordUpdated); setTimeout(onClose, 900); }
   };
 
   return (
@@ -1811,7 +1809,7 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Change Password</Text>
+            <Text style={styles.modalTitle}>{t.changePassword}</Text>
             <TouchableOpacity onPress={onClose} style={styles.modalClose}>
               <X size={18} color={Colors.textMuted} strokeWidth={2} />
             </TouchableOpacity>
@@ -1819,12 +1817,12 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
           {error ? <ErrorBanner message={error} /> : null}
           {success ? <SuccessBanner message={success} /> : null}
           <AuthField
-            label="New Password"
+            label={t.newPasswordLabel}
             value={newPw}
             onChange={setNewPw}
             icon={<Lock size={13} color={Colors.textMuted} />}
             secureTextEntry={!showPw}
-            placeholder="Min 6 characters"
+            placeholder={t.minCharsPlaceholder}
             right={
               <TouchableOpacity onPress={() => setShowPw(p => !p)}>
                 {showPw ? <EyeOff size={13} color={Colors.textMuted} /> : <Eye size={13} color={Colors.textMuted} />}
@@ -1832,15 +1830,15 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
             }
           />
           <AuthField
-            label="Confirm Password"
+            label={t.confirmPasswordLabel}
             value={confirmPw}
             onChange={setConfirmPw}
             icon={<Lock size={13} color={Colors.textMuted} />}
             secureTextEntry={!showPw}
-            placeholder="Repeat password"
+            placeholder={t.repeatPasswordPlaceholder}
           />
           <GlossyButton
-            title={saving ? 'Saving...' : 'Update Password'}
+            title={saving ? t.phoneSaving : t.updatePasswordBtn}
             onPress={handleSave}
             loading={saving}
             fullWidth
@@ -1865,6 +1863,7 @@ type ContactSettings = {
 
 function AccountFooter() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [contact, setContact] = useState<ContactSettings>({
     phone: '', whatsapp: '', instagram: '', facebook: '', tiktok: '',
   });
@@ -1915,7 +1914,7 @@ function AccountFooter() {
 
       {/* ── Social icons ── */}
       <View style={footerStyles.socialSection}>
-        <Text style={footerStyles.sectionLabel}>FOLLOW US</Text>
+        <Text style={footerStyles.sectionLabel}>{t.followUs.toUpperCase()}</Text>
         <View style={footerStyles.socialRow}>
           <TouchableOpacity
             style={footerStyles.socialBtn}
@@ -1952,7 +1951,7 @@ function AccountFooter() {
       {/* ── Customer service ── */}
       {hasPhone ? (
         <View style={footerStyles.serviceSection}>
-          <Text style={footerStyles.sectionLabel}>CUSTOMER SERVICE</Text>
+          <Text style={footerStyles.sectionLabel}>{t.customerService.toUpperCase()}</Text>
           {contact.phone ? (
             <TouchableOpacity
               style={footerStyles.phoneRow}
@@ -1969,7 +1968,7 @@ function AccountFooter() {
             onPress={openWhatsApp}
           >
             <MessageCircle size={14} color='#25D366' strokeWidth={2} />
-            <Text style={footerStyles.waBtnText}>WhatsApp Us</Text>
+            <Text style={footerStyles.waBtnText}>{t.whatsappUs}</Text>
           </TouchableOpacity>
         </View>
       ) : null}

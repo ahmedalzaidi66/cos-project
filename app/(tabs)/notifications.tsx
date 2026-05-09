@@ -22,49 +22,57 @@ import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
 // ─── Type metadata ────────────────────────────────────────────────────────────
 
-const BROADCAST_META: Record<NotificationType, { icon: React.ComponentType<any>; color: string; label: string }> = {
-  offer:       { icon: Tag,         color: Colors.gold,          label: 'Offer' },
-  new_product: { icon: Package,     color: Colors.neonBlue,      label: 'New Product' },
-  custom:      { icon: Sparkles,    color: Colors.textSecondary, label: 'Update' },
-};
+function getBroadcastMeta(t: any): Record<NotificationType, { icon: React.ComponentType<any>; color: string; label: string }> {
+  return {
+    offer:       { icon: Tag,      color: Colors.gold,          label: t.notifTypeOffer },
+    new_product: { icon: Package,  color: Colors.neonBlue,      label: t.notifTypeNewProduct },
+    custom:      { icon: Sparkles, color: Colors.textSecondary, label: t.notifTypeUpdate },
+  };
+}
 
-const ORDER_META: Record<OrderNotificationType, { icon: React.ComponentType<any>; color: string; label: string }> = {
-  order_placed:    { icon: ShoppingBag,  color: Colors.neonBlue,  label: 'Order Placed' },
-  order_confirmed: { icon: ClipboardList,color: '#4ADE80',        label: 'Confirmed' },
-  order_preparing: { icon: Package,      color: Colors.warning,   label: 'Preparing' },
-  order_shipped:   { icon: Truck,        color: '#7C83FF',        label: 'Shipped' },
-  order_delivered: { icon: CheckCircle,  color: Colors.success,   label: 'Delivered' },
-  order_cancelled: { icon: XCircle,      color: Colors.error,     label: 'Cancelled' },
-};
+function getOrderMeta(t: any): Record<OrderNotificationType, { icon: React.ComponentType<any>; color: string; label: string }> {
+  return {
+    order_placed:    { icon: ShoppingBag,   color: Colors.neonBlue, label: t.notifTypeOrderPlaced },
+    order_confirmed: { icon: ClipboardList, color: '#4ADE80',       label: t.notifTypeConfirmed },
+    order_preparing: { icon: Package,       color: Colors.warning,  label: t.notifTypePreparing },
+    order_shipped:   { icon: Truck,         color: '#7C83FF',       label: t.notifTypeShipped },
+    order_delivered: { icon: CheckCircle,   color: Colors.success,  label: t.notifTypeDelivered },
+    order_cancelled: { icon: XCircle,       color: Colors.error,    label: t.notifTypeCancelled },
+  };
+}
 
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, t: any): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t.notifJustNow;
+  if (mins < 60) return (t.notifMinAgo as string).replace('{{n}}', String(mins));
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return (t.notifHourAgo as string).replace('{{n}}', String(hrs));
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return (t.notifDayAgo as string).replace('{{n}}', String(days));
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // ─── Inbox item renderer ──────────────────────────────────────────────────────
 
 function NotificationItem({ item, onPress }: { item: InboxItem; onPress: (item: InboxItem) => void }) {
+  const { t } = useLanguage();
   const isOrder = item.source === 'order';
   const isUnread = isOrder ? !item.is_read : !item.isRead;
+
+  const broadcastMeta = getBroadcastMeta(t);
+  const orderMeta = getOrderMeta(t);
 
   let meta: { icon: React.ComponentType<any>; color: string; label: string };
   let title: string;
   let message: string;
 
   if (isOrder) {
-    meta = ORDER_META[item.type as OrderNotificationType] ?? ORDER_META.order_placed;
+    meta = orderMeta[item.type as OrderNotificationType] ?? orderMeta.order_placed;
     title = item.title;
     message = item.body;
   } else {
-    meta = BROADCAST_META[item.type as NotificationType] ?? BROADCAST_META.custom;
+    meta = broadcastMeta[item.type as NotificationType] ?? broadcastMeta.custom;
     title = item.title;
     message = item.message;
   }
@@ -86,7 +94,7 @@ function NotificationItem({ item, onPress }: { item: InboxItem; onPress: (item: 
           <Text style={[styles.itemTitle, isUnread && styles.itemTitleUnread]} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={styles.itemTime}>{timeAgo(item.created_at)}</Text>
+          <Text style={styles.itemTime}>{timeAgo(item.created_at, t)}</Text>
         </View>
         <Text style={styles.itemMessage} numberOfLines={2}>{message}</Text>
         <View style={[styles.typeBadge, { borderColor: meta.color + '50' }]}>
@@ -98,25 +106,27 @@ function NotificationItem({ item, onPress }: { item: InboxItem; onPress: (item: 
 }
 
 function EmptyInbox() {
+  const { t } = useLanguage();
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIconWrap}>
         <Bell size={40} color={Colors.textMuted} strokeWidth={1.5} />
       </View>
-      <Text style={styles.emptyTitle}>All caught up</Text>
-      <Text style={styles.emptySubtitle}>Order updates and offers will appear here</Text>
+      <Text style={styles.emptyTitle}>{t.notifAllCaughtUp}</Text>
+      <Text style={styles.emptySubtitle}>{t.notifEmptySubtitle}</Text>
     </View>
   );
 }
 
 function GuestView() {
+  const { t } = useLanguage();
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIconWrap}>
         <Bell size={40} color={Colors.textMuted} strokeWidth={1.5} />
       </View>
-      <Text style={styles.emptyTitle}>Sign in to see notifications</Text>
-      <Text style={styles.emptySubtitle}>Create an account to receive order updates and offers</Text>
+      <Text style={styles.emptyTitle}>{t.notifSignIn}</Text>
+      <Text style={styles.emptySubtitle}>{t.notifSignInSubtitle}</Text>
     </View>
   );
 }
@@ -126,6 +136,7 @@ function GuestView() {
 export default function NotificationsScreen() {
   const { inboxItems, unreadCount, loading, markAsRead, markAllRead, refresh } = useNotifications();
   const { isAuthenticated } = useAuth();
+  const { t } = useLanguage();
 
   const handlePress = useCallback((item: InboxItem) => {
     markAsRead(item);
@@ -133,14 +144,14 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Notifications" />
+      <AppHeader title={t.notifTitle} />
 
       {isAuthenticated && unreadCount > 0 && (
         <View style={styles.topBar}>
-          <Text style={styles.unreadLabel}>{unreadCount} unread</Text>
+          <Text style={styles.unreadLabel}>{(t.notifUnread as string).replace('{{n}}', String(unreadCount))}</Text>
           <TouchableOpacity onPress={markAllRead} style={styles.markAllBtn} activeOpacity={0.7}>
             <CheckCheck size={14} color={Colors.neonBlue} strokeWidth={2} />
-            <Text style={styles.markAllText}>Mark all read</Text>
+            <Text style={styles.markAllText}>{t.notifMarkAllRead}</Text>
           </TouchableOpacity>
         </View>
       )}

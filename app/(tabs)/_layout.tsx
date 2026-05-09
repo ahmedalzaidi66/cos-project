@@ -24,7 +24,7 @@ type TabDef = {
   isCenter?: boolean;
 };
 
-function getTabs(t: { navHome: string; navShop: string; navSaved: string; navAccount: string }): TabDef[] {
+function getTabs(t: { navHome: string; navShop: string; navSaved: string; navAccount: string; navMatch: string; navAlerts: string }): TabDef[] {
   return [
     {
       name: 'index',
@@ -45,13 +45,13 @@ function getTabs(t: { navHome: string; navShop: string; navSaved: string; navAcc
     {
       name: 'canopy',
       route: '/(tabs)/canopy',
-      label: 'Match',
+      label: t.navMatch,
       isCenter: true,
     },
     {
       name: 'notifications',
       route: '/(tabs)/notifications',
-      label: 'Alerts',
+      label: t.navAlerts,
       icon: (active) => (
         <Bell size={18} color={active ? '#FF4D8D' : '#804060'} strokeWidth={active ? 2.5 : 1.8} />
       ),
@@ -131,7 +131,7 @@ function TabItem({
 
 // ─── Center Match Filter button ──────────────────────────────────────────────
 
-function CenterTabItem({ active, onPress }: { active: boolean; onPress: () => void }) {
+function CenterTabItem({ active, onPress, label }: { active: boolean; onPress: () => void; label: string }) {
   const scale = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(active ? 1 : 0.4)).current;
 
@@ -187,7 +187,7 @@ function CenterTabItem({ active, onPress }: { active: boolean; onPress: () => vo
         />
       </Animated.View>
       <Text style={[styles.centerLabel, active && styles.centerLabelActive]}>
-        MATCH
+        {label.toUpperCase()}
       </Text>
     </Pressable>
   );
@@ -235,6 +235,7 @@ function CustomTabBar() {
                 key={tab.name}
                 active={active}
                 onPress={() => navigate(tab)}
+                label={tab.label}
               />
             );
           }

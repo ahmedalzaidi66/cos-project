@@ -280,23 +280,21 @@ function getCategoryColor(slug: string): string {
 
 function ShopByCategorySection({ categories, language }: { categories: Category[]; language: string }) {
   const router = useRouter();
-  const isRTL = language === 'ar';
-  const title = language === 'ar' ? 'تسوقي حسب القسم' : 'Shop by Category';
+  const { t } = useLanguage();
+  const isRTL = language === 'ar' || language === 'ckb';
 
   if (categories.length === 0) return null;
 
   return (
     <View style={catStyles.section}>
       <View style={[catStyles.headerRow, isRTL && catStyles.headerRowRTL]}>
-        <Text style={catStyles.title}>{title}</Text>
+        <Text style={catStyles.title}>{t.shopByCategory}</Text>
         <TouchableOpacity
           style={catStyles.viewAllBtn}
           activeOpacity={0.7}
           onPress={() => router.push('/(tabs)/products' as any)}
         >
-          <Text style={catStyles.viewAllText}>
-            {language === 'ar' ? 'عرض الكل' : 'View all'}
-          </Text>
+          <Text style={catStyles.viewAllText}>{t.viewAll}</Text>
           <ChevronRight size={13} color={Colors.neonBlue} strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
@@ -361,6 +359,7 @@ const FLOATING_SHADES = [
 
 function BeautyTryOnHero() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
   const faceSize = isWide ? 136 : Math.min(width * 0.15, 58);
@@ -394,17 +393,17 @@ function BeautyTryOnHero() {
       <View style={[tryOnStyles.content, isWide && { paddingTop: 20, paddingBottom: 24, gap: 12 }]}>
         <View style={[tryOnStyles.badge, isWide && { paddingHorizontal: 10, paddingVertical: 4 }]}>
           <Sparkles size={isWide ? 9 : 6} color={Colors.neonBlue} strokeWidth={2.5} />
-          <Text style={[tryOnStyles.badgeText, isWide && { fontSize: 8 }]}>AI-POWERED</Text>
+          <Text style={[tryOnStyles.badgeText, isWide && { fontSize: 8 }]}>{t.tryOnBadge}</Text>
         </View>
 
         <Text style={[tryOnStyles.title, isWide && { fontSize: 24, lineHeight: 30 }]}>
-          Discover Your{'\n'}
-          <Text style={tryOnStyles.titleAccent}>Perfect Shade</Text>
+          {t.tryOnTitle}{'\n'}
+          <Text style={tryOnStyles.titleAccent}>{t.tryOnTitleAccent}</Text>
         </Text>
 
         {isWide && (
           <Text style={[tryOnStyles.subtitle, { fontSize: 11, lineHeight: 16 }]}>
-            See how makeup looks on you in seconds{'\n'}using AI face detection
+            {t.tryOnSubtitle}
           </Text>
         )}
 
@@ -414,7 +413,7 @@ function BeautyTryOnHero() {
               {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
               <Image source={require('../../assets/images/canopy/canopy-before.png')} style={tryOnStyles.faceImage} resizeMode="cover" />
               <View style={tryOnStyles.faceLabel}>
-                <Text style={tryOnStyles.faceLabelText}>BEFORE</Text>
+                <Text style={tryOnStyles.faceLabelText}>{t.tryOnBefore}</Text>
               </View>
             </View>
           </View>
@@ -429,7 +428,7 @@ function BeautyTryOnHero() {
               <Image source={require('../../assets/images/canopy/canopy-after.png')} style={tryOnStyles.faceImage} resizeMode="cover" />
               <LinearGradient colors={['transparent', 'rgba(255,77,141,0.15)']} style={StyleSheet.absoluteFill} />
               <View style={[tryOnStyles.faceLabel, tryOnStyles.faceLabelAfter]}>
-                <Text style={[tryOnStyles.faceLabelText, { color: Colors.neonBlue }]}>AFTER</Text>
+                <Text style={[tryOnStyles.faceLabelText, { color: Colors.neonBlue }]}>{t.tryOnAfter}</Text>
               </View>
             </View>
             <View style={tryOnStyles.afterShadeDots}>
@@ -442,10 +441,10 @@ function BeautyTryOnHero() {
 
         <View style={tryOnStyles.categoriesRow}>
           {[
-            { label: 'Lipstick', color: '#B22234' },
-            { label: 'Blush', color: '#E07B8B' },
-            { label: 'Concealer', color: '#D4A574' },
-            { label: 'Foundation', color: '#C4956A' },
+            { label: t.tryOnCatLipstick, color: '#B22234' },
+            { label: t.tryOnCatBlush, color: '#E07B8B' },
+            { label: t.tryOnCatConcealer, color: '#D4A574' },
+            { label: t.tryOnCatFoundation, color: '#C4956A' },
           ].map((cat) => (
             <View key={cat.label} style={tryOnStyles.categoryChip}>
               <View style={[tryOnStyles.categoryDot, { backgroundColor: cat.color }]} />
@@ -462,7 +461,7 @@ function BeautyTryOnHero() {
           <LinearGradient colors={['#FF4D8D', '#E0356E']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
           <View style={tryOnStyles.ctaGlow} />
           <Camera size={isWide ? 14 : 9} color="#FFFFFF" strokeWidth={2.5} />
-          <Text style={[tryOnStyles.ctaText, isWide && { fontSize: 12 }]}>TRY NOW</Text>
+          <Text style={[tryOnStyles.ctaText, isWide && { fontSize: 12 }]}>{t.tryOnCta}</Text>
           <ChevronRight size={isWide ? 12 : 8} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
         </TouchableOpacity>
       </View>
