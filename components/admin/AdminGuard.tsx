@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ShieldOff, ArrowLeft } from 'lucide-react-native';
-import { useAdmin } from '@/context/AdminContext';
+import { useAdmin, EMPLOYEE_DEFAULT_ROUTES } from '@/context/AdminContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
@@ -19,9 +19,7 @@ export default function AdminGuard({ permission, children }: Props) {
 
   useEffect(() => {
     if (!hydrated) return;
-    console.log('[AdminGuard] hydrated, isAdminAuthenticated =', isAdminAuthenticated);
     if (!isAdminAuthenticated) {
-      console.log('[AdminGuard] Not authenticated, redirecting to login');
       router.replace('/admin/login');
     }
   }, [isAdminAuthenticated, hydrated]);
@@ -45,12 +43,16 @@ export default function AdminGuard({ permission, children }: Props) {
 
 function AccessDenied() {
   const router = useRouter();
+  const { hasPermission } = usePermissions();
 
-  const goToDashboard = () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.location.href = '/admin/dashboard';
+  const goToSafeRoute = () => {
+    // Find the first route this user is allowed to access
+    const safeRoute = EMPLOYEE_DEFAULT_ROUTES.find((r) => hasPermission(r.permission))?.route;
+    if (safeRoute) {
+      router.replace(safeRoute as any);
     } else {
-      router.replace('/admin/dashboard');
+      // No permitted routes at all — log out to login
+      router.replace('/admin/login');
     }
   };
 
@@ -66,11 +68,11 @@ function AccessDenied() {
       </Text>
       <TouchableOpacity
         style={styles.btn}
-        onPress={goToDashboard}
+        onPress={goToSafeRoute}
         activeOpacity={0.8}
       >
         <ArrowLeft size={16} color={Colors.background} strokeWidth={2} />
-        <Text style={styles.btnText}>Back to Dashboard</Text>
+        <Text style={styles.btnText}>Go Back</Text>
       </TouchableOpacity>
     </View>
   );
