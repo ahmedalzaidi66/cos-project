@@ -171,7 +171,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
                 <Animated.View style={{ transform: [{ scale: heartScale }] }}>
                   <Heart
                     size={14}
-                    color={wishlistCount > 0 ? '#FF4D6D' : Colors.textPrimary}
+                    color={wishlistCount > 0 ? '#FF4D6D' : C.textPrimary}
                     fill={wishlistCount > 0 ? '#FF4D6D' : 'transparent'}
                     strokeWidth={2}
                   />
