@@ -411,10 +411,8 @@ function BeautyTryOnHero() {
         <View style={tryOnStyles.faceRow}>
           <View style={tryOnStyles.faceCard}>
             <View style={[tryOnStyles.faceImageWrap, { width: faceSize, height: faceSize }]}>
-              <LinearGradient colors={['#2a1020', '#3d1830']} style={StyleSheet.absoluteFill} />
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <View style={{ width: faceSize * 0.45, height: faceSize * 0.45, borderRadius: faceSize * 0.225, backgroundColor: 'rgba(255,77,141,0.12)', borderWidth: 1, borderColor: 'rgba(255,77,141,0.2)' }} />
-              </View>
+              {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
+              <Image source={require('../../assets/images/canopy/canopy-before.png')} style={tryOnStyles.faceImage} resizeMode="cover" />
               <View style={tryOnStyles.faceLabel}>
                 <Text style={tryOnStyles.faceLabelText}>BEFORE</Text>
               </View>
@@ -427,11 +425,9 @@ function BeautyTryOnHero() {
 
           <View style={tryOnStyles.faceCard}>
             <View style={[tryOnStyles.faceImageWrap, tryOnStyles.faceImageWrapAfter, { width: faceSize, height: faceSize }]}>
-              <LinearGradient colors={['#2a1020', '#4a1535']} style={StyleSheet.absoluteFill} />
-              <LinearGradient colors={['transparent', 'rgba(255,77,141,0.2)']} style={StyleSheet.absoluteFill} />
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <View style={{ width: faceSize * 0.45, height: faceSize * 0.45, borderRadius: faceSize * 0.225, backgroundColor: 'rgba(255,77,141,0.22)', borderWidth: 1, borderColor: 'rgba(255,77,141,0.45)' }} />
-              </View>
+              {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
+              <Image source={require('../../assets/images/canopy/canopy-after.png')} style={tryOnStyles.faceImage} resizeMode="cover" />
+              <LinearGradient colors={['transparent', 'rgba(255,77,141,0.15)']} style={StyleSheet.absoluteFill} />
               <View style={[tryOnStyles.faceLabel, tryOnStyles.faceLabelAfter]}>
                 <Text style={[tryOnStyles.faceLabelText, { color: Colors.neonBlue }]}>AFTER</Text>
               </View>
