@@ -21,6 +21,7 @@ import StarRating from '@/components/StarRating';
 import WishlistHeart from '@/components/WishlistHeart';
 import { useWishlistToast } from '@/context/WishlistToastContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 
 const PAGE_SIZE = 24;
@@ -67,9 +68,11 @@ const skStyles = StyleSheet.create({
 // ─── Product card (inline, memoized) ─────────────────────────────────────────
 
 const ProductCard = memo(function ProductCard({
-  product, cardW, language, t, onPress,
+  product, cardW, language, t, cardBg, imageWrapBg, textColor, onPress,
 }: {
-  product: Product; cardW: number; language: string; t: any; onPress: () => void;
+  product: Product; cardW: number; language: string; t: any;
+  cardBg?: string; imageWrapBg?: string; textColor?: string;
+  onPress: () => void;
 }) {
   const { addToCart } = useCart();
   const { showCartToast } = useWishlistToast();
@@ -80,11 +83,11 @@ const ProductCard = memo(function ProductCard({
 
   return (
     <TouchableOpacity
-      style={[styles.card, { width: cardW }]}
+      style={[styles.card, { width: cardW }, cardBg ? { backgroundColor: cardBg } : undefined]}
       onPress={onPress}
       activeOpacity={0.88}
     >
-      <View style={[styles.cardImageWrap, { height: imgH }]}>
+      <View style={[styles.cardImageWrap, { height: imgH }, imageWrapBg ? { backgroundColor: imageWrapBg } : undefined]}>
         <Image
           source={imgUri ? { uri: imgUri } : undefined}
           style={[styles.cardImage, isOOS && { opacity: 0.5 }]}
@@ -103,7 +106,7 @@ const ProductCard = memo(function ProductCard({
         <WishlistHeart product={product} size={13} variant="card" />
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.cardName} numberOfLines={2}>
+        <Text style={[styles.cardName, textColor ? { color: textColor } : undefined]} numberOfLines={2}>
           {getProductName(product, language)}
         </Text>
         <StarRating rating={product.rating} reviewCount={product.review_count} size={10} showCount />
@@ -140,6 +143,7 @@ export default function ProductsScreen() {
   const router = useRouter();
   const { category: categoryParam } = useLocalSearchParams<{ category?: string }>();
   const { language, t } = useLanguage();
+  const C = useAppColors();
   const { width } = useWindowDimensions();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -253,11 +257,11 @@ export default function ProductsScreen() {
   }, [loadingMore]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader title={activeLabel} showBack />
 
       {/* Category filter chips */}
-      <View style={styles.filterWrap}>
+      <View style={[styles.filterWrap, { backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -270,11 +274,11 @@ export default function ProductsScreen() {
             const label = item === null ? t.allLabel : (cat ? getCategoryName(cat, language) : capitalize(item ?? ''));
             return (
               <TouchableOpacity
-                style={[styles.chip, active && styles.chipActive]}
+                style={[styles.chip, { borderColor: C.border }, active && styles.chipActive]}
                 onPress={() => { setSelectedCategory(item); setSelectedMakeupSub(null); }}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                <Text style={[styles.chipText, { color: C.textSecondary }, active && styles.chipTextActive]}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -357,6 +361,9 @@ export default function ProductsScreen() {
               cardW={cardW}
               language={language}
               t={t}
+              cardBg={C.backgroundCard}
+              imageWrapBg={C.backgroundInput}
+              textColor={C.textPrimary}
               onPress={() => router.push(`/product/${item.id}`)}
             />
           )}
@@ -422,7 +429,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chipTextActive: {
-    color: Colors.background,
+    color: '#FFFFFF',
     fontWeight: '700',
   },
 

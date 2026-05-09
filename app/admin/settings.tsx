@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useRouter } from 'expo-router';
-import { Save, Store, Mail, DollarSign, Globe, Share2, Package, Camera, RefreshCw, Upload, Trash2 } from 'lucide-react-native';
+import { Save, Store, Mail, DollarSign, Globe, Share2, Package, Camera, RefreshCw, Upload, Trash2, Sun, Moon, Smartphone } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -289,6 +289,95 @@ function TryOnModelSection({
   );
 }
 
+const THEME_SETTING_KEY = 'customer_app_theme';
+
+function CustomerAppThemeSection({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const options: { id: string; label: string; desc: string; Icon: React.ComponentType<any> }[] = [
+    { id: 'dark',  label: 'Dark',  desc: 'Deep dark background with pink accents — current default', Icon: Moon },
+    { id: 'light', label: 'Light', desc: 'Clean white background with dark text, pink accents preserved', Icon: Sun },
+  ];
+
+  return (
+    <View style={themeToggle.root}>
+      <Text style={themeToggle.subtitle}>
+        Controls the background and text colours across all customer-facing pages.
+        Admin dashboard is unaffected.
+      </Text>
+      <View style={themeToggle.row}>
+        {options.map(({ id, label, desc, Icon }) => {
+          const active = (value || 'dark') === id;
+          return (
+            <TouchableOpacity
+              key={id}
+              style={[themeToggle.option, active && themeToggle.optionActive]}
+              onPress={() => onChange(id)}
+              activeOpacity={0.8}
+            >
+              <View style={[themeToggle.iconWrap, active && themeToggle.iconWrapActive]}>
+                <Icon size={20} color={active ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
+              </View>
+              <Text style={[themeToggle.label, active && themeToggle.labelActive]}>{label}</Text>
+              <Text style={themeToggle.desc} numberOfLines={2}>{desc}</Text>
+              {active && (
+                <View style={themeToggle.activeBadge}>
+                  <Text style={themeToggle.activeBadgeText}>ACTIVE</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const themeToggle = StyleSheet.create({
+  root: { gap: Spacing.md },
+  subtitle: { color: Colors.textMuted, fontSize: FontSize.xs, lineHeight: 18 },
+  row: { flexDirection: 'row', gap: Spacing.md, flexWrap: 'wrap' },
+  option: {
+    flex: 1,
+    minWidth: 140,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.md,
+    gap: 6,
+    alignItems: 'flex-start',
+  },
+  optionActive: {
+    borderColor: Colors.neonBlue,
+    backgroundColor: Colors.neonBlueGlow,
+  },
+  iconWrap: {
+    width: 40, height: 40, borderRadius: Radius.md,
+    backgroundColor: Colors.backgroundCard, borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  iconWrapActive: {
+    borderColor: Colors.neonBlueBorder,
+    backgroundColor: 'rgba(255,77,141,0.12)',
+  },
+  label: { color: Colors.textSecondary, fontSize: FontSize.md, fontWeight: '700' },
+  labelActive: { color: Colors.textPrimary },
+  desc: { color: Colors.textMuted, fontSize: 10, lineHeight: 15, fontWeight: '400' },
+  activeBadge: {
+    backgroundColor: Colors.neonBlue,
+    borderRadius: Radius.full,
+    paddingHorizontal: 8, paddingVertical: 3,
+    marginTop: 2,
+  },
+  activeBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+});
+
 type SettingsMap = Record<string, string>;
 
 const SETTING_GROUPS = [
@@ -482,6 +571,18 @@ function SettingsScreen() {
             </View>
           );
         })}
+
+        {/* ── Customer App Theme ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Smartphone size={18} color={Colors.neonBlue} strokeWidth={2} />
+            <Text style={styles.cardTitle}>Customer App Theme</Text>
+          </View>
+          <CustomerAppThemeSection
+            value={settings[THEME_SETTING_KEY] ?? 'dark'}
+            onChange={(v) => updateField(THEME_SETTING_KEY, v)}
+          />
+        </View>
 
         {/* ── Try-On Model Image ── */}
         <View style={styles.card}>

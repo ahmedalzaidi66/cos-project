@@ -27,6 +27,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { PageBlock } from '@/context/PageBuilderContext';
 import { useLayout, SectionId, SpacingBreakpoint } from '@/context/LayoutContext';
 import { Colors, Radius, Spacing, FontSize } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import HeroVideo from '@/components/HeroVideo';
 import { getProductName, getProductImage } from '@/lib/supabase';
@@ -67,6 +68,7 @@ function clampSpacing(sp: SpacingBreakpoint): SpacingBreakpoint {
 
 export default function ShopScreen() {
   const { language, t } = useLanguage();
+  const C = useAppColors();
   const { content, cmsRow, refresh: refreshCMS } = useCMS();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -223,7 +225,7 @@ export default function ShopScreen() {
   const hasBlocks = visibleBlocks.length > 0;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader />
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -281,14 +283,15 @@ function getCategoryColor(slug: string): string {
 function ShopByCategorySection({ categories, language }: { categories: Category[]; language: string }) {
   const router = useRouter();
   const { t } = useLanguage();
+  const C = useAppColors();
   const isRTL = language === 'ar' || language === 'ckb';
 
   if (categories.length === 0) return null;
 
   return (
-    <View style={catStyles.section}>
+    <View style={[catStyles.section, { backgroundColor: C.background }]}>
       <View style={[catStyles.headerRow, isRTL && catStyles.headerRowRTL]}>
-        <Text style={catStyles.title}>{t.shopByCategory}</Text>
+        <Text style={[catStyles.title, { color: C.textPrimary }]}>{t.shopByCategory}</Text>
         <TouchableOpacity
           style={catStyles.viewAllBtn}
           activeOpacity={0.7}
@@ -321,7 +324,7 @@ function ShopByCategorySection({ categories, language }: { categories: Category[
                   )}
                 </View>
               </View>
-              <Text style={catStyles.label} numberOfLines={2}>{name}</Text>
+              <Text style={[catStyles.label, { color: C.textSecondary }]} numberOfLines={2}>{name}</Text>
             </TouchableOpacity>
           );
         })}
@@ -360,12 +363,13 @@ const FLOATING_SHADES = [
 function BeautyTryOnHero() {
   const router = useRouter();
   const { t } = useLanguage();
+  const C = useAppColors();
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
   const faceSize = isWide ? 136 : Math.min(width * 0.15, 58);
 
   return (
-    <View style={tryOnStyles.wrapper}>
+    <View style={[tryOnStyles.wrapper, { backgroundColor: C.backgroundCard }]}>
       <LinearGradient
         colors={['rgba(255,77,141,0.18)', 'rgba(180,40,100,0.08)', 'rgba(10,5,7,0)']}
         style={StyleSheet.absoluteFill}
@@ -396,13 +400,13 @@ function BeautyTryOnHero() {
           <Text style={[tryOnStyles.badgeText, isWide && { fontSize: 8 }]}>{t.tryOnBadge}</Text>
         </View>
 
-        <Text style={[tryOnStyles.title, isWide && { fontSize: 24, lineHeight: 30 }]}>
+        <Text style={[tryOnStyles.title, { color: C.textPrimary }, isWide && { fontSize: 24, lineHeight: 30 }]}>
           {t.tryOnTitle}{'\n'}
           <Text style={tryOnStyles.titleAccent}>{t.tryOnTitleAccent}</Text>
         </Text>
 
         {isWide && (
-          <Text style={[tryOnStyles.subtitle, { fontSize: 11, lineHeight: 16 }]}>
+          <Text style={[tryOnStyles.subtitle, { color: C.textSecondary, fontSize: 11, lineHeight: 16 }]}>
             {t.tryOnSubtitle}
           </Text>
         )}
@@ -448,7 +452,7 @@ function BeautyTryOnHero() {
           ].map((cat) => (
             <View key={cat.label} style={tryOnStyles.categoryChip}>
               <View style={[tryOnStyles.categoryDot, { backgroundColor: cat.color }]} />
-              <Text style={tryOnStyles.categoryText}>{cat.label}</Text>
+              <Text style={[tryOnStyles.categoryText, { color: C.textSecondary }]}>{cat.label}</Text>
             </View>
           ))}
         </View>
@@ -506,6 +510,9 @@ const HomeSectionCard = memo(function HomeSectionCard({
   product,
   language,
   justAdded,
+  cardBg,
+  imageWrapBg,
+  textColor,
   onPress,
   onAddToCart,
   addToCartLabel,
@@ -513,14 +520,17 @@ const HomeSectionCard = memo(function HomeSectionCard({
   product: Product;
   language: string;
   justAdded: boolean;
+  cardBg?: string;
+  imageWrapBg?: string;
+  textColor?: string;
   onPress: () => void;
   onAddToCart: (e: any) => void;
   addToCartLabel: string;
 }) {
   const imgUri = getProductImage(product) || undefined;
   return (
-    <View style={styles.card}>
-      <View style={styles.cardImageWrap}>
+    <View style={[styles.card, cardBg ? { backgroundColor: cardBg } : undefined]}>
+      <View style={[styles.cardImageWrap, imageWrapBg ? { backgroundColor: imageWrapBg } : undefined]}>
         <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={styles.cardImageTouchable}>
           <Image
             source={imgUri ? { uri: imgUri } : undefined}
@@ -536,7 +546,7 @@ const HomeSectionCard = memo(function HomeSectionCard({
         <WishlistHeart product={product} size={10} variant="card" />
       </View>
       <View style={styles.cardInfo}>
-        <Text style={styles.cardName} numberOfLines={2}>
+        <Text style={[styles.cardName, textColor ? { color: textColor } : undefined]} numberOfLines={2}>
           {getProductName(product, language)}
         </Text>
         <StarRating rating={product.rating} reviewCount={product.review_count} size={8} showCount={false} />
@@ -563,6 +573,7 @@ const HomeSectionRow = memo(function HomeSectionRow({ section, language }: { sec
   const router = useRouter();
   const { addToCart } = useCart();
   const { t } = useLanguage();
+  const C = useAppColors();
   const { showCartToast } = useWishlistToast();
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
@@ -573,9 +584,9 @@ const HomeSectionRow = memo(function HomeSectionRow({ section, language }: { sec
   const addToCartLabel = t.addToCart.toUpperCase();
 
   return (
-    <View style={styles.sectionWrap}>
+    <View style={[styles.sectionWrap, { backgroundColor: C.background }]}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
+        <Text style={[styles.sectionTitle, { color: C.textPrimary }]}>{title.toUpperCase()}</Text>
         <TouchableOpacity
           style={styles.seeAllBtn}
           onPress={() => router.push('/(tabs)/products' as any)}
@@ -595,6 +606,9 @@ const HomeSectionRow = memo(function HomeSectionRow({ section, language }: { sec
             product={product}
             language={language}
             justAdded={justAddedId === product.id}
+            cardBg={C.backgroundCard}
+            imageWrapBg={C.backgroundInput}
+            textColor={C.textPrimary}
             onPress={() => router.push(`/product/${product.id}`)}
             onAddToCart={(e) => {
               const nativeEv = e?.nativeEvent as any;
