@@ -372,9 +372,10 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         <AuthField
           label="Date of Birth"
           value={dob}
-          onChange={setDob}
+          onChange={v => setDob(formatDobInput(v))}
           icon={<CalendarDays size={13} color={Colors.textMuted} />}
           placeholder="DD/MM/YYYY"
+          keyboardType="number-pad"
         />
         <View style={styles.dobHintRow}>
           <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
@@ -701,9 +702,10 @@ function PhoneLoginForm() {
         <AuthField
           label="Date of Birth"
           value={dob}
-          onChange={setDob}
+          onChange={v => setDob(formatDobInput(v))}
           icon={<CalendarDays size={13} color={Colors.textMuted} />}
           placeholder="DD/MM/YYYY"
+          keyboardType="number-pad"
         />
         <View style={styles.dobHintRow}>
           <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
@@ -862,6 +864,23 @@ const phoneStyles = StyleSheet.create({
 // Shown to new phone-OTP users before they can access the full profile view.
 // Requires Full Name + Date of Birth. Cannot be dismissed without saving.
 
+// Auto-formats user keystrokes into DD/MM/YYYY by inserting slashes.
+// Strips all non-digits, then inserts "/" after position 2 and 4.
+function formatDobInput(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+// Converts YYYY-MM-DD (DB format) to DD/MM/YYYY for display.
+function dbDobToDisplay(raw: string): string {
+  if (!raw) return '';
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return raw;
+}
+
 function normaliseDob(raw: string): string {
   const clean = raw.trim();
   if (!clean) return '';
@@ -976,9 +995,10 @@ function PhoneSignupGate() {
             <AuthField
               label="Date of Birth"
               value={dob}
-              onChange={setDob}
+              onChange={v => setDob(formatDobInput(v))}
               icon={<CalendarDays size={13} color={Colors.textMuted} />}
               placeholder="DD/MM/YYYY"
+              keyboardType="number-pad"
             />
             <View style={gateStyles.dobHintRow}>
               <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
@@ -1454,7 +1474,7 @@ function EditProfileModal({
   const [firstName, setFirstName] = useState(currentFirst);
   const [lastName, setLastName] = useState(currentLast);
   const [profileEmail, setProfileEmail] = useState(currentProfileEmail);
-  const [dob, setDob] = useState(currentDob);
+  const [dob, setDob] = useState(() => dbDobToDisplay(currentDob));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -1464,7 +1484,7 @@ function EditProfileModal({
       setFirstName(currentFirst);
       setLastName(currentLast);
       setProfileEmail(currentProfileEmail);
-      setDob(currentDob);
+      setDob(dbDobToDisplay(currentDob));
       setError('');
       setSuccess('');
     }
@@ -1556,9 +1576,10 @@ function EditProfileModal({
             <AuthField
               label="Date of Birth"
               value={dob}
-              onChange={v => setDob(v)}
+              onChange={v => setDob(formatDobInput(v))}
               icon={<CalendarDays size={13} color={Colors.textMuted} />}
               placeholder="DD/MM/YYYY"
+              keyboardType="number-pad"
             />
             <View style={styles.dobHintRow}>
               <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
