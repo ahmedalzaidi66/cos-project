@@ -5,6 +5,23 @@ import { DarkColors, LightColors } from '@/constants/theme';
 
 export type AppThemeMode = 'dark' | 'light';
 
+const THEME_STORAGE_KEY = 'customer_app_theme';
+
+function readPersistedTheme(): AppThemeMode {
+  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+    const v = localStorage.getItem(THEME_STORAGE_KEY);
+    if (v === 'light') return 'light';
+    if (v === 'dark') return 'dark';
+  }
+  return 'dark';
+}
+
+function persistTheme(mode: AppThemeMode) {
+  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+  }
+}
+
 type ThemeContextType = {
   mode: AppThemeMode;
   C: typeof DarkColors;
@@ -37,11 +54,24 @@ function injectCSSVars(C: typeof DarkColors) {
   document.body.style.backgroundColor = C.background;
 }
 
+function applyMode(mode: AppThemeMode) {
+  injectCSSVars(mode === 'light' ? LightColors : DarkColors);
+  persistTheme(mode);
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<AppThemeMode>('dark');
+  // Read from localStorage synchronously so first render uses the correct theme
+  const [mode, setMode] = useState<AppThemeMode>(() => {
+    const persisted = readPersistedTheme();
+    // Apply CSS vars immediately for web — prevents flash
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      injectCSSVars(persisted === 'light' ? LightColors : DarkColors);
+    }
+    return persisted;
+  });
 
   useEffect(() => {
-    // Initial fetch
+    // Background fetch from Supabase — updates if admin changed value
     supabase
       .from('site_settings')
       .select('value')
@@ -54,9 +84,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
         const raw = data?.value ?? 'dark';
         const resolved: AppThemeMode = raw === 'light' ? 'light' : 'dark';
-        console.log('[ThemeContext] loaded customer_app_theme =', raw, '→ mode =', resolved);
         setMode(resolved);
-        injectCSSVars(resolved === 'light' ? LightColors : DarkColors);
+        applyMode(resolved);
       });
 
     // Realtime: update while app is open when admin changes the setting
@@ -68,9 +97,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         (payload) => {
           const newVal = (payload.new as { value?: string })?.value;
           const resolved: AppThemeMode = newVal === 'light' ? 'light' : 'dark';
-          console.log('[ThemeContext] realtime update → mode =', resolved);
           setMode(resolved);
-          injectCSSVars(resolved === 'light' ? LightColors : DarkColors);
+          applyMode(resolved);
         }
       )
       .subscribe();
