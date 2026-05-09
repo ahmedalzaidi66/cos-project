@@ -134,7 +134,14 @@ export default function AppHeader({ showBack = false, title }: Props) {
               resizeMode="contain"
             />
           ) : (
-            <Text style={styles.logoText}>{branding.app_name || 'Lazurde Makeup'}</Text>
+            <Text style={styles.logoText}>
+              {branding.app_name || 'LAZURDE'}
+              {(branding.app_tagline) ? (
+                <Text style={styles.logoAccent}> {branding.app_tagline}</Text>
+              ) : (
+                <Text style={styles.logoAccent}> BEAUTY</Text>
+              )}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -270,6 +277,12 @@ const styles = StyleSheet.create({
   },
   logoText: {
     color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  logoAccent: {
+    color: Colors.neonBlue,
     fontSize: FontSize.sm,
     fontWeight: '900',
     letterSpacing: 1.5,
