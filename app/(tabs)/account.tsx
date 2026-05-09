@@ -27,8 +27,10 @@ import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 
 export default function AccountScreen() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) return <AuthView />;
+  // New phone users must complete their profile before entering the app
+  if (user?.isPhoneUser && !user.firstName) return <PhoneSignupGate />;
   return <ProfileView />;
 }
 
@@ -432,6 +434,234 @@ function PhoneLoginForm() {
   );
 }
 
+// ─── Phone Signup Gate ────────────────────────────────────────────────────────
+// Shown to new phone-OTP users before they can access the full profile view.
+// Requires Full Name + Date of Birth. Cannot be dismissed without saving.
+
+function normaliseDob(raw: string): string {
+  const clean = raw.trim();
+  if (!clean) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+  const m = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return clean;
+}
+
+function PhoneSignupGate() {
+  const { user, logout, refreshUser } = useAuth();
+  const { t } = useLanguage();
+  const [fullName, setFullName] = useState('');
+  const [dob, setDob] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    const nameParts = fullName.trim().split(/\s+/);
+    if (nameParts.length < 2 || !nameParts[0] || !nameParts[1]) {
+      setError('Please enter your full name (first and last).');
+      return;
+    }
+    if (!dob.trim()) {
+      setError('Date of birth is required.');
+      return;
+    }
+    const normDob = normaliseDob(dob);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) {
+      setError('Please use DD/MM/YYYY format.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(' ');
+
+    // Update auth user_metadata (name)
+    const { error: authErr } = await supabase.auth.updateUser({
+      data: { first_name: firstName, last_name: lastName },
+    });
+    if (authErr) { setSaving(false); setError(authErr.message); return; }
+
+    // Upsert customer_profiles
+    if (user?.id) {
+      const { error: cpErr } = await supabase
+        .from('customer_profiles')
+        .upsert({
+          id: user.id,
+          first_name: firstName,
+          last_name: lastName,
+          date_of_birth: normDob,
+          phone: user.phone || null,
+          phone_verified_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
+      if (cpErr) { setSaving(false); setError(cpErr.message); return; }
+    }
+
+    // Refresh the user in context → firstName is now set → AccountScreen
+    // re-evaluates and renders ProfileView
+    await refreshUser();
+    setSaving(false);
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <AppHeader title={t.account} />
+      <ScrollView
+        contentContainerStyle={styles.authContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header */}
+        <View style={styles.authHeader}>
+          <View style={gateStyles.iconRing}>
+            <User size={28} color={Colors.neonBlue} strokeWidth={1.5} />
+          </View>
+          <Text style={styles.authTitle}>Complete Your Profile</Text>
+          <Text style={styles.authSubtitle}>
+            Please fill in your details to continue
+          </Text>
+        </View>
+
+        {/* Phone badge */}
+        {user?.phone ? (
+          <View style={gateStyles.phoneBadge}>
+            <SmartphoneNfc size={13} color={Colors.success} strokeWidth={2} />
+            <Text style={gateStyles.phoneBadgeText}>{user.phone}</Text>
+            <View style={gateStyles.verifiedDot} />
+          </View>
+        ) : null}
+
+        {/* Form card */}
+        <View style={gateStyles.card}>
+          {error ? <ErrorBanner message={error} /> : null}
+
+          <AuthField
+            label="Full Name"
+            value={fullName}
+            onChange={setFullName}
+            icon={<User size={13} color={Colors.textMuted} />}
+            placeholder="First Last"
+          />
+
+          <View>
+            <AuthField
+              label="Date of Birth"
+              value={dob}
+              onChange={setDob}
+              icon={<CalendarDays size={13} color={Colors.textMuted} />}
+              placeholder="DD/MM/YYYY"
+            />
+            <View style={gateStyles.dobHintRow}>
+              <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
+              <Text style={gateStyles.dobHintText}>
+                ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
+              </Text>
+            </View>
+          </View>
+
+          <GlossyButton
+            title={saving ? 'Saving...' : 'Continue'}
+            onPress={handleSave}
+            loading={saving}
+            fullWidth
+            size="xs"
+            style={{ marginTop: 4 }}
+          />
+        </View>
+
+        {/* Sign out link */}
+        <TouchableOpacity
+          style={gateStyles.signOutRow}
+          onPress={logout}
+          activeOpacity={0.7}
+        >
+          <LogOut size={13} color={Colors.textMuted} strokeWidth={2} />
+          <Text style={gateStyles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const gateStyles = StyleSheet.create({
+  iconRing: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1.5,
+    borderColor: Colors.neonBlueBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  phoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,230,118,0.10)',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(0,230,118,0.25)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  phoneBadgeText: {
+    color: Colors.success,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  verifiedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+  },
+  card: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    ...Shadow.card,
+  },
+  dobHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 2,
+  },
+  dobHintText: {
+    color: Colors.neonBlue,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  signOutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+  },
+  signOutText: {
+    color: Colors.textMuted,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+});
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -815,18 +1045,6 @@ function EditProfileModal({
       setSuccess('');
     }
   }, [open, currentFirst, currentLast, currentProfileEmail, currentDob]);
-
-  // Validate date format YYYY-MM-DD or DD/MM/YYYY
-  function normaliseDob(raw: string): string {
-    const clean = raw.trim();
-    if (!clean) return '';
-    // Already YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
-    // DD/MM/YYYY or DD-MM-YYYY
-    const m = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    return clean;
-  }
 
   const handleSave = async () => {
     if (!firstName.trim() || !lastName.trim()) {

@@ -33,7 +33,7 @@ type AuthContextType = {
   /** Phone OTP — request a code (does not change email login) */
   requestOtp: (phone: string) => Promise<{ success: boolean; error?: string; cooldownSeconds?: number }>;
   /** Phone OTP — verify the code and sign the user in */
-  verifyOtp: (phone: string, code: string) => Promise<{ success: boolean; error?: string; attemptsLeft?: number }>;
+  verifyOtp: (phone: string, code: string) => Promise<{ success: boolean; error?: string; attemptsLeft?: number; isNewUser?: boolean }>;
   /** Re-fetch the current user's profile (e.g. after saving customer_profiles) */
   refreshUser: () => Promise<void>;
 };
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyOtp = useCallback(async (
     phone: string,
     code: string
-  ): Promise<{ success: boolean; error?: string; attemptsLeft?: number }> => {
+  ): Promise<{ success: boolean; error?: string; attemptsLeft?: number; isNewUser?: boolean }> => {
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-otp`, {
         method: 'POST',
@@ -202,14 +202,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const json = await res.json();
       if (!json.success) return { success: false, error: json.error, attemptsLeft: json.attemptsLeft };
 
-      // Set the Supabase session from the tokens returned by the edge function
       const { error: sessionError } = await supabase.auth.setSession({
         access_token: json.session.access_token,
         refresh_token: json.session.refresh_token,
       });
       if (sessionError) return { success: false, error: sessionError.message };
 
-      return { success: true };
+      return { success: true, isNewUser: !!json.isNewUser };
     } catch {
       return { success: false, error: 'Network error. Please try again.' };
     }
