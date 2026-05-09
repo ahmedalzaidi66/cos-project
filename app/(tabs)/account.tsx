@@ -203,6 +203,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [dob, setDob] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -216,11 +217,29 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
     if (!email.trim() || !email.includes('@')) { setError(t.validEmailRequired); return; }
     if (password.length < 6) { setError(t.passwordMinLength); return; }
     if (password !== confirm) { setError(t.passwordsNoMatch); return; }
+    if (!dob.trim()) { setError('Date of birth is required.'); return; }
+    const normDob = normaliseDob(dob);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) { setError('Please use DD/MM/YYYY format.'); return; }
+
     setLoading(true);
     setError('');
     const result = await register(firstName, lastName, email, password);
     setLoading(false);
     if (!result.success) { setError(result.error ?? t.validEmailRequired); return; }
+
+    // Save DOB to customer_profiles; get user id from session
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (userId) {
+      await supabase.from('customer_profiles').upsert({
+        id: userId,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        date_of_birth: normDob,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    }
+
     if (result.needsVerification) { setVerifyPending(true); return; }
     onSuccess();
   };
@@ -290,6 +309,21 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         secureTextEntry={!showPw}
         placeholder={t.confirmPassword}
       />
+      <View>
+        <AuthField
+          label="Date of Birth"
+          value={dob}
+          onChange={setDob}
+          icon={<CalendarDays size={13} color={Colors.textMuted} />}
+          placeholder="DD/MM/YYYY"
+        />
+        <View style={styles.dobHintRow}>
+          <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
+          <Text style={styles.dobHintText}>
+            ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
+          </Text>
+        </View>
+      </View>
       <GlossyButton
         title={t.createAccount}
         onPress={handleRegister}
