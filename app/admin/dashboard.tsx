@@ -24,7 +24,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
-import { supabase } from '@/lib/supabase';
+import { adminSupabase } from '@/lib/supabase';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 
@@ -85,9 +85,10 @@ function DashboardContent() {
     setLoading(true);
     setError(null);
     try {
+      const admin = adminSupabase();
       const [productsRes, ordersRes] = await Promise.all([
-        supabase.from('products').select('id, stock', { count: 'exact' }),
-        supabase
+        admin.from('products').select('id, stock', { count: 'exact' }),
+        admin
           .from('orders')
           .select('id, total, status, created_at, customer_first_name, customer_last_name, payment_method')
           .order('created_at', { ascending: false }),

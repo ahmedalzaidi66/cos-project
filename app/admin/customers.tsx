@@ -15,7 +15,7 @@ import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
-import { supabase } from '@/lib/supabase';
+import { adminSupabase } from '@/lib/supabase';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 
@@ -44,12 +44,17 @@ function CustomersContent() {
   }, []);
 
   const fetchCustomers = async () => {
-    const { data: orders } = await supabase
+    setLoading(true);
+    const { data: orders, error } = await adminSupabase()
       .from('orders')
       .select('customer_email, customer_first_name, customer_last_name, customer_phone, total, status, created_at, id')
       .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[Customers] Failed to load orders:', error.message);
+    }
     const map: Record<string, Customer> = {};
     (orders ?? []).forEach((o: any) => {
+      if (!o.customer_email) return;
       if (!map[o.customer_email]) {
         map[o.customer_email] = {
           email: o.customer_email,

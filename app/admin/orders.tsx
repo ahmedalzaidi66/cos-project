@@ -552,7 +552,7 @@ function OrdersContent() {
     setLoading(true);
     setLoadError(null);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await adminSupabase()
         .from('orders')
         .select('id, customer_first_name, customer_last_name, customer_email, customer_phone, street, city, state, zip, country, governorate, area, notes, subtotal, shipping, total, status, payment_method, payment_status, created_at, delivery_address_text, delivery_latitude, delivery_longitude, delivery_location_link')
         .order('created_at', { ascending: false });
