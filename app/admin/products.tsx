@@ -146,6 +146,7 @@ type ShadeItem = {
   color_hex: string;
   shade_image: string;
   product_image: string;
+  is_available: boolean;
 };
 
 function hasMissingTranslation(form: FormState, lang: LangCode): boolean {
@@ -471,7 +472,7 @@ function WebProductsScreen() {
           .order('sort_order'),
         supabase
           .from('product_shades')
-          .select('id, name, color_hex, shade_image, product_image, sort_order')
+          .select('id, name, color_hex, shade_image, product_image, sort_order, is_available')
           .eq('product_id', p.id)
           .order('sort_order'),
       ]);
@@ -535,6 +536,7 @@ function WebProductsScreen() {
           color_hex: s.color_hex,
           shade_image: s.shade_image,
           product_image: s.product_image,
+          is_available: s.is_available !== false,
         }))
       );
       setShowForm(true);
@@ -620,6 +622,7 @@ function WebProductsScreen() {
         shade_image: s.shade_image,
         product_image: s.product_image,
         sort_order: i,
+        is_available: s.is_available !== false,
       }));
       await db.from('product_shades').insert(shadeRows);
     }
@@ -697,6 +700,17 @@ function WebProductsScreen() {
       setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, stock: newStock } : p));
       setQuickEditStock((prev) => { const n = { ...prev }; delete n[productId]; return n; });
       showToast('تم تحديث المخزون');
+    }
+  };
+
+  const toggleInStock = async (productId: string, current: boolean) => {
+    const next = !current;
+    const { error } = await adminSupabase().from('products').update({ in_stock: next }).eq('id', productId);
+    if (error) {
+      showToast('Failed to update availability: ' + error.message, 'error');
+    } else {
+      setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, in_stock: next } : p));
+      showToast(next ? 'Product marked as Available' : 'Product marked as Out of Stock');
     }
   };
 
@@ -870,6 +884,23 @@ function WebProductsScreen() {
                 </View>
               </View>
               <View style={styles.productActions}>
+                {/* Availability toggle */}
+                <TouchableOpacity
+                  style={[
+                    styles.availabilityBtn,
+                    p.in_stock !== false ? styles.availabilityBtnIn : styles.availabilityBtnOut,
+                  ]}
+                  onPress={() => toggleInStock(p.id, p.in_stock !== false)}
+                  activeOpacity={0.75}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                >
+                  <Text style={[
+                    styles.availabilityBtnText,
+                    p.in_stock !== false ? styles.availabilityBtnTextIn : styles.availabilityBtnTextOut,
+                  ]}>
+                    {p.in_stock !== false ? 'In Stock' : 'OOS'}
+                  </Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, openingEdit === p.id && { opacity: 0.6 }]}
                   onPress={() => { if (!openingEdit) openEdit(p); }}
@@ -1456,10 +1487,11 @@ function ShadeManager({ shades, onChange }: { shades: ShadeItem[]; onChange: (s:
       color_hex: '#CC6677',
       shade_image: '',
       product_image: '',
+      is_available: true,
     }]);
   };
 
-  const updateShade = (id: string, field: keyof ShadeItem, value: string) => {
+  const updateShade = (id: string, field: keyof ShadeItem, value: string | boolean) => {
     onChange(shades.map((s) => s.id === id ? { ...s, [field]: value } : s));
   };
 
@@ -1513,6 +1545,15 @@ function ShadeManager({ shades, onChange }: { shades: ShadeItem[]; onChange: (s:
             <Text style={shadeStyles.cardIndex}>#{idx + 1}</Text>
             <Text style={shadeStyles.cardName} numberOfLines={1}>{shade.name || 'Unnamed shade'}</Text>
             <View style={shadeStyles.cardActions}>
+              <TouchableOpacity
+                style={[shadeStyles.shadeAvailBtn, shade.is_available !== false ? shadeStyles.shadeAvailBtnIn : shadeStyles.shadeAvailBtnOut]}
+                onPress={() => updateShade(shade.id, 'is_available', shade.is_available === false)}
+                activeOpacity={0.75}
+              >
+                <Text style={[shadeStyles.shadeAvailText, shade.is_available !== false ? shadeStyles.shadeAvailTextIn : shadeStyles.shadeAvailTextOut]}>
+                  {shade.is_available !== false ? 'Available' : 'OOS'}
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => moveShade(shade.id, -1)} disabled={idx === 0} activeOpacity={0.7} style={shadeStyles.moveBtn}>
                 <ChevronUp size={14} color={idx === 0 ? Colors.textMuted : Colors.neonBlue} strokeWidth={2} />
               </TouchableOpacity>
@@ -1686,6 +1727,24 @@ const shadeStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,77,141,0.04)',
   },
   addBtnText: { color: Colors.neonBlue, fontSize: FontSize.sm, fontWeight: '700' },
+  shadeAvailBtn: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+    borderWidth: 1,
+    marginRight: 4,
+  },
+  shadeAvailBtnIn: {
+    backgroundColor: 'rgba(0,230,118,0.12)',
+    borderColor: 'rgba(0,230,118,0.4)',
+  },
+  shadeAvailBtnOut: {
+    backgroundColor: 'rgba(255,68,68,0.12)',
+    borderColor: 'rgba(255,68,68,0.4)',
+  },
+  shadeAvailText: { fontSize: 9, fontWeight: '700' },
+  shadeAvailTextIn: { color: Colors.success },
+  shadeAvailTextOut: { color: Colors.error },
 });
 
 function FormField({
@@ -1998,7 +2057,25 @@ const styles = StyleSheet.create({
   productActions: {
     flexDirection: 'row',
     gap: Spacing.xs,
+    alignItems: 'center',
   },
+  availabilityBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  availabilityBtnIn: {
+    backgroundColor: 'rgba(0,230,118,0.12)',
+    borderColor: 'rgba(0,230,118,0.4)',
+  },
+  availabilityBtnOut: {
+    backgroundColor: 'rgba(255,68,68,0.12)',
+    borderColor: 'rgba(255,68,68,0.4)',
+  },
+  availabilityBtnText: { fontSize: 10, fontWeight: '700' },
+  availabilityBtnTextIn: { color: Colors.success },
+  availabilityBtnTextOut: { color: Colors.error },
   actionBtn: {
     width: 32,
     height: 32,

@@ -50,6 +50,7 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
   }, [product.id]);
 
   const displayImage = activeShade?.product_image || getProductImage(product) || undefined;
+  const isOutOfStock = product.in_stock === false || (product.stock === 0 && product.in_stock !== true);
 
   const imageH = productCardSizes.imageHeight;
   const pad    = productCardSizes.cardPadding;
@@ -63,6 +64,10 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
       if (nativeEv?.preventDefault) nativeEv.preventDefault();
     } else {
       e?.stopPropagation?.();
+    }
+    if (isOutOfStock) {
+      showCartToast('Out of stock');
+      return;
     }
     if (shades.length > 0 && !activeShade) {
       router.push(`/product/${product.id}`);
@@ -92,17 +97,23 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
       <View style={[styles.imageContainer, { height: imageH, borderTopLeftRadius: cardR, borderTopRightRadius: cardR }]}>
         <Image
           source={displayImage ? { uri: displayImage } : undefined}
-          style={styles.image}
+          style={[styles.image, isOutOfStock && styles.imageOOS]}
           resizeMode="cover"
           fadeDuration={200}
         />
-        {product.badge && (
+        {isOutOfStock ? (
+          <View style={[styles.badge, styles.oosBadge, isRTL ? styles.badgeRTL : styles.badgeLTR]}>
+            <Text style={[styles.badgeText, { fontSize: Math.max(9, productCardSizes.titleFontSize - 3) }]}>
+              Out of Stock
+            </Text>
+          </View>
+        ) : product.badge ? (
           <View style={[styles.badge, isRTL ? styles.badgeRTL : styles.badgeLTR]}>
             <Text style={[styles.badgeText, { fontSize: Math.max(9, productCardSizes.titleFontSize - 3) }]}>
               {product.badge}
             </Text>
           </View>
-        )}
+        ) : null}
         <WishlistHeart
           product={product}
           size={13}
@@ -116,17 +127,20 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
         <View style={styles.shadeDotsRow}>
           {shades.slice(0, 6).map((shade) => {
             const isActive = activeShade?.id === shade.id;
+            const shadeOOS = shade.is_available === false;
             return (
               <TouchableOpacity
                 key={shade.id}
-                activeOpacity={0.7}
+                activeOpacity={shadeOOS ? 1 : 0.7}
                 onPress={(e) => {
                   e.stopPropagation();
+                  if (shadeOOS) { showCartToast('This shade is out of stock'); return; }
                   setActiveShade(isActive ? null : shade);
                 }}
                 style={[
                   styles.shadeDotOuter,
                   isActive && styles.shadeDotActive,
+                  shadeOOS && styles.shadeDotOOS,
                 ]}
               >
                 {shade.shade_image ? (
@@ -182,9 +196,9 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
             )}
           </View>
           <TouchableOpacity
-            style={[styles.addBtn, justAdded && styles.addBtnAdded, { borderRadius: btnR }]}
+            style={[styles.addBtn, justAdded && styles.addBtnAdded, isOutOfStock && styles.addBtnOOS, { borderRadius: btnR }]}
             onPress={handleAddToCart}
-            activeOpacity={0.8}
+            activeOpacity={isOutOfStock ? 1 : 0.8}
           >
             {justAdded
               ? <Check size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2.5} />
@@ -217,6 +231,7 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover' as const,
   },
+  imageOOS: { opacity: 0.55 },
   badge: {
     position: 'absolute',
     top: 5,
@@ -224,6 +239,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     paddingHorizontal: 4,
     paddingVertical: 2,
+  },
+  oosBadge: {
+    backgroundColor: 'rgba(60,20,20,0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,68,68,0.5)',
   },
   badgeLTR: { left: 5 },
   badgeRTL: { right: 5 },
@@ -276,6 +296,10 @@ const styles = StyleSheet.create({
   addBtnAdded: {
     backgroundColor: '#1a7a45',
   },
+  addBtnOOS: {
+    backgroundColor: 'rgba(80,40,40,0.6)',
+    opacity: 0.65,
+  },
 
   // Shade dots
   shadeDotsRow: {
@@ -298,6 +322,10 @@ const styles = StyleSheet.create({
   },
   shadeDotActive: {
     borderColor: Colors.neonBlue,
+  },
+  shadeDotOOS: {
+    opacity: 0.35,
+    borderColor: 'rgba(255,68,68,0.4)',
   },
   shadeDotImage: {
     width: 12,

@@ -83,6 +83,7 @@ const ProductCard = memo(function ProductCard({
   const [justAdded, setJustAdded] = React.useState(false);
   const imgH = Math.round(cardW * 0.62);
   const imgUri = getProductImage(product) || undefined;
+  const isOOS = product.in_stock === false || product.stock === 0;
 
   return (
     <TouchableOpacity
@@ -93,15 +94,19 @@ const ProductCard = memo(function ProductCard({
       <View style={[styles.cardImageWrap, { height: imgH }]}>
         <Image
           source={imgUri ? { uri: imgUri } : undefined}
-          style={styles.cardImage}
+          style={[styles.cardImage, isOOS && { opacity: 0.5 }]}
           resizeMode="cover"
           fadeDuration={200}
         />
-        {product.badge && (
+        {isOOS ? (
+          <View style={[styles.badge, styles.oosBadge]}>
+            <Text style={styles.badgeText}>Out of Stock</Text>
+          </View>
+        ) : product.badge ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{product.badge}</Text>
           </View>
-        )}
+        ) : null}
         <WishlistHeart product={product} size={13} variant="card" />
       </View>
       <View style={styles.cardBody}>
@@ -112,12 +117,13 @@ const ProductCard = memo(function ProductCard({
         <View style={styles.cardFooter}>
           <Text style={styles.cardPrice}>{formatPrice(product.price, language)}</Text>
           <TouchableOpacity
-            style={[styles.cartBtn, justAdded && styles.cartBtnAdded]}
-            activeOpacity={0.85}
+            style={[styles.cartBtn, justAdded && styles.cartBtnAdded, isOOS && styles.cartBtnOOS]}
+            activeOpacity={isOOS ? 1 : 0.85}
             onPress={(e) => {
               const nativeEv = e?.nativeEvent as any;
               if (nativeEv?.stopPropagation) nativeEv.stopPropagation();
               if (nativeEv?.preventDefault) nativeEv.preventDefault();
+              if (isOOS) { showCartToast('Out of stock'); return; }
               addToCart(product);
               showCartToast('Added to cart');
               setJustAdded(true);
@@ -446,6 +452,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
+  oosBadge: {
+    backgroundColor: 'rgba(60,20,20,0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,68,68,0.5)',
+  },
   badgeText: {
     color: Colors.background,
     fontSize: 8,
@@ -480,6 +491,10 @@ const styles = StyleSheet.create({
   },
   cartBtnAdded: {
     backgroundColor: '#1a7a45',
+  },
+  cartBtnOOS: {
+    backgroundColor: 'rgba(80,40,40,0.6)',
+    opacity: 0.65,
   },
   footerLoader: {
     paddingVertical: 20,

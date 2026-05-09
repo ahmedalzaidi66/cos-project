@@ -87,9 +87,11 @@ export default function ProductDetailScreen() {
 
   const requiresShade = shades.length > 0;
   const canTryOn = product ? isTryOnEligible(product.category, shades.length > 0) : false;
+  const isProductOOS = product ? (product.in_stock === false || product.stock === 0) : false;
 
   const handleAddToCart = useCallback(() => {
     if (!product) return;
+    if (isProductOOS) return;
     if (requiresShade && !selectedShade) {
       setShadeWarning(true);
       setTimeout(() => setShadeWarning(false), 3000);
@@ -300,11 +302,13 @@ export default function ProductDetailScreen() {
             >
               {shades.map((shade) => {
                 const isActive = selectedShade?.id === shade.id;
+                const shadeOOS = shade.is_available === false;
                 return (
                   <TouchableOpacity
                     key={shade.id}
-                    activeOpacity={0.7}
+                    activeOpacity={shadeOOS ? 1 : 0.7}
                     onPress={() => {
+                      if (shadeOOS) return;
                       if (isActive && !requiresShade) {
                         setSelectedShade(null);
                       } else if (!isActive) {
@@ -315,6 +319,7 @@ export default function ProductDetailScreen() {
                     style={[
                       styles.shadeCircleOuter,
                       isActive && styles.shadeCircleOuterActive,
+                      shadeOOS && styles.shadeCircleOOS,
                     ]}
                   >
                     {shade.shade_image ? (
@@ -393,15 +398,19 @@ export default function ProductDetailScreen() {
             <View
               style={[
                 styles.stockDot,
-                { backgroundColor: product.stock > 10 ? Colors.success : Colors.warning },
+                {
+                  backgroundColor: isProductOOS
+                    ? Colors.error
+                    : product.stock > 10 ? Colors.success : Colors.warning,
+                },
               ]}
             />
-            <Text style={styles.stockText}>
-              {product.stock > 10
+            <Text style={[styles.stockText, isProductOOS && { color: Colors.error }]}>
+              {isProductOOS
+                ? t.outOfStock
+                : product.stock > 10
                 ? t.inStock
-                : product.stock > 0
-                ? t.onlyLeft.replace('{{n}}', String(product.stock))
-                : t.outOfStock}
+                : t.onlyLeft.replace('{{n}}', String(product.stock))}
             </Text>
           </View>
 
@@ -422,10 +431,10 @@ export default function ProductDetailScreen() {
             <Text style={styles.qtyLabel}>{t.quantity}</Text>
             <QuantitySelector
               value={quantity}
-              onDecrement={() => setQuantity((q) => Math.max(1, q - 1))}
-              onIncrement={() => setQuantity((q) => Math.min(product.stock, q + 1))}
+              onDecrement={() => { if (!isProductOOS) setQuantity((q) => Math.max(1, q - 1)); }}
+              onIncrement={() => { if (!isProductOOS) setQuantity((q) => Math.min(product.stock > 0 ? product.stock : 1, q + 1)); }}
               min={1}
-              max={product.stock}
+              max={isProductOOS ? 1 : (product.stock > 0 ? product.stock : 1)}
             />
           </View>
 
@@ -481,9 +490,9 @@ export default function ProductDetailScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <GlossyButton
-                title={t.addToCart}
+                title={isProductOOS ? (t.outOfStock ?? 'Out of Stock') : t.addToCart}
                 onPress={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={isProductOOS}
                 fullWidth
               />
             </View>
@@ -993,6 +1002,10 @@ const styles = StyleSheet.create({
   shadeCircleOuterActive: {
     borderColor: Colors.neonBlue,
     ...Shadow.neonBlueSubtle,
+  },
+  shadeCircleOOS: {
+    opacity: 0.3,
+    borderColor: 'rgba(255,68,68,0.35)',
   },
   shadeCircleImage: {
     width: 30,

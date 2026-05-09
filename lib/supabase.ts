@@ -74,6 +74,7 @@ export type Product = {
   main_image: string | null;
   images: string[];
   stock: number;
+  in_stock: boolean;
   badge: string | null;
   is_featured: boolean;
   featured: boolean | null;
@@ -301,6 +302,7 @@ export type ProductShade = {
   shade_image: string;
   product_image: string;
   sort_order: number;
+  is_available: boolean;
 };
 
 export async function fetchProductShades(productId: string): Promise<ProductShade[]> {
@@ -309,7 +311,7 @@ export async function fetchProductShades(productId: string): Promise<ProductShad
 
   const { data } = await supabase
     .from('product_shades')
-    .select('id, name, color_hex, shade_image, product_image, sort_order')
+    .select('id, name, color_hex, shade_image, product_image, sort_order, is_available')
     .eq('product_id', productId)
     .order('sort_order', { ascending: true });
   const result = (data ?? []) as ProductShade[];
@@ -388,7 +390,7 @@ export async function fetchProducts(opts?: {
     .select(`
       id, name, name_ar, name_es, name_de, price, compare_price,
       category, category_id, makeup_subcategory, image_url, main_image,
-      rating, review_count, badge, is_featured, featured, stock, status,
+      rating, review_count, badge, is_featured, featured, stock, in_stock, status,
       slug, try_on_type, created_at,
       translation:product_translations!left(language, name, short_description)
     `)
@@ -693,7 +695,7 @@ export async function getRelatedProducts(
     .select(`
       id, name, name_ar, name_es, name_de, price, compare_price,
       category, category_id, makeup_subcategory, image_url, main_image,
-      rating, review_count, badge, is_featured, featured, stock, status,
+      rating, review_count, badge, is_featured, featured, stock, in_stock, status,
       slug, try_on_type, specifications, created_at,
       translation:product_translations!left(language, name, short_description)
     `)
