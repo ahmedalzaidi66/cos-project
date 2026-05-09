@@ -42,17 +42,11 @@ function AuthView() {
   const [tab, setTab] = useState<AuthTab>('login');
   const { t } = useLanguage();
 
-  const headerIcon = tab === 'phone'
-    ? <SmartphoneNfc size={34} color={Colors.neonBlue} strokeWidth={1.5} />
-    : <User size={34} color={Colors.neonBlue} strokeWidth={1.5} />;
-
-  const headerTitle = tab === 'login' ? t.welcomeBack
-    : tab === 'register' ? t.createAccount
-    : 'Phone Login';
-
-  const headerSubtitle = tab === 'login' ? t.signInSubtitle
-    : tab === 'register' ? t.registerSubtitle
-    : 'Enter your phone number to receive a verification code';
+  const meta = {
+    login:    { icon: <User size={34} color={Colors.neonBlue} strokeWidth={1.5} />,          title: t.welcomeBack,    subtitle: t.signInSubtitle },
+    register: { icon: <User size={34} color={Colors.neonBlue} strokeWidth={1.5} />,          title: t.createAccount,  subtitle: t.registerSubtitle },
+    phone:    { icon: <SmartphoneNfc size={34} color={Colors.neonBlue} strokeWidth={1.5} />, title: 'Phone Login',    subtitle: 'Enter your number to receive a verification code' },
+  }[tab];
 
   return (
     <KeyboardAvoidingView
@@ -65,48 +59,113 @@ function AuthView() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Brand header ── */}
         <View style={styles.authHeader}>
-          {headerIcon}
-          <Text style={styles.authTitle}>{headerTitle}</Text>
-          <Text style={styles.authSubtitle}>{headerSubtitle}</Text>
+          <View style={authViewStyles.iconRing}>
+            {meta.icon}
+          </View>
+          <Text style={styles.authTitle}>{meta.title}</Text>
+          <Text style={styles.authSubtitle}>{meta.subtitle}</Text>
         </View>
 
-        <View style={styles.tabRow}>
-          <TouchableOpacity
-            style={[styles.authTab, tab === 'login' && styles.authTabActive]}
-            onPress={() => setTab('login')}
-          >
-            <Text style={[styles.authTabText, tab === 'login' && styles.authTabTextActive]}>
-              {t.login}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.authTab, tab === 'register' && styles.authTabActive]}
-            onPress={() => setTab('register')}
-          >
-            <Text style={[styles.authTabText, tab === 'register' && styles.authTabTextActive]}>
-              {t.register}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.authTab, tab === 'phone' && styles.authTabActive]}
-            onPress={() => setTab('phone')}
-          >
-            <SmartphoneNfc size={11} color={tab === 'phone' ? Colors.white : Colors.textMuted} strokeWidth={2} />
-            <Text style={[styles.authTabText, tab === 'phone' && styles.authTabTextActive]}>
-              Phone
-            </Text>
-          </TouchableOpacity>
+        {/* ── Tab selector ── */}
+        <View style={authViewStyles.tabBar}>
+          {(['login', 'register', 'phone'] as AuthTab[]).map(t2 => {
+            const active = tab === t2;
+            const label = t2 === 'login' ? t.login : t2 === 'register' ? t.register : 'Phone';
+            return (
+              <TouchableOpacity
+                key={t2}
+                style={[authViewStyles.tabItem, active && authViewStyles.tabItemActive]}
+                onPress={() => setTab(t2)}
+                activeOpacity={0.8}
+              >
+                {t2 === 'phone' && (
+                  <SmartphoneNfc size={11} color={active ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
+                )}
+                <Text style={[authViewStyles.tabLabel, active && authViewStyles.tabLabelActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {tab === 'login' ? <LoginForm /> :
-         tab === 'register' ? <RegisterForm onSuccess={() => setTab('login')} /> :
-         <PhoneLoginForm />}
+        {/* ── Form panel ── */}
+        <View style={authViewStyles.panel}>
+          {tab === 'login'    ? <LoginForm /> : null}
+          {tab === 'register' ? <RegisterForm onSuccess={() => setTab('login')} /> : null}
+          {tab === 'phone'    ? <PhoneLoginForm /> : null}
+        </View>
+
         <AccountFooter />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+const authViewStyles = StyleSheet.create({
+  iconRing: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1.5,
+    borderColor: Colors.neonBlueBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 4,
+    gap: 3,
+    marginBottom: Spacing.md,
+  },
+  tabItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+  },
+  tabItemActive: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    shadowColor: Colors.neonBlue,
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  tabLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    color: Colors.textMuted,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  tabLabelActive: {
+    color: Colors.neonBlue,
+  },
+  panel: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    ...Shadow.card,
+    marginBottom: Spacing.md,
+  },
+});
 
 function LoginForm() {
   const { login, resendVerificationEmail } = useAuth();
@@ -149,7 +208,7 @@ function LoginForm() {
   };
 
   return (
-    <View style={styles.form}>
+    <>
       {resendSuccess ? <SuccessBanner message={resendSuccess} /> : null}
       {error ? <ErrorBanner message={error} /> : null}
       {unverified && !resendSuccess ? (
@@ -191,7 +250,7 @@ function LoginForm() {
         size="xs"
         style={{ marginTop: 4 }}
       />
-    </View>
+    </>
   );
 }
 
@@ -255,7 +314,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
 
   if (verifyPending) {
     return (
-      <View style={styles.form}>
+      <>
         <SuccessBanner message={resendSuccess || t.emailVerificationSent} />
         <GlossyButton
           title={resending ? t.resendingEmail : t.resendVerificationEmail}
@@ -265,12 +324,12 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
           size="xs"
           variant="outline"
         />
-      </View>
+      </>
     );
   }
 
   return (
-    <View style={styles.form}>
+    <>
       {error ? <ErrorBanner message={error} /> : null}
       <View style={styles.nameRow}>
         <View style={{ flex: 1 }}>
@@ -332,7 +391,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         size="xs"
         style={{ marginTop: 4 }}
       />
-    </View>
+    </>
   );
 }
 
@@ -415,16 +474,23 @@ function CountryCodePicker({
   );
 }
 
+type PhoneStep = 'enter_phone' | 'enter_code' | 'complete_profile';
+
 function PhoneLoginForm() {
-  const { requestOtp, verifyOtp } = useAuth();
+  const { requestOtp, verifyOtp, refreshUser } = useAuth();
   const [country, setCountry] = useState<CountryEntry>(COUNTRY_CODES[0]);
   const [localPhone, setLocalPhone] = useState('');
-  const [fullPhone, setFullPhone] = useState(''); // E.164 stored after OTP request
+  const [fullPhone, setFullPhone] = useState('');
   const [code, setCode] = useState('');
-  const [step, setStep] = useState<'enter_phone' | 'enter_code'>('enter_phone');
+  const [step, setStep] = useState<PhoneStep>('enter_phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
+  // Profile completion fields (new users only)
+  const [fullName, setFullName] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [dob, setDob] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -432,12 +498,10 @@ function PhoneLoginForm() {
     return () => clearInterval(id);
   }, [cooldown]);
 
-  const getE164 = () => buildE164(country.code, localPhone);
-
   const handleRequestOtp = async () => {
     const digits = localPhone.replace(/\D/g, '');
     if (digits.length < 7) { setError('Please enter a valid phone number.'); return; }
-    const e164 = getE164();
+    const e164 = buildE164(country.code, localPhone);
     setLoading(true);
     setError('');
     const result = await requestOtp(e164);
@@ -464,7 +528,14 @@ function PhoneLoginForm() {
           ? `${result.error ?? 'Invalid code'} (${result.attemptsLeft} attempts left)`
           : (result.error ?? 'Verification failed')
       );
+      return;
     }
+    // New user → ask for profile details inline
+    if (result.isNewUser) {
+      setError('');
+      setStep('complete_profile');
+    }
+    // Existing user → AuthContext session triggers AccountScreen re-render automatically
   };
 
   const handleResend = async () => {
@@ -482,9 +553,49 @@ function PhoneLoginForm() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    const nameParts = fullName.trim().split(/\s+/);
+    if (nameParts.length < 2 || !nameParts[0] || !nameParts[1]) {
+      setError('Please enter your full name (first and last).'); return;
+    }
+    if (!dob.trim()) { setError('Date of birth is required.'); return; }
+    const normDob = normaliseDob(dob);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(normDob)) { setError('Please use DD/MM/YYYY format.'); return; }
+
+    setSaving(true);
+    setError('');
+    const firstName = nameParts[0];
+    const lastName  = nameParts.slice(1).join(' ');
+
+    const { error: authErr } = await supabase.auth.updateUser({
+      data: { first_name: firstName, last_name: lastName },
+      ...(profileEmail.trim() ? { email: profileEmail.trim() } : {}),
+    });
+    if (authErr) { setSaving(false); setError(authErr.message); return; }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (userId) {
+      const { error: cpErr } = await supabase.from('customer_profiles').upsert({
+        id: userId,
+        first_name: firstName,
+        last_name: lastName,
+        date_of_birth: normDob,
+        phone: fullPhone,
+        phone_verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+      if (cpErr) { setSaving(false); setError(cpErr.message); return; }
+    }
+
+    await refreshUser();
+    setSaving(false);
+  };
+
+  // ── Step: enter phone ──
   if (step === 'enter_phone') {
     return (
-      <View style={styles.form}>
+      <>
         {error ? <ErrorBanner message={error} /> : null}
         <View>
           <Text style={phoneStyles.fieldLabel}>Phone Number</Text>
@@ -511,51 +622,105 @@ function PhoneLoginForm() {
           size="xs"
           style={{ marginTop: 4 }}
         />
-      </View>
+      </>
     );
   }
 
+  // ── Step: enter OTP code ──
+  if (step === 'enter_code') {
+    return (
+      <>
+        {error ? <ErrorBanner message={error} /> : null}
+        <View style={styles.phoneHint}>
+          <SmartphoneNfc size={13} color={Colors.textSecondary} strokeWidth={2} />
+          <Text style={styles.phoneHintText}>Code sent to {fullPhone}</Text>
+        </View>
+        <AuthField
+          label="Verification Code"
+          value={code}
+          onChange={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
+          icon={<Lock size={13} color={Colors.textMuted} />}
+          keyboardType="number-pad"
+          placeholder="6-digit code"
+        />
+        <GlossyButton
+          title={loading ? 'Verifying...' : 'Verify Code'}
+          onPress={handleVerifyOtp}
+          loading={loading}
+          fullWidth
+          size="xs"
+          style={{ marginTop: 4 }}
+        />
+        <TouchableOpacity
+          onPress={handleResend}
+          disabled={cooldown > 0}
+          style={styles.resendRow}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.resendText, cooldown > 0 && styles.resendTextDim]}>
+            {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => { setStep('enter_phone'); setCode(''); setError(''); }}
+          style={styles.resendRow}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.resendText}>Change number</Text>
+        </TouchableOpacity>
+      </>
+    );
+  }
+
+  // ── Step: complete profile (new users) ──
   return (
-    <View style={styles.form}>
+    <>
       {error ? <ErrorBanner message={error} /> : null}
-      <View style={styles.phoneHint}>
-        <SmartphoneNfc size={13} color={Colors.textSecondary} strokeWidth={2} />
-        <Text style={styles.phoneHintText}>Code sent to {fullPhone}</Text>
+      {/* Verified phone badge */}
+      <View style={phoneStyles.verifiedBadge}>
+        <CheckCircle size={13} color={Colors.success} strokeWidth={2} />
+        <Text style={phoneStyles.verifiedBadgeText}>{fullPhone} verified</Text>
       </View>
+      <Text style={phoneStyles.profilePrompt}>Complete your profile to continue</Text>
       <AuthField
-        label="Verification Code"
-        value={code}
-        onChange={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
-        icon={<Lock size={13} color={Colors.textMuted} />}
-        keyboardType="number-pad"
-        placeholder="6-digit code"
+        label="Full Name"
+        value={fullName}
+        onChange={setFullName}
+        icon={<User size={13} color={Colors.textMuted} />}
+        placeholder="First Last"
       />
+      <AuthField
+        label="Email (optional)"
+        value={profileEmail}
+        onChange={setProfileEmail}
+        icon={<Mail size={13} color={Colors.textMuted} />}
+        keyboardType="email-address"
+        placeholder="you@example.com"
+      />
+      <View>
+        <AuthField
+          label="Date of Birth"
+          value={dob}
+          onChange={setDob}
+          icon={<CalendarDays size={13} color={Colors.textMuted} />}
+          placeholder="DD/MM/YYYY"
+        />
+        <View style={styles.dobHintRow}>
+          <Cake size={11} color={Colors.neonBlue} strokeWidth={2} />
+          <Text style={styles.dobHintText}>
+            ادخل تاريخ ميلادك للحصول على عروض تاريخ الميلاد
+          </Text>
+        </View>
+      </View>
       <GlossyButton
-        title={loading ? 'Verifying...' : 'Verify Code'}
-        onPress={handleVerifyOtp}
-        loading={loading}
+        title={saving ? 'Saving...' : 'Continue'}
+        onPress={handleSaveProfile}
+        loading={saving}
         fullWidth
         size="xs"
         style={{ marginTop: 4 }}
       />
-      <TouchableOpacity
-        onPress={handleResend}
-        disabled={cooldown > 0}
-        style={styles.resendRow}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.resendText, cooldown > 0 && styles.resendTextDim]}>
-          {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => { setStep('enter_phone'); setCode(''); setError(''); }}
-        style={styles.resendRow}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.resendText}>Change number</Text>
-      </TouchableOpacity>
-    </View>
+    </>
   );
 }
 
@@ -665,6 +830,31 @@ const phoneStyles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,230,118,0.10)',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(0,230,118,0.25)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  verifiedBadgeText: {
+    color: Colors.success,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  profilePrompt: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 2,
   },
 });
 
