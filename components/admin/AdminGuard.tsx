@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ShieldOff, ArrowLeft } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
@@ -46,6 +46,14 @@ export default function AdminGuard({ permission, children }: Props) {
 function AccessDenied() {
   const router = useRouter();
 
+  const goToDashboard = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.href = '/admin/dashboard';
+    } else {
+      router.replace('/admin/dashboard');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
@@ -58,7 +66,7 @@ function AccessDenied() {
       </Text>
       <TouchableOpacity
         style={styles.btn}
-        onPress={() => router.replace('/admin/dashboard')}
+        onPress={goToDashboard}
         activeOpacity={0.8}
       >
         <ArrowLeft size={16} color={Colors.background} strokeWidth={2} />
