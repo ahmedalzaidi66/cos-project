@@ -17,6 +17,7 @@ import { Camera, Upload, RefreshCw, Eye, EyeOff, ImagePlus, Sparkles, CircleAler
 import AppHeader from '@/components/AppHeader';
 import { useLanguage } from '@/context/LanguageContext';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { supabase, type Product, type ProductShade, getProductImage } from '@/lib/supabase';
 import { useCart } from '@/context/CartContext';
@@ -314,6 +315,7 @@ export default function VirtualTryOnScreen() {
   const { addToCart } = useCart();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist();
   const { language } = useLanguage();
+  const C = useAppColors();
 
   // Quick preview popup
   const [previewProduct, setPreviewProduct] = useState<TryOnProduct | null>(null);
@@ -556,12 +558,12 @@ export default function VirtualTryOnScreen() {
 
   // ── Overlay controls panel (web only) ─────────────────────────────────
   const OverlayControls = Platform.OS === 'web' && showOverlayPanel ? (
-    <View style={styles.overlayPanel}>
+    <View style={[styles.overlayPanel, { backgroundColor: C.backgroundSecondary }]}>
       {/* Type selector */}
       <View style={styles.overlayTypeRow}>
         {isBlushCategory && (
           <TouchableOpacity
-            style={[styles.overlayTypeBtn, selectedOverlay === 'blush' && styles.overlayTypeBtnOn, selectedOverlay === 'blush' && { borderColor: '#FF8FA3' }]}
+            style={[styles.overlayTypeBtn, { backgroundColor: C.backgroundCard, borderColor: C.border }, selectedOverlay === 'blush' && styles.overlayTypeBtnOn, selectedOverlay === 'blush' && { borderColor: '#FF8FA3' }]}
             onPress={() => setSelectedOverlay('blush')}
             activeOpacity={0.8}
           >
@@ -571,7 +573,7 @@ export default function VirtualTryOnScreen() {
         )}
         {isConcealerCategory && (
           <TouchableOpacity
-            style={[styles.overlayTypeBtn, selectedOverlay === 'concealer' && styles.overlayTypeBtnOn, selectedOverlay === 'concealer' && { borderColor: '#FFB3A7' }]}
+            style={[styles.overlayTypeBtn, { backgroundColor: C.backgroundCard, borderColor: C.border }, selectedOverlay === 'concealer' && styles.overlayTypeBtnOn, selectedOverlay === 'concealer' && { borderColor: '#FFB3A7' }]}
             onPress={() => setSelectedOverlay('concealer')}
             activeOpacity={0.8}
           >
@@ -580,7 +582,7 @@ export default function VirtualTryOnScreen() {
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          style={styles.overlayResetBtn}
+          style={[styles.overlayResetBtn, { backgroundColor: C.backgroundCard, borderColor: C.border }]}
           onPress={selectedOverlay === 'blush' ? resetBlush : resetConcealer}
           activeOpacity={0.75}
         >
@@ -599,7 +601,7 @@ export default function VirtualTryOnScreen() {
               return (
                 <TouchableOpacity
                   key={pk}
-                  style={[styles.presetBtn, on && styles.presetBtnOn, on && { borderColor: '#FF8FA3' }]}
+                  style={[styles.presetBtn, { backgroundColor: C.backgroundCard, borderColor: C.border }, on && styles.presetBtnOn, on && { borderColor: '#FF8FA3' }]}
                   onPress={() => handleBlushPreset(pk)}
                   activeOpacity={0.8}
                 >
@@ -642,7 +644,7 @@ export default function VirtualTryOnScreen() {
   ) : null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader />
       <ScrollView
         style={styles.scroll}
@@ -650,7 +652,7 @@ export default function VirtualTryOnScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Hero */}
-        <View style={styles.hero}>
+        <View style={[styles.hero, { borderBottomColor: C.border }]}>
           <LinearGradient
             colors={['rgba(255,77,141,0.10)', 'rgba(0,224,255,0.04)', 'transparent']}
             style={StyleSheet.absoluteFill}
@@ -664,8 +666,8 @@ export default function VirtualTryOnScreen() {
               <Sparkles size={24} color={Colors.neonBlue} strokeWidth={1.5} />
             </View>
             <View style={styles.heroTextWrap}>
-              <Text style={styles.heroTitle}>Virtual Try-On</Text>
-              <Text style={styles.heroSubtitle}>
+              <Text style={[styles.heroTitle, { color: C.textPrimary }]}>Virtual Try-On</Text>
+              <Text style={[styles.heroSubtitle, { color: C.textMuted }]}>
                 Try lipstick, blush, concealer, and foundation shades on your photo
               </Text>
             </View>
@@ -735,7 +737,7 @@ export default function VirtualTryOnScreen() {
         </View>
 
         {/* Mode toggle */}
-        <View style={styles.modeToggleSection}>
+        <View style={[styles.modeToggleSection, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
           <TouchableOpacity
             style={[styles.modeToggleBtn, faceMode === 'model' && styles.modeToggleBtnActive]}
             onPress={() => handleSwitchMode('model')}
@@ -765,10 +767,10 @@ export default function VirtualTryOnScreen() {
               <View style={styles.uploadIconCircle}>
                 <Camera size={32} color={Colors.neonBlue} strokeWidth={1.5} />
               </View>
-              <Text style={styles.uploadText}>
+              <Text style={[styles.uploadText, { color: C.textPrimary }]}>
                 {faceMode === 'model' ? 'No model image configured' : 'Upload your photo'}
               </Text>
-              <Text style={styles.uploadHint}>
+              <Text style={[styles.uploadHint, { color: C.textMuted }]}>
                 {faceMode === 'model' ? 'Upload a photo to try on makeup' : 'Clear, front-facing, natural lighting'}
               </Text>
             </TouchableOpacity>
@@ -799,7 +801,7 @@ export default function VirtualTryOnScreen() {
                 </View>
               </View>
 
-              <View style={[styles.canvasWrap, { width: previewSize, height: previewSize }]}>
+              <View style={[styles.canvasWrap, { width: previewSize, height: previewSize, backgroundColor: C.backgroundSecondary }]}>
                 {Platform.OS === 'web' && (
                   <>
                     <img
@@ -914,7 +916,7 @@ export default function VirtualTryOnScreen() {
               return (
                 <TouchableOpacity
                   key={cat}
-                  style={[styles.categoryTab, active && styles.categoryTabActive]}
+                  style={[styles.categoryTab, { backgroundColor: C.backgroundCard, borderColor: C.border }, active && styles.categoryTabActive]}
                   onPress={() => {
                     const first = categoryProducts(cat)[0];
                     if (first) {
@@ -937,11 +939,11 @@ export default function VirtualTryOnScreen() {
 
         {/* Products for active category */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{CATEGORY_LABELS[selectedProduct.category]} PRODUCTS</Text>
+          <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>{CATEGORY_LABELS[selectedProduct.category]} PRODUCTS</Text>
           {dbLoading ? (
             <ActivityIndicator color={Colors.neonBlue} size="small" style={{ marginTop: 12 }} />
           ) : categoryProducts(selectedProduct.category).length === 0 ? (
-            <Text style={styles.emptyTabText}>No products available</Text>
+            <Text style={[styles.emptyTabText, { color: C.textMuted }]}>No products available</Text>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.productScrollContent}>
               {categoryProducts(selectedProduct.category).map(product => (
@@ -964,10 +966,10 @@ export default function VirtualTryOnScreen() {
         {/* Shade selector */}
         <View style={styles.section}>
           <View style={styles.shadeSectionHeader}>
-            <Text style={styles.sectionLabel}>SELECT SHADE</Text>
+            <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>SELECT SHADE</Text>
             {selectedProduct.id !== '__placeholder__' && (
               <View style={styles.shadeHeaderRight}>
-                <Text style={styles.shadeProductName}>{selectedProduct.name}</Text>
+                <Text style={[styles.shadeProductName, { color: C.textPrimary }]}>{selectedProduct.name}</Text>
                 <View style={styles.finishTag}>
                   <Text style={styles.finishTagText}>{FINISH_LABELS[selectedProduct.finish]}</Text>
                 </View>
@@ -975,11 +977,11 @@ export default function VirtualTryOnScreen() {
             )}
           </View>
           {selectedProduct.id === '__placeholder__' ? (
-            <Text style={styles.emptyTabText}>Select a product to see shades</Text>
+            <Text style={[styles.emptyTabText, { color: C.textMuted }]}>Select a product to see shades</Text>
           ) : (
           <View style={styles.shadesGrid}>
             {selectedProduct.shades.length === 0 ? (
-              <Text style={styles.emptyTabText}>No shades available</Text>
+              <Text style={[styles.emptyTabText, { color: C.textMuted }]}>No shades available</Text>
             ) : selectedProduct.shades.map((shade) => {
               const isActive = selectedShade?.id === shade.id;
               const shadeHex = shade.hex || '#CC9988';
@@ -990,11 +992,11 @@ export default function VirtualTryOnScreen() {
                   onPress={() => setSelectedShade(shade)}
                   activeOpacity={0.8}
                 >
-                  <View style={[styles.shadeImageWrap, isActive && styles.shadeImageWrapActive]}>
+                  <View style={[styles.shadeImageWrap, { backgroundColor: C.backgroundSecondary }, isActive && styles.shadeImageWrapActive]}>
                     <Image source={{ uri: shade.imageUrl }} style={styles.shadeImage} resizeMode="cover" />
                     <View style={[styles.shadeColorDot, { backgroundColor: shadeHex }]} />
                   </View>
-                  <Text style={[styles.shadeName, isActive && styles.shadeNameActive]} numberOfLines={1}>
+                  <Text style={[styles.shadeName, { color: C.textMuted }, isActive && styles.shadeNameActive]} numberOfLines={1}>
                     {shade.name}
                   </Text>
                   {isActive && <View style={styles.shadeActiveLine} />}
@@ -1008,7 +1010,7 @@ export default function VirtualTryOnScreen() {
         {/* Quick color strip */}
         {selectedProduct.id !== '__placeholder__' && selectedProduct.shades.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>QUICK COLOR PICK</Text>
+          <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>QUICK COLOR PICK</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorStripContent}>
             {selectedProduct.shades.map((shade) => {
               const isActive = selectedShade.id === shade.id;
@@ -1084,11 +1086,12 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product, selected, onPress, onPreview, onAddToCart, onToggleWishlist, wishlisted, language }: ProductCardProps) {
+  const C = useAppColors();
   return (
-    <View style={[styles.prodCard, selected && styles.prodCardActive]}>
+    <View style={[styles.prodCard, { backgroundColor: C.backgroundCard, borderColor: C.border }, selected && styles.prodCardActive]}>
       {/* Tappable image area → select product + open preview */}
       <TouchableOpacity
-        style={styles.prodImageWrap}
+        style={[styles.prodImageWrap, { backgroundColor: C.backgroundSecondary }]}
         onPress={() => { onPress(); onPreview(); }}
         activeOpacity={0.88}
       >
@@ -1123,7 +1126,7 @@ function ProductCard({ product, selected, onPress, onPreview, onAddToCart, onTog
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => { onPress(); onPreview(); }} activeOpacity={0.85}>
-        <Text style={[styles.prodName, selected && styles.prodNameActive]} numberOfLines={1}>{product.name}</Text>
+        <Text style={[styles.prodName, { color: C.textPrimary }, selected && styles.prodNameActive]} numberOfLines={1}>{product.name}</Text>
         <Text style={styles.prodPrice}>{formatPrice(product.price, language)}</Text>
       </TouchableOpacity>
 
@@ -1163,6 +1166,7 @@ function QuickPreviewModal({
   product, shade, onShadeChange, onClose,
   onTryShade, onAddToCart, onToggleWishlist, isWishlisted, language,
 }: QuickPreviewModalProps) {
+  const C = useAppColors();
   return (
     <Modal
       visible
@@ -1171,7 +1175,7 @@ function QuickPreviewModal({
       onRequestClose={onClose}
     >
       <TouchableOpacity style={styles.previewOverlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={styles.previewSheet} onPress={() => {}}>
+        <TouchableOpacity activeOpacity={1} style={[styles.previewSheet, { backgroundColor: C.backgroundCard }]} onPress={() => {}}>
           {/* Handle bar */}
           <View style={styles.previewHandle} />
 
@@ -1181,7 +1185,7 @@ function QuickPreviewModal({
           </TouchableOpacity>
 
           {/* Product image */}
-          <View style={styles.previewImageWrap}>
+          <View style={[styles.previewImageWrap, { backgroundColor: C.backgroundSecondary }]}>
             <Image source={{ uri: product.imageUrl }} style={styles.previewImage} resizeMode="cover" />
             <LinearGradient
               colors={['transparent', 'rgba(7,13,26,0.6)']}
@@ -1197,14 +1201,14 @@ function QuickPreviewModal({
 
           {/* Name + price */}
           <View style={styles.previewInfo}>
-            <Text style={styles.previewName} numberOfLines={2}>{product.name}</Text>
+            <Text style={[styles.previewName, { color: C.textPrimary }]} numberOfLines={2}>{product.name}</Text>
             <Text style={styles.previewPrice}>{formatPrice(product.price, language)}</Text>
           </View>
 
           {/* Shade circles */}
           {product.shades.length > 0 && (
             <View style={styles.previewShadesSection}>
-              <Text style={styles.previewShadesLabel}>SELECT SHADE</Text>
+              <Text style={[styles.previewShadesLabel, { color: C.textSecondary }]}>SELECT SHADE</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewShadesRow}>
                 {product.shades.map(s => {
                   const active = shade.id === s.id;
@@ -1247,7 +1251,7 @@ function QuickPreviewModal({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.previewHeartBtn, isWishlisted && styles.previewHeartBtnActive]}
+              style={[styles.previewHeartBtn, { backgroundColor: C.backgroundCard, borderColor: C.border }, isWishlisted && styles.previewHeartBtnActive]}
               onPress={() => onToggleWishlist(product)}
               activeOpacity={0.85}
             >

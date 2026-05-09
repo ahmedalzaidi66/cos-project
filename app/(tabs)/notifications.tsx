@@ -19,6 +19,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import AppHeader from '@/components/AppHeader';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 
 // ─── Type metadata ────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ function timeAgo(dateStr: string, t: any): string {
 
 function NotificationItem({ item, onPress }: { item: InboxItem; onPress: (item: InboxItem) => void }) {
   const { t } = useLanguage();
+  const C = useAppColors();
   const isOrder = item.source === 'order';
   const isUnread = isOrder ? !item.is_read : !item.isRead;
 
@@ -81,7 +83,7 @@ function NotificationItem({ item, onPress }: { item: InboxItem; onPress: (item: 
 
   return (
     <TouchableOpacity
-      style={[styles.item, isUnread && styles.itemUnread]}
+      style={[styles.item, { backgroundColor: C.backgroundCard, borderColor: C.border }, isUnread && { backgroundColor: C.navy, borderColor: C.neonBlueBorder }]}
       onPress={() => onPress(item)}
       activeOpacity={0.75}
     >
@@ -107,26 +109,28 @@ function NotificationItem({ item, onPress }: { item: InboxItem; onPress: (item: 
 
 function EmptyInbox() {
   const { t } = useLanguage();
+  const C = useAppColors();
   return (
     <View style={styles.empty}>
-      <View style={styles.emptyIconWrap}>
-        <Bell size={40} color={Colors.textMuted} strokeWidth={1.5} />
+      <View style={[styles.emptyIconWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+        <Bell size={40} color={C.textMuted} strokeWidth={1.5} />
       </View>
-      <Text style={styles.emptyTitle}>{t.notifAllCaughtUp}</Text>
-      <Text style={styles.emptySubtitle}>{t.notifEmptySubtitle}</Text>
+      <Text style={[styles.emptyTitle, { color: C.textSecondary }]}>{t.notifAllCaughtUp}</Text>
+      <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>{t.notifEmptySubtitle}</Text>
     </View>
   );
 }
 
 function GuestView() {
   const { t } = useLanguage();
+  const C = useAppColors();
   return (
     <View style={styles.empty}>
-      <View style={styles.emptyIconWrap}>
-        <Bell size={40} color={Colors.textMuted} strokeWidth={1.5} />
+      <View style={[styles.emptyIconWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+        <Bell size={40} color={C.textMuted} strokeWidth={1.5} />
       </View>
-      <Text style={styles.emptyTitle}>{t.notifSignIn}</Text>
-      <Text style={styles.emptySubtitle}>{t.notifSignInSubtitle}</Text>
+      <Text style={[styles.emptyTitle, { color: C.textSecondary }]}>{t.notifSignIn}</Text>
+      <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>{t.notifSignInSubtitle}</Text>
     </View>
   );
 }
@@ -137,17 +141,18 @@ export default function NotificationsScreen() {
   const { inboxItems, unreadCount, loading, markAsRead, markAllRead, refresh } = useNotifications();
   const { isAuthenticated } = useAuth();
   const { t } = useLanguage();
+  const C = useAppColors();
 
   const handlePress = useCallback((item: InboxItem) => {
     markAsRead(item);
   }, [markAsRead]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader title={t.notifTitle} />
 
       {isAuthenticated && unreadCount > 0 && (
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
           <Text style={styles.unreadLabel}>{(t.notifUnread as string).replace('{{n}}', String(unreadCount))}</Text>
           <TouchableOpacity onPress={markAllRead} style={styles.markAllBtn} activeOpacity={0.7}>
             <CheckCheck size={14} color={Colors.neonBlue} strokeWidth={2} />

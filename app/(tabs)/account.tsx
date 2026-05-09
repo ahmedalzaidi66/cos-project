@@ -24,6 +24,7 @@ import AppHeader from '@/components/AppHeader';
 import GlossyButton from '@/components/GlossyButton';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 
 export default function AccountScreen() {
@@ -41,6 +42,7 @@ type AuthTab = 'login' | 'register' | 'phone';
 function AuthView() {
   const [tab, setTab] = useState<AuthTab>('login');
   const { t } = useLanguage();
+  const C = useAppColors();
 
   const meta = {
     login:    { title: t.welcomeBack,   subtitle: t.signInSubtitle },
@@ -49,14 +51,14 @@ function AuthView() {
   }[tab];
 
   const TAB_ICONS: Record<AuthTab, React.ReactNode> = {
-    login:    <Lock    size={13} color={tab === 'login'    ? Colors.neonBlue : Colors.textMuted} strokeWidth={2.5} />,
-    register: <User   size={13} color={tab === 'register' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2.5} />,
-    phone:    <SmartphoneNfc size={13} color={tab === 'phone' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2.5} />,
+    login:    <Lock    size={13} color={tab === 'login'    ? Colors.neonBlue : C.textMuted} strokeWidth={2.5} />,
+    register: <User   size={13} color={tab === 'register' ? Colors.neonBlue : C.textMuted} strokeWidth={2.5} />,
+    phone:    <SmartphoneNfc size={13} color={tab === 'phone' ? Colors.neonBlue : C.textMuted} strokeWidth={2.5} />,
   };
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: C.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <AppHeader title={t.account} />
@@ -72,20 +74,20 @@ function AuthView() {
               <Text style={authViewStyles.logoLetter}>L</Text>
             </View>
           </View>
-          <Text style={authViewStyles.brandName}>LAZURDE</Text>
-          <Text style={authViewStyles.brandTagline}>{t.authBrandTagline}</Text>
+          <Text style={[authViewStyles.brandName, { color: C.textPrimary }]}>LAZURDE</Text>
+          <Text style={[authViewStyles.brandTagline, { color: C.textMuted }]}>{t.authBrandTagline}</Text>
         </View>
 
         {/* ── Main card ── */}
-        <View style={authViewStyles.card}>
+        <View style={[authViewStyles.card, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
           {/* Card header */}
           <View style={authViewStyles.cardHeader}>
-            <Text style={authViewStyles.cardTitle}>{meta.title}</Text>
-            <Text style={authViewStyles.cardSubtitle}>{meta.subtitle}</Text>
+            <Text style={[authViewStyles.cardTitle, { color: C.textPrimary }]}>{meta.title}</Text>
+            <Text style={[authViewStyles.cardSubtitle, { color: C.textMuted }]}>{meta.subtitle}</Text>
           </View>
 
           {/* Tab selector */}
-          <View style={authViewStyles.tabBar}>
+          <View style={[authViewStyles.tabBar, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
             {(['login', 'register', 'phone'] as AuthTab[]).map(t2 => {
               const active = tab === t2;
               const label = t2 === 'login' ? t.login : t2 === 'register' ? t.register : t.phoneTabLabel;
@@ -106,7 +108,7 @@ function AuthView() {
           </View>
 
           {/* Thin divider */}
-          <View style={authViewStyles.cardDivider} />
+          <View style={[authViewStyles.cardDivider, { backgroundColor: C.border }]} />
 
           {/* Form */}
           <View style={authViewStyles.formArea}>
@@ -272,6 +274,7 @@ const authViewStyles = StyleSheet.create({
 function LoginForm() {
   const { login, resendVerificationEmail } = useAuth();
   const { t } = useLanguage();
+  const C = useAppColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -327,7 +330,7 @@ function LoginForm() {
         label={t.email}
         value={email}
         onChange={setEmail}
-        icon={<Mail size={13} color={Colors.textMuted} />}
+        icon={<Mail size={13} color={C.textMuted} />}
         keyboardType="email-address"
         placeholder={t.emailPlaceholder}
       />
@@ -335,12 +338,12 @@ function LoginForm() {
         label={t.password}
         value={password}
         onChange={setPassword}
-        icon={<Lock size={13} color={Colors.textMuted} />}
+        icon={<Lock size={13} color={C.textMuted} />}
         secureTextEntry={!showPw}
         placeholder="••••••••"
         right={
           <TouchableOpacity onPress={() => setShowPw(p => !p)}>
-            {showPw ? <EyeOff size={13} color={Colors.textMuted} /> : <Eye size={13} color={Colors.textMuted} />}
+            {showPw ? <EyeOff size={13} color={C.textMuted} /> : <Eye size={13} color={C.textMuted} />}
           </TouchableOpacity>
         }
       />
@@ -359,6 +362,7 @@ function LoginForm() {
 function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const { register, resendVerificationEmail } = useAuth();
   const { t } = useLanguage();
+  const C = useAppColors();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -445,7 +449,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         label={t.email}
         value={email}
         onChange={setEmail}
-        icon={<Mail size={13} color={Colors.textMuted} />}
+        icon={<Mail size={13} color={C.textMuted} />}
         keyboardType="email-address"
         placeholder={t.emailPlaceholder}
       />
@@ -453,12 +457,12 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         label={t.password}
         value={password}
         onChange={setPassword}
-        icon={<Lock size={13} color={Colors.textMuted} />}
+        icon={<Lock size={13} color={C.textMuted} />}
         secureTextEntry={!showPw}
         placeholder={t.passwordPlaceholder}
         right={
           <TouchableOpacity onPress={() => setShowPw(p => !p)}>
-            {showPw ? <EyeOff size={13} color={Colors.textMuted} /> : <Eye size={13} color={Colors.textMuted} />}
+            {showPw ? <EyeOff size={13} color={C.textMuted} /> : <Eye size={13} color={C.textMuted} />}
           </TouchableOpacity>
         }
       />
@@ -466,7 +470,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         label={t.confirmPassword}
         value={confirm}
         onChange={setConfirm}
-        icon={<Lock size={13} color={Colors.textMuted} />}
+        icon={<Lock size={13} color={C.textMuted} />}
         secureTextEntry={!showPw}
         placeholder={t.confirmPassword}
       />
@@ -475,7 +479,7 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
           label={t.dobLabel ?? 'Date of Birth'}
           value={dob}
           onChange={v => setDob(formatDobInput(v))}
-          icon={<CalendarDays size={13} color={Colors.textMuted} />}
+          icon={<CalendarDays size={13} color={C.textMuted} />}
           placeholder="DD/MM/YYYY"
           keyboardType="number-pad"
         />
@@ -525,19 +529,20 @@ function CountryCodePicker({
 }) {
   const [open, setOpen] = useState(false);
   const { t } = useLanguage();
+  const C = useAppColors();
 
   return (
     <View>
       <TouchableOpacity
-        style={phoneStyles.ccBtn}
+        style={[phoneStyles.ccBtn, { backgroundColor: C.backgroundInput, borderColor: C.border }]}
         onPress={() => setOpen(true)}
         activeOpacity={0.8}
       >
         <Text style={phoneStyles.ccFlag}>{selected.flag}</Text>
-        <Text style={phoneStyles.ccCode}>{selected.code}</Text>
+        <Text style={[phoneStyles.ccCode, { color: C.textPrimary }]}>{selected.code}</Text>
         <ChevronRight
           size={11}
-          color={Colors.textMuted}
+          color={C.textMuted}
           strokeWidth={2.5}
           style={{ transform: [{ rotate: '90deg' }] }}
         />
@@ -549,8 +554,8 @@ function CountryCodePicker({
           activeOpacity={1}
           onPress={() => setOpen(false)}
         >
-          <View style={phoneStyles.pickerSheet}>
-            <Text style={phoneStyles.pickerTitle}>{t.phoneSelectCountry}</Text>
+          <View style={[phoneStyles.pickerSheet, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+            <Text style={[phoneStyles.pickerTitle, { color: C.textPrimary }]}>{t.phoneSelectCountry}</Text>
             {COUNTRY_CODES.map(c => (
               <TouchableOpacity
                 key={c.code}
@@ -562,8 +567,8 @@ function CountryCodePicker({
                 activeOpacity={0.8}
               >
                 <Text style={phoneStyles.pickerFlag}>{c.flag}</Text>
-                <Text style={phoneStyles.pickerLabel}>{c.label}</Text>
-                <Text style={phoneStyles.pickerCode}>{c.code}</Text>
+                <Text style={[phoneStyles.pickerLabel, { color: C.textPrimary }]}>{c.label}</Text>
+                <Text style={[phoneStyles.pickerCode, { color: C.textMuted }]}>{c.code}</Text>
                 {c.code === selected.code && (
                   <CheckCircle size={14} color={Colors.neonBlue} strokeWidth={2} />
                 )}
@@ -581,6 +586,7 @@ type PhoneStep = 'enter_phone' | 'enter_code' | 'complete_profile';
 function PhoneLoginForm() {
   const { requestOtp, verifyOtp, refreshUser } = useAuth();
   const { t } = useLanguage();
+  const C = useAppColors();
   const [country, setCountry] = useState<CountryEntry>(COUNTRY_CODES[0]);
   const [localPhone, setLocalPhone] = useState('');
   const [fullPhone, setFullPhone] = useState('');
@@ -701,17 +707,17 @@ function PhoneLoginForm() {
       <>
         {error ? <ErrorBanner message={error} /> : null}
         <View>
-          <Text style={phoneStyles.fieldLabel}>{t.phoneNumberLabel}</Text>
+          <Text style={[phoneStyles.fieldLabel, { color: C.textSecondary }]}>{t.phoneNumberLabel}</Text>
           <View style={phoneStyles.phoneRow}>
             <CountryCodePicker selected={country} onSelect={setCountry} />
-            <View style={phoneStyles.localInputWrap}>
+            <View style={[phoneStyles.localInputWrap, { backgroundColor: C.backgroundInput, borderColor: C.border }]}>
               <TextInput
-                style={phoneStyles.localInput}
+                style={[phoneStyles.localInput, { color: C.textPrimary }]}
                 value={localPhone}
                 onChangeText={v => setLocalPhone(v.replace(/[^\d\s\-]/g, ''))}
                 keyboardType="phone-pad"
                 placeholder={t.phoneNumberPlaceholder}
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={C.textMuted}
                 maxLength={15}
               />
             </View>
@@ -735,14 +741,14 @@ function PhoneLoginForm() {
       <>
         {error ? <ErrorBanner message={error} /> : null}
         <View style={styles.phoneHint}>
-          <SmartphoneNfc size={13} color={Colors.textSecondary} strokeWidth={2} />
-          <Text style={styles.phoneHintText}>{(t.phoneCodeSentTo as string).replace('{{phone}}', fullPhone)}</Text>
+          <SmartphoneNfc size={13} color={C.textSecondary} strokeWidth={2} />
+          <Text style={[styles.phoneHintText, { color: C.textSecondary }]}>{(t.phoneCodeSentTo as string).replace('{{phone}}', fullPhone)}</Text>
         </View>
         <AuthField
           label={t.phoneVerificationCode}
           value={code}
           onChange={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
-          icon={<Lock size={13} color={Colors.textMuted} />}
+          icon={<Lock size={13} color={C.textMuted} />}
           keyboardType="number-pad"
           placeholder={t.phone6DigitPlaceholder}
         />
@@ -786,19 +792,19 @@ function PhoneLoginForm() {
         <CheckCircle size={13} color={Colors.success} strokeWidth={2} />
         <Text style={phoneStyles.verifiedBadgeText}>{(t.phoneVerified as string).replace('{{phone}}', fullPhone)}</Text>
       </View>
-      <Text style={phoneStyles.profilePrompt}>{t.phoneCompleteProfile}</Text>
+      <Text style={[phoneStyles.profilePrompt, { color: C.textMuted }]}>{t.phoneCompleteProfile}</Text>
       <AuthField
         label={t.phoneFullName}
         value={fullName}
         onChange={setFullName}
-        icon={<User size={13} color={Colors.textMuted} />}
+        icon={<User size={13} color={C.textMuted} />}
         placeholder={t.phoneFullNamePlaceholder}
       />
       <AuthField
         label={t.phoneEmailOptional}
         value={profileEmail}
         onChange={setProfileEmail}
-        icon={<Mail size={13} color={Colors.textMuted} />}
+        icon={<Mail size={13} color={C.textMuted} />}
         keyboardType="email-address"
         placeholder="you@example.com"
       />
@@ -807,7 +813,7 @@ function PhoneLoginForm() {
           label={t.dobLabel ?? 'Date of Birth'}
           value={dob}
           onChange={v => setDob(formatDobInput(v))}
-          icon={<CalendarDays size={13} color={Colors.textMuted} />}
+          icon={<CalendarDays size={13} color={C.textMuted} />}
           placeholder="DD/MM/YYYY"
           keyboardType="number-pad"
         />
@@ -995,6 +1001,7 @@ function normaliseDob(raw: string): string {
 function PhoneSignupGate() {
   const { user, logout, refreshUser } = useAuth();
   const { t } = useLanguage();
+  const C = useAppColors();
   const [fullName, setFullName] = useState('');
   const [dob, setDob] = useState('');
   const [saving, setSaving] = useState(false);
@@ -1052,7 +1059,7 @@ function PhoneSignupGate() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: C.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <AppHeader title={t.account} />
@@ -1068,14 +1075,14 @@ function PhoneSignupGate() {
               <Text style={gateStyles.logoLetter}>L</Text>
             </View>
           </View>
-          <Text style={gateStyles.brandName}>LAZURDE</Text>
+          <Text style={[gateStyles.brandName, { color: C.textPrimary }]}>LAZURDE</Text>
         </View>
 
         {/* Card */}
-        <View style={gateStyles.card}>
+        <View style={[gateStyles.card, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
           <View style={gateStyles.cardHeader}>
-            <Text style={gateStyles.cardTitle}>{t.phoneCompleteProfile}</Text>
-            <Text style={gateStyles.cardSubtitle}>{t.phoneTabSubtitle}</Text>
+            <Text style={[gateStyles.cardTitle, { color: C.textPrimary }]}>{t.phoneCompleteProfile}</Text>
+            <Text style={[gateStyles.cardSubtitle, { color: C.textMuted }]}>{t.phoneTabSubtitle}</Text>
           </View>
 
           {/* Phone badge */}
@@ -1087,7 +1094,7 @@ function PhoneSignupGate() {
             </View>
           ) : null}
 
-          <View style={gateStyles.cardDivider} />
+          <View style={[gateStyles.cardDivider, { backgroundColor: C.border }]} />
 
           <View style={gateStyles.formArea}>
             {error ? <ErrorBanner message={error} /> : null}
@@ -1096,7 +1103,7 @@ function PhoneSignupGate() {
               label={t.phoneFullName}
               value={fullName}
               onChange={setFullName}
-              icon={<User size={13} color={Colors.textMuted} />}
+              icon={<User size={13} color={C.textMuted} />}
               placeholder={t.phoneFullNamePlaceholder}
             />
 
@@ -1105,7 +1112,7 @@ function PhoneSignupGate() {
                 label={t.dobLabel ?? 'Date of Birth'}
                 value={dob}
                 onChange={v => setDob(formatDobInput(v))}
-                icon={<CalendarDays size={13} color={Colors.textMuted} />}
+                icon={<CalendarDays size={13} color={C.textMuted} />}
                 placeholder="DD/MM/YYYY"
                 keyboardType="number-pad"
               />
@@ -1132,8 +1139,8 @@ function PhoneSignupGate() {
           onPress={logout}
           activeOpacity={0.7}
         >
-          <LogOut size={13} color={Colors.textMuted} strokeWidth={2} />
-          <Text style={gateStyles.signOutText}>{t.signOut}</Text>
+          <LogOut size={13} color={C.textMuted} strokeWidth={2} />
+          <Text style={[gateStyles.signOutText, { color: C.textMuted }]}>{t.signOut}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -1305,6 +1312,7 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
 function ProfileView() {
   const { user, logout, refreshUser } = useAuth();
   const { t, language } = useLanguage();
+  const C = useAppColors();
   const { count: wishlistCount } = useWishlist();
   const { unreadCount } = useNotifications();
   const router = useRouter();
@@ -1374,12 +1382,12 @@ function ProfileView() {
     : '';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader title={t.account} />
       <ScrollView contentContainerStyle={styles.profileContent} showsVerticalScrollIndicator={false}>
 
         {/* ── Avatar card ── */}
-        <View style={styles.heroCard}>
+        <View style={[styles.heroCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{initials}</Text>
@@ -1394,7 +1402,7 @@ function ProfileView() {
           </View>
 
           <View style={styles.heroInfo}>
-            <Text style={styles.heroName}>
+            <Text style={[styles.heroName, { color: C.textPrimary }]}>
               {(user?.firstName || user?.lastName)
                 ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
                 : isPhoneUser ? 'Phone User' : ''}
@@ -1417,11 +1425,11 @@ function ProfileView() {
                 </View>
               )}
               {memberSince ? (
-                <Text style={styles.memberSince}>{t.memberSince} {memberSince}</Text>
+                <Text style={[styles.memberSince, { color: C.textMuted }]}>{t.memberSince} {memberSince}</Text>
               ) : null}
             </View>
 
-            <Text style={styles.heroEmail}>
+            <Text style={[styles.heroEmail, { color: C.textMuted }]}>
               {isPhoneUser
                 ? (user?.phone ? user.phone : (user?.profileEmail || ''))
                 : user?.email}
@@ -1443,8 +1451,8 @@ function ProfileView() {
             <View style={styles.completionLeft}>
               <Pencil size={14} color={Colors.neonBlue} strokeWidth={2} />
               <View>
-                <Text style={styles.completionTitle}>{t.completeProfileTitle}</Text>
-                <Text style={styles.completionSub}>{t.completeProfileSub}</Text>
+                <Text style={[styles.completionTitle, { color: C.textPrimary }]}>{t.completeProfileTitle}</Text>
+                <Text style={[styles.completionSub, { color: C.textMuted }]}>{t.completeProfileSub}</Text>
               </View>
             </View>
             <ChevronRight size={15} color={Colors.neonBlue} strokeWidth={2} />
@@ -1482,7 +1490,7 @@ function ProfileView() {
         {ordersExpanded && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t.orderHistory}</Text>
+              <Text style={[styles.sectionTitle, { color: C.textSecondary }]}>{t.orderHistory}</Text>
               <TouchableOpacity
                 onPress={() => user?.email && fetchOrders(user.email)}
                 style={styles.refreshBtn}
@@ -1493,11 +1501,11 @@ function ProfileView() {
               </TouchableOpacity>
             </View>
             {loadingOrders ? (
-              <Text style={styles.dimText}>{t.loadingOrders}</Text>
+              <Text style={[styles.dimText, { color: C.textMuted }]}>{t.loadingOrders}</Text>
             ) : orders.length === 0 ? (
-              <View style={styles.emptyBlock}>
-                <Package size={32} color={Colors.textMuted} strokeWidth={1.5} />
-                <Text style={styles.dimText}>{t.noOrdersYet}</Text>
+              <View style={[styles.emptyBlock, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+                <Package size={32} color={C.textMuted} strokeWidth={1.5} />
+                <Text style={[styles.dimText, { color: C.textMuted }]}>{t.noOrdersYet}</Text>
               </View>
             ) : (
               <View style={styles.ordersList}>
@@ -1508,19 +1516,19 @@ function ProfileView() {
         )}
 
         {/* ── Settings list ── */}
-        <View style={styles.menuCard}>
+        <View style={[styles.menuCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
           <MenuRow
             icon={<Globe size={16} color={Colors.neonBlue} strokeWidth={2} />}
             label={t.language}
             right={<LanguageSwitcher />}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.borderLight }]} />
           <MenuRow
-            icon={<KeyRound size={16} color={Colors.textSecondary} strokeWidth={2} />}
+            icon={<KeyRound size={16} color={C.textSecondary} strokeWidth={2} />}
             label={t.changePassword}
             onPress={() => setPwModalOpen(true)}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.borderLight }]} />
           <MenuRow
             icon={<LogOut size={16} color={Colors.error} strokeWidth={2} />}
             label={t.signOut}
@@ -1564,15 +1572,16 @@ function QuickTile({
   badge?: string;
   onPress: () => void;
 }) {
+  const C = useAppColors();
   return (
-    <TouchableOpacity style={styles.quickTile} onPress={onPress} activeOpacity={0.8}>
-      <View style={styles.quickTileIcon}>{icon}</View>
+    <TouchableOpacity style={[styles.quickTile, { backgroundColor: C.backgroundCard, borderColor: C.border }]} onPress={onPress} activeOpacity={0.8}>
+      <View style={[styles.quickTileIcon, { backgroundColor: C.backgroundInput }]}>{icon}</View>
       {badge ? (
         <View style={styles.quickTileBadge}>
           <Text style={styles.quickTileBadgeText}>{badge}</Text>
         </View>
       ) : null}
-      <Text style={styles.quickTileLabel}>{label}</Text>
+      <Text style={[styles.quickTileLabel, { color: C.textMuted }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -1588,15 +1597,16 @@ function MenuRow({
   right?: React.ReactNode;
   onPress?: () => void;
 }) {
+  const C = useAppColors();
   const inner = (
     <View style={styles.menuRow}>
       <View style={styles.menuRowLeft}>
         {icon}
-        <Text style={[styles.menuRowLabel, labelColor ? { color: labelColor } : undefined]}>
+        <Text style={[styles.menuRowLabel, { color: C.textPrimary }, labelColor ? { color: labelColor } : undefined]}>
           {label}
         </Text>
       </View>
-      {right ?? <ChevronRight size={15} color={Colors.textMuted} strokeWidth={2} />}
+      {right ?? <ChevronRight size={15} color={C.textMuted} strokeWidth={2} />}
     </View>
   );
   if (!onPress) return inner;
@@ -1611,22 +1621,23 @@ function MenuRow({
 
 function OrderCard({ order }: { order: Order }) {
   const { language } = useLanguage();
+  const C = useAppColors();
   const date = new Date(order.created_at).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
-  const sc = ORDER_STATUS_COLORS[order.status] ?? Colors.textMuted;
+  const sc = ORDER_STATUS_COLORS[order.status] ?? C.textMuted;
   const sl = ORDER_STATUS_LABELS[order.status] ?? (order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—');
 
   return (
-    <View style={styles.orderCard}>
+    <View style={[styles.orderCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
       <View style={styles.orderTopRow}>
-        <Text style={styles.orderId}>#{order.id.slice(0, 8).toUpperCase()}</Text>
+        <Text style={[styles.orderId, { color: C.textPrimary }]}>#{order.id.slice(0, 8).toUpperCase()}</Text>
         <View style={[styles.statusBadge, { borderColor: sc, backgroundColor: sc + '18' }]}>
           <Text style={[styles.statusText, { color: sc }]}>{sl}</Text>
         </View>
       </View>
       <View style={styles.orderBottom}>
-        <Text style={styles.orderDate}>{date}</Text>
+        <Text style={[styles.orderDate, { color: C.textMuted }]}>{date}</Text>
         <Text style={styles.orderTotal}>{formatPrice(order.total, language)}</Text>
       </View>
     </View>
@@ -1648,6 +1659,7 @@ function EditProfileModal({
   isPhoneUser: boolean;
 }) {
   const { t } = useLanguage();
+  const C = useAppColors();
   const [firstName, setFirstName] = useState(currentFirst);
   const [lastName, setLastName] = useState(currentLast);
   const [profileEmail, setProfileEmail] = useState(currentProfileEmail);
@@ -1715,11 +1727,11 @@ function EditProfileModal({
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t.editProfileTitle}</Text>
+            <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t.editProfileTitle}</Text>
             <TouchableOpacity onPress={onClose} style={styles.modalClose}>
-              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+              <X size={18} color={C.textMuted} strokeWidth={2} />
             </TouchableOpacity>
           </View>
           {error ? <ErrorBanner message={error} /> : null}
@@ -1743,7 +1755,7 @@ function EditProfileModal({
             label={isPhoneUser ? t.phoneEmailOptional : t.emailLabel}
             value={profileEmail}
             onChange={setProfileEmail}
-            icon={<Mail size={13} color={Colors.textMuted} />}
+            icon={<Mail size={13} color={C.textMuted} />}
             keyboardType="email-address"
             placeholder="your@email.com"
           />
@@ -1754,7 +1766,7 @@ function EditProfileModal({
               label={t.dobLabel}
               value={dob}
               onChange={v => setDob(formatDobInput(v))}
-              icon={<CalendarDays size={13} color={Colors.textMuted} />}
+              icon={<CalendarDays size={13} color={C.textMuted} />}
               placeholder="DD/MM/YYYY"
               keyboardType="number-pad"
             />
@@ -1782,6 +1794,7 @@ function EditProfileModal({
 
 function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useLanguage();
+  const C = useAppColors();
   const [newPw, setNewPw] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [showPw, setShowPw] = useState(false);
@@ -1807,11 +1820,11 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t.changePassword}</Text>
+            <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t.changePassword}</Text>
             <TouchableOpacity onPress={onClose} style={styles.modalClose}>
-              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+              <X size={18} color={C.textMuted} strokeWidth={2} />
             </TouchableOpacity>
           </View>
           {error ? <ErrorBanner message={error} /> : null}
@@ -1820,12 +1833,12 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
             label={t.newPasswordLabel}
             value={newPw}
             onChange={setNewPw}
-            icon={<Lock size={13} color={Colors.textMuted} />}
+            icon={<Lock size={13} color={C.textMuted} />}
             secureTextEntry={!showPw}
             placeholder={t.minCharsPlaceholder}
             right={
               <TouchableOpacity onPress={() => setShowPw(p => !p)}>
-                {showPw ? <EyeOff size={13} color={Colors.textMuted} /> : <Eye size={13} color={Colors.textMuted} />}
+                {showPw ? <EyeOff size={13} color={C.textMuted} /> : <Eye size={13} color={C.textMuted} />}
               </TouchableOpacity>
             }
           />
@@ -1833,7 +1846,7 @@ function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => 
             label={t.confirmPasswordLabel}
             value={confirmPw}
             onChange={setConfirmPw}
-            icon={<Lock size={13} color={Colors.textMuted} />}
+            icon={<Lock size={13} color={C.textMuted} />}
             secureTextEntry={!showPw}
             placeholder={t.repeatPasswordPlaceholder}
           />
@@ -1864,6 +1877,7 @@ type ContactSettings = {
 function AccountFooter() {
   const router = useRouter();
   const { t } = useLanguage();
+  const C = useAppColors();
   const [contact, setContact] = useState<ContactSettings>({
     phone: '', whatsapp: '', instagram: '', facebook: '', tiktok: '',
   });
@@ -1958,8 +1972,8 @@ function AccountFooter() {
               activeOpacity={0.8}
               onPress={callPhone}
             >
-              <Phone size={13} color={Colors.textSecondary} strokeWidth={2} />
-              <Text style={footerStyles.phoneText}>{contact.phone}</Text>
+              <Phone size={13} color={C.textSecondary} strokeWidth={2} />
+              <Text style={[footerStyles.phoneText, { color: C.textSecondary }]}>{contact.phone}</Text>
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
@@ -2078,18 +2092,19 @@ function AuthField({
   right?: React.ReactNode;
 }) {
   const [focused, setFocused] = useState(false);
+  const C = useAppColors();
   return (
     <View style={fieldStyles.wrapper}>
-      <Text style={fieldStyles.label}>{label}</Text>
-      <View style={[fieldStyles.row, focused && fieldStyles.rowFocused]}>
+      <Text style={[fieldStyles.label, { color: C.textSecondary }]}>{label}</Text>
+      <View style={[fieldStyles.row, { backgroundColor: C.backgroundInput, borderColor: C.border }, focused && fieldStyles.rowFocused]}>
         {icon && <View style={fieldStyles.iconWrap}>{icon}</View>}
         <TextInput
-          style={fieldStyles.input}
+          style={[fieldStyles.input, { color: C.textPrimary }]}
           value={value}
           onChangeText={onChange}
           keyboardType={keyboardType}
           placeholder={placeholder}
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={C.textMuted}
           secureTextEntry={secureTextEntry}
           autoCapitalize="none"
           autoCorrect={false}

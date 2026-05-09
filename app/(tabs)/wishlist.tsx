@@ -20,6 +20,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { getProductName, getProductImage } from '@/lib/supabase';
 import AppHeader from '@/components/AppHeader';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 
 export default function WishlistScreen() {
@@ -29,6 +30,7 @@ export default function WishlistScreen() {
   const { t, language } = useLanguage();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const C = useAppColors();
 
   const handleMoveToCart = useCallback(
     (item: WishlistItem) => {
@@ -58,14 +60,14 @@ export default function WishlistScreen() {
 
   if (!isAuthenticated) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: C.background }]}>
         <AppHeader title={t.myWishlist ?? 'My Wishlist'} />
         <View style={styles.emptyState}>
-          <View style={styles.emptyIconWrap}>
-            <Heart size={52} color={Colors.textMuted} strokeWidth={1.5} />
+          <View style={[styles.emptyIconWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+            <Heart size={52} color={C.textMuted} strokeWidth={1.5} />
           </View>
-          <Text style={styles.emptyTitle}>{t.signInToSave ?? 'Sign in to save favorites'}</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>{t.signInToSave ?? 'Sign in to save favorites'}</Text>
+          <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>
             {t.signInToSaveDesc ?? 'Create an account to save products and access your wishlist from any device.'}
           </Text>
           <TouchableOpacity
@@ -81,7 +83,7 @@ export default function WishlistScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader title={t.myWishlist ?? 'My Wishlist'} showBack />
 
       {loading ? (
@@ -90,11 +92,11 @@ export default function WishlistScreen() {
         </View>
       ) : wishlistItems.length === 0 ? (
         <View style={styles.emptyState}>
-          <View style={styles.emptyIconWrap}>
-            <Heart size={52} color={Colors.textMuted} strokeWidth={1.5} />
+          <View style={[styles.emptyIconWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+            <Heart size={52} color={C.textMuted} strokeWidth={1.5} />
           </View>
-          <Text style={styles.emptyTitle}>{t.wishlistEmpty ?? 'Your wishlist is empty'}</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>{t.wishlistEmpty ?? 'Your wishlist is empty'}</Text>
+          <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>
             {t.wishlistEmptyDesc ?? 'Tap the heart icon on any product to save it here.'}
           </Text>
           <TouchableOpacity
@@ -108,8 +110,8 @@ export default function WishlistScreen() {
       ) : (
         <>
           {/* Header row with count + clear button */}
-          <View style={styles.listHeader}>
-            <Text style={styles.listCount}>
+          <View style={[styles.listHeader, { borderBottomColor: C.border }]}>
+            <Text style={[styles.listCount, { color: C.textSecondary }]}>
               {count} {count === 1 ? (t.item ?? 'item') : (t.items ?? 'items')}
             </Text>
             <TouchableOpacity onPress={handleClearAll} activeOpacity={0.7} style={styles.clearBtn}>
@@ -159,6 +161,7 @@ function WishlistCard({
   const slideAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const { t } = useLanguage();
+  const C = useAppColors();
 
   const animateOut = useCallback(
     (cb: () => void) => {
@@ -195,7 +198,7 @@ function WishlistCard({
     <Animated.View
       style={[
         styles.card,
-        { transform: [{ translateX: slideAnim }], opacity: opacityAnim },
+        { backgroundColor: C.backgroundCard, borderColor: C.border, transform: [{ translateX: slideAnim }], opacity: opacityAnim },
       ]}
     >
       {/* Product image */}
@@ -203,7 +206,7 @@ function WishlistCard({
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.cardImage} resizeMode="cover" />
         ) : (
-          <View style={[styles.cardImage, styles.cardImagePlaceholder]} />
+          <View style={[styles.cardImage, styles.cardImagePlaceholder, { backgroundColor: C.backgroundSecondary }]} />
         )}
         {product.badge && (
           <View style={styles.cardBadge}>
@@ -215,7 +218,7 @@ function WishlistCard({
       {/* Product info */}
       <TouchableOpacity style={styles.cardInfo} onPress={onView} activeOpacity={0.9}>
         <Text style={styles.cardCategory}>{product.category?.toUpperCase()}</Text>
-        <Text style={styles.cardName} numberOfLines={2}>{name}</Text>
+        <Text style={[styles.cardName, { color: C.textPrimary }]} numberOfLines={2}>{name}</Text>
         <View style={styles.cardPriceRow}>
           <Text style={styles.cardPrice}>{formatPrice(product.price, language)}</Text>
           {product.compare_price != null && product.compare_price > product.price && (

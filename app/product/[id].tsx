@@ -36,6 +36,7 @@ import WishlistHeart from '@/components/WishlistHeart';
 import VirtualTryOnModal from '@/components/VirtualTryOnModal';
 import ImageViewerModal from '@/components/ImageViewerModal';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 
 export default function ProductDetailScreen() {
@@ -44,6 +45,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const { addToCart, items } = useCart();
   const { t, language } = useLanguage();
+  const C = useAppColors();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -153,12 +155,12 @@ export default function ProductDetailScreen() {
 
   if (loading || !product) {
     return (
-      <View style={styles.loadingContainer}>
-        <View style={[styles.loadingImage, { height: imageContainerHeight }]} />
+      <View style={[styles.loadingContainer, { backgroundColor: C.background }]}>
+        <View style={[styles.loadingImage, { height: imageContainerHeight, backgroundColor: C.backgroundCard }]} />
         <View style={styles.loadingContent}>
-          <View style={styles.loadingLine} />
-          <View style={[styles.loadingLine, { width: '60%' }]} />
-          <View style={[styles.loadingLine, { width: '40%' }]} />
+          <View style={[styles.loadingLine, { backgroundColor: C.backgroundCard }]} />
+          <View style={[styles.loadingLine, { width: '60%', backgroundColor: C.backgroundCard }]} />
+          <View style={[styles.loadingLine, { width: '40%', backgroundColor: C.backgroundCard }]} />
         </View>
       </View>
     );
@@ -175,7 +177,7 @@ export default function ProductDetailScreen() {
   const viewerInitialIndex = selectedShade?.product_image ? 0 : activeImageIndex;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       {/* Back button — fixed over the entire screen, never clipped by ScrollView */}
       <TouchableOpacity
         style={styles.backBtn}
@@ -217,7 +219,7 @@ export default function ProductDetailScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} bounces>
         {/* Image section — plain View so back button is never swallowed */}
-        <View style={[styles.imageContainer, { height: imageContainerHeight }]}>
+        <View style={[styles.imageContainer, { height: imageContainerHeight, backgroundColor: C.backgroundSecondary }]}>
           {/* Tap-to-open-viewer overlay — sits below all buttons */}
           <TouchableOpacity
             style={StyleSheet.absoluteFillObject}
@@ -261,6 +263,7 @@ export default function ProductDetailScreen() {
                 activeOpacity={0.8}
                 style={[
                   styles.thumbnail,
+                  { borderColor: C.border },
                   idx === activeImageIndex && styles.thumbnailActive,
                 ]}
               >
@@ -278,9 +281,9 @@ export default function ProductDetailScreen() {
           <View style={styles.shadeSection}>
             <View style={styles.shadeHeader}>
               {selectedShade ? (
-                <Text style={styles.shadeName}>{selectedShade.name}</Text>
+                <Text style={[styles.shadeName, { color: C.textSecondary }]}>{selectedShade.name}</Text>
               ) : (
-                <Text style={[styles.shadeName, shadeWarning && { color: Colors.error }]}>
+                <Text style={[styles.shadeName, { color: C.textSecondary }, shadeWarning && { color: Colors.error }]}>
                   {t.selectShade ?? 'Select a shade'}
                 </Text>
               )}
@@ -345,7 +348,7 @@ export default function ProductDetailScreen() {
 
         <View style={styles.content}>
           <View style={styles.nameRow}>
-            <Text style={styles.name}>{getProductName(product, language)}</Text>
+            <Text style={[styles.name, { color: C.textPrimary }]}>{getProductName(product, language)}</Text>
           </View>
           <View style={styles.ratingRow}>
             <StarRating
@@ -363,7 +366,7 @@ export default function ProductDetailScreen() {
           </View>
 
           {product.sku && (
-            <Text style={styles.sku}>{t.skuLabel}: {product.sku}</Text>
+            <Text style={[styles.sku, { color: C.textMuted }]}>{t.skuLabel}: {product.sku}</Text>
           )}
 
           <View style={styles.trustRow}>
@@ -372,27 +375,27 @@ export default function ProductDetailScreen() {
             <TrustBadge icon={<Star size={14} color={Colors.neonBlue} />} label={t.topRated} />
           </View>
 
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.borderLight }]} />
 
-          <Text style={styles.sectionTitle}>{t.description}</Text>
-          <Text style={styles.description}>{getProductDescription(product, language)}</Text>
+          <Text style={[styles.sectionTitle, { color: C.textPrimary }]}>{t.description}</Text>
+          <Text style={[styles.description, { color: C.textSecondary }]}>{getProductDescription(product, language)}</Text>
 
           {product.specifications && Object.keys(product.specifications).length > 0 && (
             <>
-              <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>{t.specifications}</Text>
-              <View style={styles.specsTable}>
+              <View style={[styles.divider, { backgroundColor: C.borderLight }]} />
+              <Text style={[styles.sectionTitle, { color: C.textPrimary }]}>{t.specifications}</Text>
+              <View style={[styles.specsTable, { borderColor: C.border }]}>
                 {Object.entries(product.specifications).map(([key, val]) => (
-                  <View key={key} style={styles.specRow}>
-                    <Text style={styles.specKey}>{key}</Text>
-                    <Text style={styles.specVal}>{String(val)}</Text>
+                  <View key={key} style={[styles.specRow, { borderBottomColor: C.border }]}>
+                    <Text style={[styles.specKey, { color: C.textSecondary }]}>{key}</Text>
+                    <Text style={[styles.specVal, { color: C.textPrimary }]}>{String(val)}</Text>
                   </View>
                 ))}
               </View>
             </>
           )}
 
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.borderLight }]} />
 
           <View style={styles.stockRow}>
             <View
@@ -405,7 +408,7 @@ export default function ProductDetailScreen() {
                 },
               ]}
             />
-            <Text style={[styles.stockText, isProductOOS && { color: Colors.error }]}>
+            <Text style={[styles.stockText, { color: C.textSecondary }, isProductOOS && { color: Colors.error }]}>
               {isProductOOS
                 ? t.outOfStock
                 : product.stock > 10
@@ -428,7 +431,7 @@ export default function ProductDetailScreen() {
           )}
 
           <View style={styles.qtyRow}>
-            <Text style={styles.qtyLabel}>{t.quantity}</Text>
+            <Text style={[styles.qtyLabel, { color: C.textPrimary }]}>{t.quantity}</Text>
             <QuantitySelector
               value={quantity}
               onDecrement={() => { if (!isProductOOS) setQuantity((q) => Math.max(1, q - 1)); }}
@@ -443,11 +446,11 @@ export default function ProductDetailScreen() {
 
         {/* ── Related Products ──────────────────────────────────────── */}
         {related.length > 0 && (
-          <View style={styles.relatedSection}>
+          <View style={[styles.relatedSection, { borderTopColor: C.borderLight }]}>
             <View style={styles.relatedHeader}>
               <View style={styles.relatedTitleGroup}>
                 <View style={styles.relatedAccent} />
-                <Text style={styles.relatedTitle}>{t.youMayAlsoLike}</Text>
+                <Text style={[styles.relatedTitle, { color: C.textPrimary }]}>{t.youMayAlsoLike}</Text>
               </View>
               <TouchableOpacity
                 style={styles.relatedSeeAll}
@@ -474,7 +477,7 @@ export default function ProductDetailScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { backgroundColor: C.background, borderTopColor: C.border }]}>
         {addedFeedback ? (
           <View style={styles.successBanner}>
             <ShoppingCart size={18} color={Colors.success} strokeWidth={2} />
@@ -483,7 +486,7 @@ export default function ProductDetailScreen() {
         ) : (
           <View style={styles.footerRow}>
             <View style={styles.footerPrice}>
-              <Text style={styles.footerPriceLabel}>{t.total}</Text>
+              <Text style={[styles.footerPriceLabel, { color: C.textMuted }]}>{t.total}</Text>
               <Text style={styles.footerPriceValue}>
                 {formatPrice(product.price * quantity, language)}
               </Text>

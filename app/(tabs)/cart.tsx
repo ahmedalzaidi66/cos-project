@@ -16,6 +16,7 @@ import AppHeader from '@/components/AppHeader';
 import GlossyButton from '@/components/GlossyButton';
 import QuantitySelector from '@/components/QuantitySelector';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 
 // Prices are IQD in the database
@@ -26,13 +27,14 @@ export default function CartScreen() {
   const router = useRouter();
   const { items, removeFromCart, updateQuantity, subtotal, totalItems } = useCart();
   const { t, language } = useLanguage();
+  const C = useAppColors();
 
   const shipping = subtotal >= SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
   const total = subtotal + shipping;
 
   if (items.length === 0) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: C.background }]}>
         <AppHeader title={t.yourCart} />
         <EmptyCart />
       </View>
@@ -40,7 +42,7 @@ export default function CartScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader title={t.yourCart} />
       <FlatList
         data={items}
@@ -53,8 +55,8 @@ export default function CartScreen() {
           </Text>
         }
         ListFooterComponent={
-          <View style={styles.summary}>
-            <Text style={styles.summaryTitle}>{t.orderSummary}</Text>
+          <View style={[styles.summary, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+            <Text style={[styles.summaryTitle, { color: C.textPrimary }]}>{t.orderSummary}</Text>
             <SummaryRow label={t.subtotal} value={formatPrice(subtotal, language)} />
             <SummaryRow
               label={t.shipping}
@@ -81,7 +83,7 @@ export default function CartScreen() {
           />
         )}
       />
-      <View style={styles.footer}>
+      <View style={[styles.footer, { backgroundColor: C.background, borderTopColor: C.border }]}>
         <GlossyButton
           title={t.proceedToCheckout}
           onPress={() => router.push('/checkout')}
@@ -103,11 +105,12 @@ function CartItemCard({
   onUpdateQty: (qty: number) => void;
 }) {
   const { language } = useLanguage();
+  const C = useAppColors();
   const lineTotal = item.product.price * item.quantity;
   const displayImage = item.shade?.product_image || item.product.image_url || undefined;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
       <Image
         source={displayImage ? { uri: displayImage } : undefined}
         style={styles.cardImage}
@@ -115,7 +118,7 @@ function CartItemCard({
       />
       <View style={styles.cardInfo}>
         <View style={styles.cardTopRow}>
-          <Text style={styles.cardName} numberOfLines={2}>
+          <Text style={[styles.cardName, { color: C.textPrimary }]} numberOfLines={2}>
             {item.product.name}
           </Text>
           <TouchableOpacity onPress={onRemove} activeOpacity={0.7} style={styles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -169,11 +172,12 @@ function SummaryRow({
 function EmptyCart() {
   const router = useRouter();
   const { t } = useLanguage();
+  const C = useAppColors();
   return (
     <View style={styles.emptyContainer}>
-      <ShoppingBag size={64} color={Colors.textMuted} strokeWidth={1.5} />
-      <Text style={styles.emptyTitle}>{t.cartEmpty}</Text>
-      <Text style={styles.emptySubtitle}>{t.cartEmptySubtitle}</Text>
+      <ShoppingBag size={64} color={C.textMuted} strokeWidth={1.5} />
+      <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>{t.cartEmpty}</Text>
+      <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>{t.cartEmptySubtitle}</Text>
       <View style={{ marginTop: Spacing.lg, width: '60%' }}>
         <GlossyButton
           title={t.browseGear}

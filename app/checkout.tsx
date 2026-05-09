@@ -19,6 +19,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import GlossyButton from '@/components/GlossyButton';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { sendOrderConfirmation, sendOrderAdminNotification } from '@/lib/email';
 
@@ -120,6 +121,7 @@ export default function CheckoutScreen() {
   const { items, subtotal, clearCart } = useCart();
   const { user } = useAuth();
   const { t, language } = useLanguage();
+  const C = useAppColors();
 
   const PAYMENT_METHODS = [
     { id: 'cod',    label: t.checkoutCodLabel,   sublabel: t.checkoutCodDesc,             icon: Banknote },
@@ -317,6 +319,7 @@ export default function CheckoutScreen() {
 
   if (orderSuccess) {
     return (
+      <View style={[{ flex: 1 }, { backgroundColor: C.background }]}>
       <OrderSuccessScreen
         orderId={orderSuccess.id}
         isCOD={orderSuccess.isCOD}
@@ -327,6 +330,7 @@ export default function CheckoutScreen() {
         itemsList={orderSuccess.itemsList}
         onContinue={() => router.push('/(tabs)')}
       />
+      </View>
     );
   }
 
@@ -335,14 +339,14 @@ export default function CheckoutScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: C.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: C.background, borderBottomColor: C.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.6}>
           <ArrowLeft size={22} color="#FFFFFF" strokeWidth={2.5} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t.checkout}</Text>
+        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>{t.checkout}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -422,13 +426,13 @@ export default function CheckoutScreen() {
             return (
               <TouchableOpacity
                 key={method.id}
-                style={[styles.paymentOption, active && styles.paymentOptionActive]}
+                style={[styles.paymentOption, { backgroundColor: C.backgroundCard, borderColor: C.border }, active && styles.paymentOptionActive]}
                 onPress={() => setForm((f) => ({ ...f, paymentMethod: method.id as any }))}
                 activeOpacity={0.8}
               >
                 <Icon size={22} color={active ? Colors.neonBlue : Colors.textMuted} strokeWidth={1.5} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.paymentLabel, active && styles.paymentLabelActive]}>
+                  <Text style={[styles.paymentLabel, { color: C.textSecondary }, active && styles.paymentLabelActive]}>
                     {method.label}
                   </Text>
                   {'sublabel' in method && method.sublabel ? (
@@ -437,7 +441,7 @@ export default function CheckoutScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <View style={[styles.paymentRadio, active && styles.paymentRadioActive]}>
+                <View style={[styles.paymentRadio, { borderColor: C.border }, active && styles.paymentRadioActive]}>
                   {active && <View style={styles.paymentRadioDot} />}
                 </View>
               </TouchableOpacity>
@@ -446,14 +450,14 @@ export default function CheckoutScreen() {
         </View>
 
         {/* Order summary */}
-        <View style={styles.orderSummary}>
-          <Text style={styles.summaryTitle}>{t.orderSummary}</Text>
+        <View style={[styles.orderSummary, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+          <Text style={[styles.summaryTitle, { color: C.textPrimary }]}>{t.orderSummary}</Text>
           {items.map((item) => {
             const key = item.shade ? `${item.product.id}::${item.shade.id}` : item.product.id;
             return (
               <View key={key} style={styles.summaryItem}>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.summaryItemName} numberOfLines={1}>
+                  <Text style={[styles.summaryItemName, { color: C.textSecondary }]} numberOfLines={1}>
                     {item.product.name} x{item.quantity}
                   </Text>
                   {item.shade && (
@@ -463,19 +467,19 @@ export default function CheckoutScreen() {
                     </View>
                   )}
                 </View>
-                <Text style={styles.summaryItemPrice}>
+                <Text style={[styles.summaryItemPrice, { color: C.textPrimary }]}>
                   {formatPrice(item.product.price * item.quantity, language)}
                 </Text>
               </View>
             );
           })}
-          <View style={styles.summaryDivider} />
+          <View style={[styles.summaryDivider, { backgroundColor: C.borderLight }]} />
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>{t.subtotal}</Text>
-            <Text style={styles.summaryValue}>{formatPrice(subtotal, language)}</Text>
+            <Text style={[styles.summaryLabel, { color: C.textSecondary }]}>{t.subtotal}</Text>
+            <Text style={[styles.summaryValue, { color: C.textPrimary }]}>{formatPrice(subtotal, language)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>{t.checkoutShippingFee}</Text>
+            <Text style={[styles.summaryLabel, { color: C.textSecondary }]}>{t.checkoutShippingFee}</Text>
             <Text style={[
               styles.summaryValue,
               shippingState.status === 'free' && { color: Colors.success },
@@ -489,7 +493,7 @@ export default function CheckoutScreen() {
             </Text>
           </View>
           <View style={[styles.summaryRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>{t.total}</Text>
+            <Text style={[styles.totalLabel, { color: C.textPrimary }]}>{t.total}</Text>
             <Text style={styles.totalValue}>{formatPrice(total, language)}</Text>
           </View>
         </View>
@@ -510,12 +514,13 @@ export default function CheckoutScreen() {
 
 function ShippingBanner({ state, subtotal, language }: { state: ShippingState; subtotal: number; language: string }) {
   const { t } = useLanguage();
+  const C = useAppColors();
   if (state.status === 'idle') return null;
   if (state.status === 'loading') {
     return (
-      <View style={[bannerStyles.wrap, bannerStyles.neutral]}>
+      <View style={[bannerStyles.wrap, bannerStyles.neutral, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
         <ActivityIndicator size="small" color={Colors.neonBlue} />
-        <Text style={bannerStyles.neutralText}>{t.checkoutCalcShipping}</Text>
+        <Text style={[bannerStyles.neutralText, { color: C.textMuted }]}>{t.checkoutCalcShipping}</Text>
       </View>
     );
   }
@@ -567,10 +572,11 @@ const bannerStyles = StyleSheet.create({
 });
 
 function SectionLabel({ title, icon }: { title: string; icon: React.ReactNode }) {
+  const C = useAppColors();
   return (
     <View style={styles.sectionLabel}>
       {icon}
-      <Text style={styles.sectionLabelText}>{title}</Text>
+      <Text style={[styles.sectionLabelText, { color: C.textPrimary }]}>{title}</Text>
     </View>
   );
 }
@@ -594,13 +600,14 @@ function FormField({
   placeholder?: string;
   style?: object;
 }) {
+  const C = useAppColors();
   return (
     <View style={[styles.fieldWrapper, style]}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={[styles.fieldRow, !!error && styles.fieldRowError]}>
+      <Text style={[styles.fieldLabel, { color: C.textMuted }]}>{label}</Text>
+      <View style={[styles.fieldRow, { backgroundColor: C.backgroundInput, borderColor: C.border }, !!error && styles.fieldRowError]}>
         {icon && <View style={{ marginRight: 6 }}>{icon}</View>}
         <TextInput
-          style={styles.fieldInput}
+          style={[styles.fieldInput, { color: C.textPrimary }]}
           value={value}
           onChangeText={onChange}
           keyboardType={keyboardType}
@@ -637,6 +644,7 @@ function LocationFields({
   onAreaChange: (v: string) => void;
 }) {
   const { t } = useLanguage();
+  const C = useAppColors();
   // Derive available countries from rules (exclude wildcard-only country entries)
   const availableCountries = React.useMemo(() => {
     const seen = new Set<string>();
@@ -677,7 +685,7 @@ function LocationFields({
     <>
       {/* Country selector */}
       <View style={styles.fieldWrapper}>
-        <Text style={styles.fieldLabel}>{t.checkoutCountryLabel}</Text>
+        <Text style={[styles.fieldLabel, { color: C.textMuted }]}>{t.checkoutCountryLabel}</Text>
         {availableCountries.length > 0 ? (
           <View style={locationStyles.pillRow}>
             {availableCountries.map((c) => {
@@ -685,7 +693,7 @@ function LocationFields({
               return (
                 <TouchableOpacity
                   key={c}
-                  style={[locationStyles.pill, active && locationStyles.pillActive]}
+                  style={[locationStyles.pill, { backgroundColor: C.backgroundCard, borderColor: C.border }, active && locationStyles.pillActive]}
                   onPress={() => onCountryChange(c)}
                   activeOpacity={0.75}
                 >
@@ -695,9 +703,9 @@ function LocationFields({
             })}
           </View>
         ) : (
-          <View style={[styles.fieldRow, !!countryError && styles.fieldRowError]}>
+          <View style={[styles.fieldRow, { backgroundColor: C.backgroundInput, borderColor: C.border }, !!countryError && styles.fieldRowError]}>
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, { color: C.textPrimary }]}
               value={country}
               onChangeText={onCountryChange}
               placeholder={t.checkoutCountryPlaceholder}
@@ -713,7 +721,7 @@ function LocationFields({
       {/* Governorate */}
       {country ? (
         <View style={styles.fieldWrapper}>
-          <Text style={styles.fieldLabel}>{t.checkoutGovernorateLabel}</Text>
+          <Text style={[styles.fieldLabel, { color: C.textMuted }]}>{t.checkoutGovernorateLabel}</Text>
           {availableGovernorates.length > 0 ? (
             <>
               <View style={locationStyles.pillRow}>
@@ -722,7 +730,7 @@ function LocationFields({
                   return (
                     <TouchableOpacity
                       key={g}
-                      style={[locationStyles.pill, active && locationStyles.pillActive]}
+                      style={[locationStyles.pill, { backgroundColor: C.backgroundCard, borderColor: C.border }, active && locationStyles.pillActive]}
                       onPress={() => onGovernorateChange(g)}
                       activeOpacity={0.75}
                     >
@@ -731,9 +739,9 @@ function LocationFields({
                   );
                 })}
                 {countryHasWildcardGov && (
-                  <View style={[styles.fieldRow, !!governorateError && styles.fieldRowError, { flex: 1, minWidth: 120 }]}>
+                  <View style={[styles.fieldRow, { backgroundColor: C.backgroundInput, borderColor: C.border }, !!governorateError && styles.fieldRowError, { flex: 1, minWidth: 120 }]}>
                     <TextInput
-                      style={styles.fieldInput}
+                      style={[styles.fieldInput, { color: C.textPrimary }]}
                       value={governorate}
                       onChangeText={onGovernorateChange}
                       placeholder={t.checkoutGovernorateOrType}
@@ -746,9 +754,9 @@ function LocationFields({
               </View>
             </>
           ) : (
-            <View style={[styles.fieldRow, !!governorateError && styles.fieldRowError]}>
+            <View style={[styles.fieldRow, { backgroundColor: C.backgroundInput, borderColor: C.border }, !!governorateError && styles.fieldRowError]}>
               <TextInput
-                style={styles.fieldInput}
+                style={[styles.fieldInput, { color: C.textPrimary }]}
                 value={governorate}
                 onChangeText={onGovernorateChange}
                 placeholder={t.checkoutGovernoratePlaceholder}
@@ -765,10 +773,10 @@ function LocationFields({
       {/* Area (optional) — only show after governorate is filled */}
       {country && governorate ? (
         <View style={styles.fieldWrapper}>
-          <Text style={styles.fieldLabel}>{t.checkoutAreaLabel}</Text>
-          <View style={styles.fieldRow}>
+          <Text style={[styles.fieldLabel, { color: C.textMuted }]}>{t.checkoutAreaLabel}</Text>
+          <View style={[styles.fieldRow, { backgroundColor: C.backgroundInput, borderColor: C.border }]}>
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, { color: C.textPrimary }]}
               value={area}
               onChangeText={onAreaChange}
               placeholder={t.checkoutAreaPlaceholder}
@@ -818,6 +826,7 @@ function OrderSuccessScreen({
   address: string; total: number; itemsList: string; onContinue: () => void;
 }) {
   const { t, language } = useLanguage();
+  const C = useAppColors();
 
   const handleWhatsApp = () => {
     const message =
@@ -833,19 +842,19 @@ function OrderSuccessScreen({
   };
 
   return (
-    <View style={styles.successContainer}>
+    <View style={[styles.successContainer, { backgroundColor: C.background }]}>
       <CheckCircle size={80} color={Colors.success} strokeWidth={1.5} />
-      <Text style={styles.successTitle}>{t.orderPlaced}</Text>
+      <Text style={[styles.successTitle, { color: C.textPrimary }]}>{t.orderPlaced}</Text>
       {isCOD ? (
         <View style={styles.codBanner}>
           <Banknote size={18} color={Colors.success} strokeWidth={2} />
           <Text style={styles.codBannerText}>{t.checkoutCodSuccess}</Text>
         </View>
       ) : (
-        <Text style={styles.successSubtitle}>{t.orderPlacedSubtitle}</Text>
+        <Text style={[styles.successSubtitle, { color: C.textSecondary }]}>{t.orderPlacedSubtitle}</Text>
       )}
-      <View style={styles.orderIdBox}>
-        <Text style={styles.orderIdLabel}>Order ID</Text>
+      <View style={[styles.orderIdBox, { backgroundColor: C.backgroundCard }]}>
+        <Text style={[styles.orderIdLabel, { color: C.textMuted }]}>Order ID</Text>
         <Text style={styles.orderIdValue}>#{orderId}</Text>
       </View>
       <View style={styles.successActions}>
