@@ -338,32 +338,115 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
 
 // ─── Phone Login Form ─────────────────────────────────────────────────────────
 
+const COUNTRY_CODES = [
+  { label: 'Iraq',         flag: '🇮🇶', code: '+964' },
+  { label: 'UAE',          flag: '🇦🇪', code: '+971' },
+  { label: 'Saudi Arabia', flag: '🇸🇦', code: '+966' },
+  { label: 'Kuwait',       flag: '🇰🇼', code: '+965' },
+  { label: 'Qatar',        flag: '🇶🇦', code: '+974' },
+  { label: 'Bahrain',      flag: '🇧🇭', code: '+973' },
+  { label: 'Oman',         flag: '🇴🇲', code: '+968' },
+  { label: 'Turkey',       flag: '🇹🇷', code: '+90'  },
+] as const;
+
+type CountryEntry = typeof COUNTRY_CODES[number];
+
+function buildE164(countryCode: string, localNumber: string): string {
+  const digits = localNumber.replace(/\D/g, '');
+  return `${countryCode}${digits}`;
+}
+
+function CountryCodePicker({
+  selected,
+  onSelect,
+}: {
+  selected: CountryEntry;
+  onSelect: (c: CountryEntry) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View>
+      <TouchableOpacity
+        style={phoneStyles.ccBtn}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={phoneStyles.ccFlag}>{selected.flag}</Text>
+        <Text style={phoneStyles.ccCode}>{selected.code}</Text>
+        <ChevronRight
+          size={11}
+          color={Colors.textMuted}
+          strokeWidth={2.5}
+          style={{ transform: [{ rotate: '90deg' }] }}
+        />
+      </TouchableOpacity>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <TouchableOpacity
+          style={phoneStyles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setOpen(false)}
+        >
+          <View style={phoneStyles.pickerSheet}>
+            <Text style={phoneStyles.pickerTitle}>Select Country</Text>
+            {COUNTRY_CODES.map(c => (
+              <TouchableOpacity
+                key={c.code}
+                style={[
+                  phoneStyles.pickerRow,
+                  c.code === selected.code && phoneStyles.pickerRowActive,
+                ]}
+                onPress={() => { onSelect(c); setOpen(false); }}
+                activeOpacity={0.8}
+              >
+                <Text style={phoneStyles.pickerFlag}>{c.flag}</Text>
+                <Text style={phoneStyles.pickerLabel}>{c.label}</Text>
+                <Text style={phoneStyles.pickerCode}>{c.code}</Text>
+                {c.code === selected.code && (
+                  <CheckCircle size={14} color={Colors.neonBlue} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+}
+
 function PhoneLoginForm() {
   const { requestOtp, verifyOtp } = useAuth();
-  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState<CountryEntry>(COUNTRY_CODES[0]);
+  const [localPhone, setLocalPhone] = useState('');
+  const [fullPhone, setFullPhone] = useState(''); // E.164 stored after OTP request
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'enter_phone' | 'enter_code'>('enter_phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
 
-  // Countdown timer for resend cooldown
   useEffect(() => {
     if (cooldown <= 0) return;
     const id = setInterval(() => setCooldown(c => Math.max(0, c - 1)), 1000);
     return () => clearInterval(id);
   }, [cooldown]);
 
+  const getE164 = () => buildE164(country.code, localPhone);
+
   const handleRequestOtp = async () => {
-    if (!phone.trim()) { setError('Please enter your phone number'); return; }
+    const digits = localPhone.replace(/\D/g, '');
+    if (digits.length < 7) { setError('Please enter a valid phone number.'); return; }
+    const e164 = getE164();
     setLoading(true);
     setError('');
-    const result = await requestOtp(phone.trim());
+    const result = await requestOtp(e164);
     setLoading(false);
     if (!result.success) {
       setError(result.error ?? 'Failed to send code');
       if (result.cooldownSeconds) setCooldown(result.cooldownSeconds);
     } else {
+      setFullPhone(e164);
       setStep('enter_code');
       setCooldown(60);
     }
@@ -373,7 +456,7 @@ function PhoneLoginForm() {
     if (code.length !== 6) { setError('Enter the 6-digit code'); return; }
     setLoading(true);
     setError('');
-    const result = await verifyOtp(phone.trim(), code.trim());
+    const result = await verifyOtp(fullPhone, code.trim());
     setLoading(false);
     if (!result.success) {
       setError(
@@ -382,7 +465,6 @@ function PhoneLoginForm() {
           : (result.error ?? 'Verification failed')
       );
     }
-    // On success AuthContext sets session → AccountScreen re-renders to ProfileView automatically
   };
 
   const handleResend = async () => {
@@ -390,7 +472,7 @@ function PhoneLoginForm() {
     setCode('');
     setError('');
     setLoading(true);
-    const result = await requestOtp(phone.trim());
+    const result = await requestOtp(fullPhone);
     setLoading(false);
     if (!result.success) {
       setError(result.error ?? 'Failed to resend code');
@@ -404,14 +486,23 @@ function PhoneLoginForm() {
     return (
       <View style={styles.form}>
         {error ? <ErrorBanner message={error} /> : null}
-        <AuthField
-          label="Phone Number"
-          value={phone}
-          onChange={setPhone}
-          icon={<Phone size={13} color={Colors.textMuted} />}
-          keyboardType="phone-pad"
-          placeholder="+964 770 000 0000"
-        />
+        <View>
+          <Text style={phoneStyles.fieldLabel}>Phone Number</Text>
+          <View style={phoneStyles.phoneRow}>
+            <CountryCodePicker selected={country} onSelect={setCountry} />
+            <View style={phoneStyles.localInputWrap}>
+              <TextInput
+                style={phoneStyles.localInput}
+                value={localPhone}
+                onChangeText={v => setLocalPhone(v.replace(/[^\d\s\-]/g, ''))}
+                keyboardType="phone-pad"
+                placeholder="770 000 0000"
+                placeholderTextColor={Colors.textMuted}
+                maxLength={15}
+              />
+            </View>
+          </View>
+        </View>
         <GlossyButton
           title={loading ? 'Sending...' : 'Send Code'}
           onPress={handleRequestOtp}
@@ -429,7 +520,7 @@ function PhoneLoginForm() {
       {error ? <ErrorBanner message={error} /> : null}
       <View style={styles.phoneHint}>
         <SmartphoneNfc size={13} color={Colors.textSecondary} strokeWidth={2} />
-        <Text style={styles.phoneHintText}>Code sent to {phone}</Text>
+        <Text style={styles.phoneHintText}>Code sent to {fullPhone}</Text>
       </View>
       <AuthField
         label="Verification Code"
@@ -467,6 +558,115 @@ function PhoneLoginForm() {
     </View>
   );
 }
+
+const phoneStyles = StyleSheet.create({
+  fieldLabel: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    alignItems: 'stretch',
+  },
+  ccBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: 11,
+    minWidth: 88,
+  },
+  ccFlag: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  ccCode: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  localInputWrap: {
+    flex: 1,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'center',
+  },
+  localInput: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 11,
+  },
+  // ── Picker modal ──
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: Colors.backgroundCard,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.xxl,
+    paddingHorizontal: Spacing.lg,
+    gap: 4,
+  },
+  pickerTitle: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.md,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.md,
+  },
+  pickerRowActive: {
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+  },
+  pickerFlag: {
+    fontSize: 22,
+    lineHeight: 28,
+    width: 32,
+    textAlign: 'center',
+  },
+  pickerLabel: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  pickerCode: {
+    color: Colors.textMuted,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+});
 
 // ─── Phone Signup Gate ────────────────────────────────────────────────────────
 // Shown to new phone-OTP users before they can access the full profile view.
