@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ type Props = {
   onWishlistLoginRequired?: () => void;
 };
 
-export default function ProductCard({ product, onWishlistLoginRequired }: Props) {
+function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
   const router = useRouter();
   const { addToCart } = useCart();
   const { language, isRTL } = useLanguage();
@@ -33,11 +33,20 @@ export default function ProductCard({ product, onWishlistLoginRequired }: Props)
   const [shades, setShades] = useState<ProductShade[]>([]);
   const [activeShade, setActiveShade] = useState<ProductShade | null>(null);
   const [justAdded, setJustAdded] = useState(false);
+  const mounted = useRef(true);
 
   useEffect(() => {
-    fetchProductShades(product.id)
-      .then((s) => setShades(s ?? []))
-      .catch(() => setShades([]));
+    mounted.current = true;
+    // Defer shade fetch by one frame so the card renders immediately
+    const timer = setTimeout(() => {
+      fetchProductShades(product.id)
+        .then((s) => { if (mounted.current) setShades(s ?? []); })
+        .catch(() => { if (mounted.current) setShades([]); });
+    }, 0);
+    return () => {
+      mounted.current = false;
+      clearTimeout(timer);
+    };
   }, [product.id]);
 
   const displayImage = activeShade?.product_image || getProductImage(product) || undefined;
@@ -85,6 +94,7 @@ export default function ProductCard({ product, onWishlistLoginRequired }: Props)
           source={displayImage ? { uri: displayImage } : undefined}
           style={styles.image}
           resizeMode="cover"
+          fadeDuration={200}
         />
         {product.badge && (
           <View style={[styles.badge, isRTL ? styles.badgeRTL : styles.badgeLTR]}>
@@ -307,3 +317,5 @@ const styles = StyleSheet.create({
     marginLeft: 1,
   },
 });
+
+export default memo(ProductCardComponent);

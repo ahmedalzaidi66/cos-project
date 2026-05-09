@@ -103,11 +103,11 @@ export default function ShopScreen() {
     const { data: productsData, error: productsError } = await supabase
       .from('products')
       .select(`
-        *,
-        translation:product_translations!left(
-          id, product_id, language, name, short_description,
-          full_description, meta_title, meta_description
-        )
+        id, name, name_ar, name_es, name_de, price, compare_price,
+        category, category_id, makeup_subcategory, image_url, main_image,
+        rating, review_count, badge, is_featured, featured, stock, status,
+        slug, try_on_type, created_at,
+        translation:product_translations!left(language, name, short_description)
       `)
       .in('id', allProductIds)
       .eq('status', 'active');

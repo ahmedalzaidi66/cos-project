@@ -8,11 +8,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   useWindowDimensions,
-  I18nManager,
   ScrollView,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ShoppingBag, ChevronRight, Star, Check } from 'lucide-react-native';
+import { ShoppingBag, Check } from 'lucide-react-native';
 import { fetchProducts, fetchCategories, getProductName, getProductImage, getCategoryName, Product, Category } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import { useCart } from '@/context/CartContext';
@@ -22,6 +22,8 @@ import WishlistHeart from '@/components/WishlistHeart';
 import { useWishlistToast } from '@/context/WishlistToastContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
+
+const PAGE_SIZE = 24;
 
 type MakeupSubcategory = 'lips' | 'face' | 'eye' | 'nail';
 
@@ -38,6 +40,103 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// ─── Skeleton card ────────────────────────────────────────────────────────────
+
+const SkeletonCard = memo(function SkeletonCard({ width: cardW, anim }: { width: number; anim: Animated.Value }) {
+  const imgH = Math.round(cardW * 0.62);
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.55] });
+  return (
+    <Animated.View style={[skStyles.card, { width: cardW, opacity }]}>
+      <View style={[skStyles.image, { height: imgH }]} />
+      <View style={skStyles.body}>
+        <View style={skStyles.line} />
+        <View style={[skStyles.line, { width: '60%' }]} />
+        <View style={[skStyles.line, { width: '40%', backgroundColor: Colors.neonBlueDim, marginTop: 4 }]} />
+      </View>
+    </Animated.View>
+  );
+});
+
+const skStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  image: { width: '100%', backgroundColor: Colors.backgroundSecondary },
+  body: { padding: 6, gap: 5 },
+  line: { height: 10, backgroundColor: Colors.navyLight, borderRadius: Radius.sm, width: '80%' },
+});
+
+// ─── Product card (inline, memoized) ─────────────────────────────────────────
+
+const ProductCard = memo(function ProductCard({
+  product, cardW, language, onPress,
+}: {
+  product: Product; cardW: number; language: string; onPress: () => void;
+}) {
+  const { addToCart } = useCart();
+  const { showCartToast } = useWishlistToast();
+  const [justAdded, setJustAdded] = React.useState(false);
+  const imgH = Math.round(cardW * 0.62);
+  const imgUri = getProductImage(product) || undefined;
+
+  return (
+    <TouchableOpacity
+      style={[styles.card, { width: cardW }]}
+      onPress={onPress}
+      activeOpacity={0.88}
+    >
+      <View style={[styles.cardImageWrap, { height: imgH }]}>
+        <Image
+          source={imgUri ? { uri: imgUri } : undefined}
+          style={styles.cardImage}
+          resizeMode="cover"
+          fadeDuration={200}
+        />
+        {product.badge && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{product.badge}</Text>
+          </View>
+        )}
+        <WishlistHeart product={product} size={13} variant="card" />
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardName} numberOfLines={2}>
+          {getProductName(product, language)}
+        </Text>
+        <StarRating rating={product.rating} reviewCount={product.review_count} size={10} showCount />
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardPrice}>{formatPrice(product.price, language)}</Text>
+          <TouchableOpacity
+            style={[styles.cartBtn, justAdded && styles.cartBtnAdded]}
+            activeOpacity={0.85}
+            onPress={(e) => {
+              const nativeEv = e?.nativeEvent as any;
+              if (nativeEv?.stopPropagation) nativeEv.stopPropagation();
+              if (nativeEv?.preventDefault) nativeEv.preventDefault();
+              addToCart(product);
+              showCartToast('Added to cart');
+              setJustAdded(true);
+              setTimeout(() => setJustAdded(false), 1000);
+            }}
+          >
+            {justAdded
+              ? <Check size={11} color="#FFFFFF" strokeWidth={2.5} />
+              : <ShoppingBag size={11} color="#FFFFFF" strokeWidth={2.5} />
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 export default function ProductsScreen() {
   const router = useRouter();
   const { category: categoryParam } = useLocalSearchParams<{ category?: string }>();
@@ -49,60 +148,110 @@ export default function ProductsScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryParam ?? null);
   const [selectedMakeupSub, setSelectedMakeupSub] = useState<MakeupSubcategory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const pageRef = useRef(0);
 
   const isMakeup = selectedCategory === 'makeup';
-
-  // When nav param changes (e.g. opened from drawer), sync the filter
-  useEffect(() => {
-    setSelectedCategory(categoryParam ?? null);
-    setSelectedMakeupSub(null);
-  }, [categoryParam]);
-
-  const loadedFor = useRef({ language: '', category: selectedCategory, makeupSub: selectedMakeupSub });
-
-  const load = useCallback(async () => {
-    const fetchLang = language;
-    const fetchCat = selectedCategory;
-    const fetchMakeupSub = selectedMakeupSub;
-    setLoading(true);
-    setProducts([]);
-    try {
-      const [prods, cats] = await Promise.all([
-        fetchProducts({
-          language: fetchLang,
-          category: fetchCat ?? undefined,
-          makeup_subcategory: fetchCat === 'makeup' && fetchMakeupSub ? fetchMakeupSub : undefined,
-        }),
-        fetchCategories(fetchLang),
-      ]);
-      // Discard if state changed while fetch was in-flight
-      if (
-        loadedFor.current.language !== fetchLang ||
-        loadedFor.current.category !== fetchCat ||
-        loadedFor.current.makeupSub !== fetchMakeupSub
-      ) return;
-      setProducts(prods);
-      setCategories(cats);
-    } finally {
-      setLoading(false);
-    }
-  }, [language, selectedCategory, selectedMakeupSub]);
-
-  useEffect(() => {
-    loadedFor.current = { language, category: selectedCategory, makeupSub: selectedMakeupSub };
-    load();
-  }, [load, language, selectedCategory, selectedMakeupSub]);
 
   const numCols = width >= 768 ? 3 : 2;
   const SIDE_PAD = 8;
   const GAP = 6;
   const cardW = (width - SIDE_PAD * 2 - GAP * (numCols - 1)) / numCols;
 
+  // Skeleton animation
+  const skAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(skAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(skAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [skAnim]);
+
+  // When nav param changes, sync the filter
+  useEffect(() => {
+    setSelectedCategory(categoryParam ?? null);
+    setSelectedMakeupSub(null);
+  }, [categoryParam]);
+
+  // Stale-request guard
+  const loadedFor = useRef({ language: '', category: selectedCategory, makeupSub: selectedMakeupSub });
+
+  const loadPage = useCallback(async (page: number, replace: boolean) => {
+    const fetchLang = language;
+    const fetchCat = selectedCategory;
+    const fetchMakeupSub = selectedMakeupSub;
+
+    if (replace) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const [prods, cats] = await Promise.all([
+        fetchProducts({
+          language: fetchLang,
+          category: fetchCat ?? undefined,
+          makeup_subcategory: fetchCat === 'makeup' && fetchMakeupSub ? fetchMakeupSub : undefined,
+          limit: PAGE_SIZE,
+          offset: page * PAGE_SIZE,
+        }),
+        page === 0 ? fetchCategories(fetchLang) : Promise.resolve(null),
+      ]);
+
+      // Discard if state changed while fetch was in-flight
+      if (
+        loadedFor.current.language !== fetchLang ||
+        loadedFor.current.category !== fetchCat ||
+        loadedFor.current.makeupSub !== fetchMakeupSub
+      ) return;
+
+      setProducts((prev) => replace ? prods : [...prev, ...prods]);
+      if (cats) setCategories(cats);
+      setHasMore(prods.length === PAGE_SIZE);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [language, selectedCategory, selectedMakeupSub]);
+
+  // Reset and reload when filters change
+  useEffect(() => {
+    loadedFor.current = { language, category: selectedCategory, makeupSub: selectedMakeupSub };
+    pageRef.current = 0;
+    setProducts([]);
+    setHasMore(true);
+    loadPage(0, true);
+  }, [loadPage, language, selectedCategory, selectedMakeupSub]);
+
+  const handleLoadMore = useCallback(() => {
+    if (loadingMore || !hasMore || loading) return;
+    const nextPage = pageRef.current + 1;
+    pageRef.current = nextPage;
+    loadPage(nextPage, false);
+  }, [loadingMore, hasMore, loading, loadPage]);
+
   const activeLabel = useMemo(() => {
     if (!selectedCategory) return 'All Products';
     const cat = categories.find(c => c.slug === selectedCategory);
     return cat ? getCategoryName(cat, language) : capitalize(selectedCategory);
   }, [selectedCategory, categories, language]);
+
+  const skeletonData = useMemo(
+    () => Array.from({ length: PAGE_SIZE }, (_, i) => `__sk_${i}`),
+    []
+  );
+
+  const renderFooter = useCallback(() => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={Colors.neonBlue} />
+      </View>
+    );
+  }, [loadingMore]);
 
   return (
     <View style={styles.container}>
@@ -119,7 +268,7 @@ export default function ProductsScreen() {
           renderItem={({ item }) => {
             const active = item === selectedCategory;
             const cat = item === null ? null : categories.find(c => c.slug === item);
-            const label = item === null ? 'All' : (cat ? getCategoryName(cat, language) : capitalize(item));
+            const label = item === null ? 'All' : (cat ? getCategoryName(cat, language) : capitalize(item ?? ''));
             return (
               <TouchableOpacity
                 style={[styles.chip, active && styles.chipActive]}
@@ -163,9 +312,17 @@ export default function ProductsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={Colors.neonBlue} />
-        </View>
+        // Grid skeleton while first page loads
+        <FlatList
+          data={skeletonData}
+          keyExtractor={item => item}
+          numColumns={numCols}
+          key={`sk-cols-${numCols}`}
+          scrollEnabled={false}
+          contentContainerStyle={[styles.grid, { padding: SIDE_PAD, gap: GAP }]}
+          columnWrapperStyle={numCols > 1 ? { gap: GAP } : undefined}
+          renderItem={() => <SkeletonCard width={cardW} anim={skAnim} />}
+        />
       ) : products.length === 0 ? (
         <View style={styles.emptyWrap}>
           <ShoppingBag size={52} color={Colors.textMuted} strokeWidth={1.5} />
@@ -180,10 +337,13 @@ export default function ProductsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.grid, { padding: SIDE_PAD, gap: GAP }]}
           columnWrapperStyle={numCols > 1 ? { gap: GAP } : undefined}
-          initialNumToRender={10}
-          maxToRenderPerBatch={8}
-          windowSize={5}
+          initialNumToRender={numCols * 4}
+          maxToRenderPerBatch={numCols * 3}
+          windowSize={7}
           removeClippedSubviews
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={renderFooter}
           renderItem={({ item }) => (
             <ProductCard
               product={item}
@@ -197,67 +357,6 @@ export default function ProductsScreen() {
     </View>
   );
 }
-
-const ProductCard = memo(function ProductCard({
-  product, cardW, language, onPress,
-}: {
-  product: Product; cardW: number; language: string; onPress: () => void;
-}) {
-  const { addToCart } = useCart();
-  const { showCartToast } = useWishlistToast();
-  const [justAdded, setJustAdded] = React.useState(false);
-  const imgH = Math.round(cardW * 0.62);
-  const imgUri = getProductImage(product) || undefined;
-
-  return (
-    <TouchableOpacity
-      style={[styles.card, { width: cardW }]}
-      onPress={onPress}
-      activeOpacity={0.88}
-    >
-      <View style={[styles.cardImageWrap, { height: imgH }]}>
-        <Image
-          source={imgUri ? { uri: imgUri } : undefined}
-          style={styles.cardImage}
-          resizeMode="cover"
-        />
-        {product.badge && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{product.badge}</Text>
-          </View>
-        )}
-        <WishlistHeart product={product} size={13} variant="card" />
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardName} numberOfLines={2}>
-          {getProductName(product, language)}
-        </Text>
-        <StarRating rating={product.rating} reviewCount={product.review_count} size={10} showCount />
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardPrice}>{formatPrice(product.price, language)}</Text>
-          <TouchableOpacity
-            style={[styles.cartBtn, justAdded && styles.cartBtnAdded]}
-            activeOpacity={0.85}
-            onPress={(e) => {
-              const nativeEv = e?.nativeEvent as any;
-              if (nativeEv?.stopPropagation) nativeEv.stopPropagation();
-              if (nativeEv?.preventDefault) nativeEv.preventDefault();
-              addToCart(product);
-              showCartToast('Added to cart');
-              setJustAdded(true);
-              setTimeout(() => setJustAdded(false), 1000);
-            }}
-          >
-            {justAdded
-              ? <Check size={11} color="#FFFFFF" strokeWidth={2.5} />
-              : <ShoppingBag size={11} color="#FFFFFF" strokeWidth={2.5} />
-            }
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
@@ -319,7 +418,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14 },
   emptyText: { color: Colors.textMuted, fontSize: FontSize.md },
 
@@ -372,18 +470,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
-  viewBtn: {
-    backgroundColor: Colors.neonBlue,
-    borderRadius: Radius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  viewBtnText: {
-    color: Colors.background,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
   cartBtn: {
     width: 26,
     height: 26,
@@ -394,5 +480,9 @@ const styles = StyleSheet.create({
   },
   cartBtnAdded: {
     backgroundColor: '#1a7a45',
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });

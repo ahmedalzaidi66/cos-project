@@ -304,12 +304,17 @@ export type ProductShade = {
 };
 
 export async function fetchProductShades(productId: string): Promise<ProductShade[]> {
+  const cached = cacheGet(_shadesCache, productId);
+  if (cached) return cached;
+
   const { data } = await supabase
     .from('product_shades')
     .select('id, name, color_hex, shade_image, product_image, sort_order')
     .eq('product_id', productId)
     .order('sort_order', { ascending: true });
-  return (data ?? []) as ProductShade[];
+  const result = (data ?? []) as ProductShade[];
+  cacheSet(_shadesCache, productId, result);
+  return result;
 }
 
 function slugToLabel(slug: string): string {
@@ -325,6 +330,39 @@ export function getCategoryDescription(category: Category, language: string): st
   return category.translation?.description ?? '';
 }
 
+// ─── Session cache ────────────────────────────────────────────────────────────
+// Lightweight in-memory cache that lives for the duration of the browser session.
+// Avoids redundant round-trips when the user switches tabs or re-visits a screen.
+
+type CacheEntry<T> = { data: T; ts: number };
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+const _productCache = new Map<string, CacheEntry<Product[]>>();
+const _categoryCache = new Map<string, CacheEntry<Category[]>>();
+const _shadesCache = new Map<string, CacheEntry<ProductShade[]>>();
+
+function cacheKey(opts: Record<string, unknown>): string {
+  return JSON.stringify(opts, Object.keys(opts).sort());
+}
+
+function cacheGet<T>(map: Map<string, CacheEntry<T>>, key: string): T | null {
+  const entry = map.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) { map.delete(key); return null; }
+  return entry.data;
+}
+
+function cacheSet<T>(map: Map<string, CacheEntry<T>>, key: string, data: T): void {
+  map.set(key, { data, ts: Date.now() });
+}
+
+/** Clear all storefront caches (call after admin product edits). */
+export function clearStorefrontCache(): void {
+  _productCache.clear();
+  _categoryCache.clear();
+  _shadesCache.clear();
+}
+
 // ─── Storefront API ───────────────────────────────────────────────────────────
 
 export async function fetchProducts(opts?: {
@@ -334,8 +372,16 @@ export async function fetchProducts(opts?: {
   language?: string;
   status?: string;
   limit?: number;
+  offset?: number;
 }): Promise<Product[]> {
   const lang = opts?.language ?? 'en';
+  const limit = opts?.limit ?? 24;
+  const offset = opts?.offset ?? 0;
+
+  const key = cacheKey({ ...opts, language: lang, limit, offset });
+  const cached = cacheGet(_productCache, key);
+  if (cached) return cached;
+
   // Select only columns needed for list/card rendering — exclude large blobs
   let query = supabase
     .from('products')
@@ -347,7 +393,7 @@ export async function fetchProducts(opts?: {
       translation:product_translations!left(language, name, short_description)
     `)
     .order('created_at', { ascending: false })
-    .limit(opts?.limit ?? 80);
+    .range(offset, offset + limit - 1);
 
   if (opts?.status !== undefined) {
     query = query.eq('status', opts.status);
@@ -361,7 +407,9 @@ export async function fetchProducts(opts?: {
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data ?? []).map((row) => normalizeProductWithLanguage(row, lang));
+  const result = (data ?? []).map((row) => normalizeProductWithLanguage(row, lang));
+  cacheSet(_productCache, key, result);
+  return result;
 }
 
 export async function fetchProductById(id: string, language = 'en'): Promise<Product | null> {
@@ -380,6 +428,10 @@ export async function fetchProductById(id: string, language = 'en'): Promise<Pro
 }
 
 export async function fetchCategories(language = 'en'): Promise<Category[]> {
+  const key = `cats:${language}`;
+  const cached = cacheGet(_categoryCache, key);
+  if (cached) return cached;
+
   const { data, error } = await supabase
     .from('categories')
     .select(`
@@ -391,7 +443,9 @@ export async function fetchCategories(language = 'en'): Promise<Category[]> {
     .order('slug', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []).map((row) => normalizeCategoryRowWithLanguage(row, language));
+  const result = (data ?? []).map((row) => normalizeCategoryRowWithLanguage(row, language));
+  cacheSet(_categoryCache, key, result);
+  return result;
 }
 
 export async function fetchCMSContent(language = 'en'): Promise<CMSContent | null> {
