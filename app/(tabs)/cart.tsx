@@ -177,7 +177,7 @@ function EmptyCart() {
       <View style={{ marginTop: Spacing.lg, width: '60%' }}>
         <GlossyButton
           title={t.browseGear}
-          onPress={() => router.push('/(tabs)')}
+          onPress={() => router.push('/(tabs)/products')}
         />
       </View>
     </View>
