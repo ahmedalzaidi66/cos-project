@@ -17,6 +17,7 @@ import { useWishlist } from '@/context/WishlistContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import NavigationDrawer from '@/components/NavigationDrawer';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
+import { useAppColors } from '@/context/ThemeContext';
 import { useUISize } from '@/context/UISizeContext';
 
 type Props = {
@@ -32,6 +33,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
   const { count: wishlistCount } = useWishlist();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { headerSizes } = useUISize();
+  const C = useAppColors();
 
   const showIcons = branding.header_icons !== 'false';
 
@@ -89,9 +91,11 @@ export default function AppHeader({ showBack = false, title }: Props) {
 
   return (
     <>
-      <View style={styles.outerWrapper}>
+      <View style={[styles.outerWrapper, { backgroundColor: C.background }]}>
       <View style={[styles.container, isRTL && styles.containerRTL, {
         minHeight: headerSizes.headerHeight,
+        backgroundColor: C.background,
+        borderColor: C.border,
       }]}>
         {/* Left: hamburger or back */}
         {showBack ? (
@@ -114,7 +118,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
             activeOpacity={0.7}
             onPress={() => setDrawerOpen(true)}
           >
-            <Menu size={16} color={Colors.textPrimary} strokeWidth={2} />
+            <Menu size={16} color={C.textPrimary} strokeWidth={2} />
           </TouchableOpacity>
         )}
 
@@ -126,7 +130,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
           disabled={!!title}
         >
           {title ? (
-            <Text style={styles.pageTitle}>{title}</Text>
+            <Text style={[styles.pageTitle, { color: C.textPrimary }]}>{title}</Text>
           ) : branding.logo_url ? (
             <Image
               source={{ uri: branding.logo_url }}
@@ -134,7 +138,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
               resizeMode="contain"
             />
           ) : (
-            <Text style={styles.logoText}>
+            <Text style={[styles.logoText, { color: C.textPrimary }]}>
               {branding.app_name || 'LAZURDE'}
               {(branding.app_tagline) ? (
                 <Text style={styles.logoAccent}> {branding.app_tagline}</Text>
@@ -155,7 +159,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
                 activeOpacity={0.7}
                 onPress={() => router.push('/(tabs)/account')}
               >
-                <User size={16} color={Colors.textPrimary} strokeWidth={2} />
+                <User size={16} color={C.textPrimary} strokeWidth={2} />
               </TouchableOpacity>
 
               {/* Wishlist heart with animated badge */}
@@ -193,7 +197,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
                 activeOpacity={0.7}
                 onPress={() => router.push('/(tabs)/cart')}
               >
-                <ShoppingCart size={16} color={Colors.textPrimary} strokeWidth={2} />
+                <ShoppingCart size={16} color={C.textPrimary} strokeWidth={2} />
                 {totalItems > 0 && (
                   <View style={[styles.badge, isRTL ? styles.badgeRTL : styles.badgeLTR]}>
                     <Text style={styles.badgeText}>
@@ -206,7 +210,7 @@ export default function AppHeader({ showBack = false, title }: Props) {
           )}
         </View>
       </View>
-      <View style={styles.bottomDivider} />
+      <View style={[styles.bottomDivider, { backgroundColor: C.border }]} />
       </View>
       <NavigationDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>

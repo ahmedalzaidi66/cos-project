@@ -27,7 +27,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { PageBlock } from '@/context/PageBuilderContext';
 import { useLayout, SectionId, SpacingBreakpoint } from '@/context/LayoutContext';
 import { Colors, Radius, Spacing, FontSize } from '@/constants/theme';
-import { useAppColors } from '@/context/ThemeContext';
+import { useAppColors, useThemeMode } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import HeroVideo from '@/components/HeroVideo';
 import { getProductName, getProductImage } from '@/lib/supabase';
@@ -69,7 +69,12 @@ function clampSpacing(sp: SpacingBreakpoint): SpacingBreakpoint {
 export default function ShopScreen() {
   const { language, t } = useLanguage();
   const C = useAppColors();
+  const themeMode = useThemeMode();
   const { content, cmsRow, refresh: refreshCMS } = useCMS();
+
+  useEffect(() => {
+    console.log('[Home] active theme mode =', themeMode, '| background =', C.background);
+  }, [themeMode]);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [blocks, setBlocks] = useState<PageBlock[]>([]);

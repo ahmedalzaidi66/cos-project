@@ -47,8 +47,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .select('value')
       .eq('key', 'customer_app_theme')
       .maybeSingle()
-      .then(({ data }) => {
-        const resolved: AppThemeMode = data?.value === 'light' ? 'light' : 'dark';
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[ThemeContext] fetch error:', error.message);
+          return;
+        }
+        const raw = data?.value ?? 'dark';
+        const resolved: AppThemeMode = raw === 'light' ? 'light' : 'dark';
+        console.log('[ThemeContext] loaded customer_app_theme =', raw, '→ mode =', resolved);
         setMode(resolved);
         injectCSSVars(resolved === 'light' ? LightColors : DarkColors);
       });
@@ -62,6 +68,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         (payload) => {
           const newVal = (payload.new as { value?: string })?.value;
           const resolved: AppThemeMode = newVal === 'light' ? 'light' : 'dark';
+          console.log('[ThemeContext] realtime update → mode =', resolved);
           setMode(resolved);
           injectCSSVars(resolved === 'light' ? LightColors : DarkColors);
         }
@@ -88,4 +95,9 @@ export function useTheme() {
 // Convenience hook — returns just the color palette for the current theme
 export function useAppColors() {
   return useContext(ThemeContext).C;
+}
+
+// Returns mode string — useful for conditional rendering based on theme
+export function useThemeMode(): AppThemeMode {
+  return useContext(ThemeContext).mode;
 }

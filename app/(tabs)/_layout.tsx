@@ -13,6 +13,7 @@ import { useWishlist } from '@/context/WishlistContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppColors } from '@/context/ThemeContext';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -202,6 +203,7 @@ function CustomTabBar() {
   const { count: wishlistCount } = useWishlist();
   const { unreadCount: notifUnreadCount } = useNotifications();
   const { t } = useLanguage();
+  const C = useAppColors();
   const TABS = getTabs(t);
 
   const isActive = useCallback(
@@ -223,7 +225,7 @@ function CustomTabBar() {
 
   return (
     <View style={[styles.barWrapper, { paddingBottom: barPaddingBottom }]}>
-      <View style={styles.barBg} />
+      <View style={[styles.barBg, { backgroundColor: C.tabBar }]} />
       <View style={styles.barTopBorder} />
 
       <View style={styles.barInner}>
@@ -357,7 +359,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 2,
     borderWidth: 1.5,
-    borderColor: '#0A0507',
+    borderColor: 'transparent',
   },
   tabBadgeText: {
     color: '#FFFFFF',

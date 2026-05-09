@@ -21,7 +21,7 @@ import StarRating from '@/components/StarRating';
 import WishlistHeart from '@/components/WishlistHeart';
 import { useWishlistToast } from '@/context/WishlistToastContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
-import { useAppColors } from '@/context/ThemeContext';
+import { useAppColors, useThemeMode } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 
 const PAGE_SIZE = 24;
@@ -144,7 +144,12 @@ export default function ProductsScreen() {
   const { category: categoryParam } = useLocalSearchParams<{ category?: string }>();
   const { language, t } = useLanguage();
   const C = useAppColors();
+  const themeMode = useThemeMode();
   const { width } = useWindowDimensions();
+
+  useEffect(() => {
+    console.log('[Shop] active theme mode =', themeMode, '| background =', C.background);
+  }, [themeMode]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
