@@ -69,13 +69,13 @@ function SectionsScreen() {
 
   if (isMobile) {
     return (
-      <AdminGuard>
+      <AdminGuard permission="manage_cms">
         <AdminMobileDashboard title="أقسام الصفحة الرئيسية" showBack>{content}</AdminMobileDashboard>
       </AdminGuard>
     );
   }
   return (
-    <AdminGuard>
+    <AdminGuard permission="manage_cms">
       <AdminWebDashboard title="أقسام الصفحة الرئيسية">{content}</AdminWebDashboard>
     </AdminGuard>
   );

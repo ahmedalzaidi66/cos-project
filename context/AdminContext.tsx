@@ -174,11 +174,14 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
     console.log('[AdminContext] Employee found:', empRow.email, 'role:', empRow.role);
 
+    // Only the hardcoded super_admin role gets all permissions automatically.
+    // Every other role — including 'admin' — uses only the permissions explicitly
+    // stored in their employee row, so the admin UI can restrict access.
     const permissions: string[] =
-      empRow.role === 'admin' || empRow.role === 'super_admin'
+      empRow.role === 'super_admin'
         ? ALL_PERMISSIONS
         : Array.isArray(empRow.permissions)
-        ? empRow.permissions
+        ? empRow.permissions.filter((p: string) => ALL_PERMISSIONS.includes(p))
         : [];
 
     const user: AdminUser = {

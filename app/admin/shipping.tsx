@@ -417,14 +417,14 @@ function ShippingScreen() {
 
   if (isMobile) {
     return (
-      <AdminGuard>
+      <AdminGuard permission="manage_orders">
         <AdminMobileDashboard title="الشحن">{content}</AdminMobileDashboard>
       </AdminGuard>
     );
   }
 
   return (
-    <AdminGuard>
+    <AdminGuard permission="manage_orders">
       <AdminWebDashboard title="إدارة الشحن">{content}</AdminWebDashboard>
     </AdminGuard>
   );

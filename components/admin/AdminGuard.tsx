@@ -7,7 +7,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
 type Props = {
-  permission: string;
+  /** Permission key required to view this section. Omit for auth-only (no specific permission needed). */
+  permission?: string;
   children: React.ReactNode;
 };
 
@@ -35,7 +36,7 @@ export default function AdminGuard({ permission, children }: Props) {
 
   if (!isAdminAuthenticated) return null;
 
-  if (!hasPermission(permission)) {
+  if (permission && !hasPermission(permission)) {
     return <AccessDenied />;
   }
 
