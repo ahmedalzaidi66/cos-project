@@ -11,7 +11,7 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc } from 'lucide-react-native';
 import { Music2 } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
@@ -34,9 +34,23 @@ export default function AccountScreen() {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
+type AuthTab = 'login' | 'register' | 'phone';
+
 function AuthView() {
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [tab, setTab] = useState<AuthTab>('login');
   const { t } = useLanguage();
+
+  const headerIcon = tab === 'phone'
+    ? <SmartphoneNfc size={34} color={Colors.neonBlue} strokeWidth={1.5} />
+    : <User size={34} color={Colors.neonBlue} strokeWidth={1.5} />;
+
+  const headerTitle = tab === 'login' ? t.welcomeBack
+    : tab === 'register' ? t.createAccount
+    : 'Phone Login';
+
+  const headerSubtitle = tab === 'login' ? t.signInSubtitle
+    : tab === 'register' ? t.registerSubtitle
+    : 'Enter your phone number to receive a verification code';
 
   return (
     <KeyboardAvoidingView
@@ -50,13 +64,9 @@ function AuthView() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.authHeader}>
-          <User size={34} color={Colors.neonBlue} strokeWidth={1.5} />
-          <Text style={styles.authTitle}>
-            {tab === 'login' ? t.welcomeBack : t.createAccount}
-          </Text>
-          <Text style={styles.authSubtitle}>
-            {tab === 'login' ? t.signInSubtitle : t.registerSubtitle}
-          </Text>
+          {headerIcon}
+          <Text style={styles.authTitle}>{headerTitle}</Text>
+          <Text style={styles.authSubtitle}>{headerSubtitle}</Text>
         </View>
 
         <View style={styles.tabRow}>
@@ -76,9 +86,20 @@ function AuthView() {
               {t.register}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.authTab, tab === 'phone' && styles.authTabActive]}
+            onPress={() => setTab('phone')}
+          >
+            <SmartphoneNfc size={11} color={tab === 'phone' ? Colors.white : Colors.textMuted} strokeWidth={2} />
+            <Text style={[styles.authTabText, tab === 'phone' && styles.authTabTextActive]}>
+              Phone
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {tab === 'login' ? <LoginForm /> : <RegisterForm onSuccess={() => setTab('login')} />}
+        {tab === 'login' ? <LoginForm /> :
+         tab === 'register' ? <RegisterForm onSuccess={() => setTab('login')} /> :
+         <PhoneLoginForm />}
         <AccountFooter />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -275,6 +296,138 @@ function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         size="xs"
         style={{ marginTop: 4 }}
       />
+    </View>
+  );
+}
+
+// ─── Phone Login Form ─────────────────────────────────────────────────────────
+
+function PhoneLoginForm() {
+  const { requestOtp, verifyOtp } = useAuth();
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<'enter_phone' | 'enter_code'>('enter_phone');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+
+  // Countdown timer for resend cooldown
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setInterval(() => setCooldown(c => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldown]);
+
+  const handleRequestOtp = async () => {
+    if (!phone.trim()) { setError('Please enter your phone number'); return; }
+    setLoading(true);
+    setError('');
+    const result = await requestOtp(phone.trim());
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error ?? 'Failed to send code');
+      if (result.cooldownSeconds) setCooldown(result.cooldownSeconds);
+    } else {
+      setStep('enter_code');
+      setCooldown(60);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (code.length !== 6) { setError('Enter the 6-digit code'); return; }
+    setLoading(true);
+    setError('');
+    const result = await verifyOtp(phone.trim(), code.trim());
+    setLoading(false);
+    if (!result.success) {
+      setError(
+        result.attemptsLeft !== undefined
+          ? `${result.error ?? 'Invalid code'} (${result.attemptsLeft} attempts left)`
+          : (result.error ?? 'Verification failed')
+      );
+    }
+    // On success AuthContext sets session → AccountScreen re-renders to ProfileView automatically
+  };
+
+  const handleResend = async () => {
+    if (cooldown > 0) return;
+    setCode('');
+    setError('');
+    setLoading(true);
+    const result = await requestOtp(phone.trim());
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error ?? 'Failed to resend code');
+      if (result.cooldownSeconds) setCooldown(result.cooldownSeconds);
+    } else {
+      setCooldown(60);
+    }
+  };
+
+  if (step === 'enter_phone') {
+    return (
+      <View style={styles.form}>
+        {error ? <ErrorBanner message={error} /> : null}
+        <AuthField
+          label="Phone Number"
+          value={phone}
+          onChange={setPhone}
+          icon={<Phone size={13} color={Colors.textMuted} />}
+          keyboardType="phone-pad"
+          placeholder="+964 770 000 0000"
+        />
+        <GlossyButton
+          title={loading ? 'Sending...' : 'Send Code'}
+          onPress={handleRequestOtp}
+          loading={loading}
+          fullWidth
+          size="xs"
+          style={{ marginTop: 4 }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.form}>
+      {error ? <ErrorBanner message={error} /> : null}
+      <View style={styles.phoneHint}>
+        <SmartphoneNfc size={13} color={Colors.textSecondary} strokeWidth={2} />
+        <Text style={styles.phoneHintText}>Code sent to {phone}</Text>
+      </View>
+      <AuthField
+        label="Verification Code"
+        value={code}
+        onChange={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
+        icon={<Lock size={13} color={Colors.textMuted} />}
+        keyboardType="number-pad"
+        placeholder="6-digit code"
+      />
+      <GlossyButton
+        title={loading ? 'Verifying...' : 'Verify Code'}
+        onPress={handleVerifyOtp}
+        loading={loading}
+        fullWidth
+        size="xs"
+        style={{ marginTop: 4 }}
+      />
+      <TouchableOpacity
+        onPress={handleResend}
+        disabled={cooldown > 0}
+        style={styles.resendRow}
+        activeOpacity={0.7}
+      >
+        <Text style={[styles.resendText, cooldown > 0 && styles.resendTextDim]}>
+          {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => { setStep('enter_phone'); setCode(''); setError(''); }}
+        style={styles.resendRow}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.resendText}>Change number</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -1053,7 +1206,10 @@ const styles = StyleSheet.create({
   authTab: {
     flex: 1,
     paddingVertical: 4,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
     borderRadius: Radius.full,
   },
   authTabActive: {
@@ -1073,6 +1229,34 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     gap: Spacing.xs,
+  },
+  phoneHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  phoneHintText: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  resendRow: {
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  resendText: {
+    color: Colors.neonBlue,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  resendTextDim: {
+    color: Colors.textMuted,
   },
 
   // ── Profile ──

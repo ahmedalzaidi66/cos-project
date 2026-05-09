@@ -23,6 +23,10 @@ type AuthContextType = {
   resendVerificationEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  /** Phone OTP — request a code (does not change email login) */
+  requestOtp: (phone: string) => Promise<{ success: boolean; error?: string; cooldownSeconds?: number }>;
+  /** Phone OTP — verify the code and sign the user in */
+  verifyOtp: (phone: string, code: string) => Promise<{ success: boolean; error?: string; attemptsLeft?: number }>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -114,8 +118,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  // ── Phone OTP helpers ────────────────────────────────────────────────────────
+  const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+  const requestOtp = useCallback(async (
+    phone: string
+  ): Promise<{ success: boolean; error?: string; cooldownSeconds?: number }> => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ phone, purpose: 'login' }),
+      });
+      const json = await res.json();
+      if (!json.success) return { success: false, error: json.error, cooldownSeconds: json.cooldownSeconds };
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  }, [SUPABASE_URL, SUPABASE_ANON_KEY]);
+
+  const verifyOtp = useCallback(async (
+    phone: string,
+    code: string
+  ): Promise<{ success: boolean; error?: string; attemptsLeft?: number }> => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ phone, code, purpose: 'login' }),
+      });
+      const json = await res.json();
+      if (!json.success) return { success: false, error: json.error, attemptsLeft: json.attemptsLeft };
+
+      // Set the Supabase session from the tokens returned by the edge function
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: json.session.access_token,
+        refresh_token: json.session.refresh_token,
+      });
+      if (sessionError) return { success: false, error: sessionError.message };
+
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Network error. Please try again.' };
+    }
+  }, [SUPABASE_URL, SUPABASE_ANON_KEY]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, resendVerificationEmail, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, register, resendVerificationEmail, logout, isAuthenticated: !!user, requestOtp, verifyOtp }}>
       {children}
     </AuthContext.Provider>
   );
