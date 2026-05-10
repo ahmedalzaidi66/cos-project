@@ -12,7 +12,8 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ShoppingBag, Check } from 'lucide-react-native';
+import { ShoppingBag, Check, Search } from 'lucide-react-native';
+import SearchModal from '@/components/SearchModal';
 import { fetchProducts, fetchCategories, getProductName, getProductImage, getCategoryName, Product, Category } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import { useCart } from '@/context/CartContext';
@@ -151,6 +152,7 @@ export default function ProductsScreen() {
     console.log('[Shop] active theme mode =', themeMode, '| background =', C.background);
   }, [themeMode]);
 
+  const [searchOpen, setSearchOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryParam ?? null);
@@ -265,6 +267,18 @@ export default function ProductsScreen() {
     <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader title={activeLabel} showBack />
 
+      {/* Search tap bar */}
+      <TouchableOpacity
+        style={[styles.searchTapBar, { backgroundColor: C.backgroundInput, borderColor: C.border }]}
+        onPress={() => setSearchOpen(true)}
+        activeOpacity={0.85}
+      >
+        <Search size={15} color={C.textMuted} strokeWidth={2} />
+        <Text style={[styles.searchTapText, { color: C.textMuted }]}>
+          {t.searchGear ?? 'Search beauty...'}
+        </Text>
+      </TouchableOpacity>
+
       {/* Category filter chips */}
       <View style={[styles.filterWrap, { backgroundColor: C.backgroundSecondary, borderBottomColor: C.border }]}>
         <FlatList
@@ -374,12 +388,31 @@ export default function ProductsScreen() {
           )}
         />
       )}
+
+      <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  searchTapBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 8,
+    marginTop: 8,
+    marginBottom: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  searchTapText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '400',
+  },
 
   filterWrap: {
     borderBottomWidth: 1,

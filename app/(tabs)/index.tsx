@@ -36,6 +36,7 @@ import { useCart } from '@/context/CartContext';
 import WishlistHeart from '@/components/WishlistHeart';
 import { useWishlistToast } from '@/context/WishlistToastContext';
 import { AutoScrollRow } from '@/components/AutoScrollRow';
+import SearchModal from '@/components/SearchModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ export default function ShopScreen() {
     console.log('[Home] active theme mode =', themeMode, '| background =', C.background);
   }, [themeMode]);
 
+  const [searchOpen, setSearchOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [sectionMap, setSectionMap] = useState<SectionMap>(new Map());
@@ -236,7 +238,8 @@ export default function ShopScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
-      <AppHeader />
+      <AppHeader onSearchPress={() => setSearchOpen(true)} />
+      <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

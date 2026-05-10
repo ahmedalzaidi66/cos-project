@@ -9,7 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Menu, User, ShoppingCart, ArrowLeft, Heart } from 'lucide-react-native';
+import { Menu, User, ShoppingCart, ArrowLeft, Heart, Search } from 'lucide-react-native';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useCMS } from '@/context/CMSContext';
@@ -23,9 +23,10 @@ import { useUISize } from '@/context/UISizeContext';
 type Props = {
   showBack?: boolean;
   title?: string;
+  onSearchPress?: () => void;
 };
 
-export default function AppHeader({ showBack = false, title }: Props) {
+export default function AppHeader({ showBack = false, title, onSearchPress }: Props) {
   const router = useRouter();
   const { totalItems } = useCart();
   const { isRTL } = useLanguage();
@@ -154,6 +155,15 @@ export default function AppHeader({ showBack = false, title }: Props) {
           <LanguageSwitcher />
           {showIcons && (
             <>
+              {onSearchPress && (
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  activeOpacity={0.7}
+                  onPress={onSearchPress}
+                >
+                  <Search size={16} color={C.textPrimary} strokeWidth={2} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.iconBtn}
                 activeOpacity={0.7}
