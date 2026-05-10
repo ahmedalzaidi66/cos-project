@@ -245,7 +245,7 @@ export default {
   noProductsFound: 'Товаров пока нет',
   addFirstProduct: 'Добавьте первый товар для начала',
   searchProducts: 'Поиск товаров...',
-  productNamePlaceholder: 'напр. Pro Helmet X1',
+  productNamePlaceholder: 'напр. Бархатная матовая помада',
   descriptionPlaceholder: 'Введите описание товара...',
   imagePreviewHint: 'Введите URL изображения выше для предпросмотра',
   colProduct: 'Товар',
@@ -841,8 +841,8 @@ export default {
   canopyExplanationFormula: 'Подбор продукта = тип кожи + шаги рутины:',
   canopyExplanationMin: 'мин',
   canopyExplanationMax: 'макс',
-  canopyWeightPlaceholderLbs: 'напр. 185',
-  canopyWeightPlaceholderKg: 'напр. 84',
+  canopyWeightPlaceholderLbs: 'напр. Жирная',
+  canopyWeightPlaceholderKg: 'напр. Сухая',
 
   // Admin reviews
   searchReviews: 'Поиск отзывов...',

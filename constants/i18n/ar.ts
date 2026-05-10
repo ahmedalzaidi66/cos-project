@@ -246,7 +246,7 @@ export default {
   noProductsFound: 'لا توجد منتجات بعد',
   addFirstProduct: 'أضف منتجك الأول للبدء',
   searchProducts: 'ابحث عن منتجات...',
-  productNamePlaceholder: 'مثال: خوذة Pro X1',
+  productNamePlaceholder: 'مثال: أحمر شفاه مخملي',
   descriptionPlaceholder: 'أدخل وصف المنتج...',
   imagePreviewHint: 'أدخل رابط الصورة أعلاه للمعاينة',
   colProduct: 'المنتج',
@@ -844,8 +844,8 @@ export default {
   canopyExplanationFormula: 'توصية المنتج = نوع البشرة + خطوات الروتين:',
   canopyExplanationMin: 'الحد الأدنى',
   canopyExplanationMax: 'الحد الأقصى',
-  canopyWeightPlaceholderLbs: 'مثال: 185',
-  canopyWeightPlaceholderKg: 'مثال: 84',
+  canopyWeightPlaceholderLbs: 'مثال: دهني',
+  canopyWeightPlaceholderKg: 'مثال: جاف',
 
   // Admin reviews
   searchReviews: 'بحث في المراجعات...',

@@ -1,20 +1,29 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
-    "slug": "bolt-expo-nativewind",
+    "name": "Lazurde Beauty",
+    "slug": "lazurde-beauty",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "lazurde",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lazurde.beauty"
+    },
+    "android": {
+      "package": "com.lazurde.beauty"
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Lazurde Beauty",
+      "shortName": "Lazurde",
+      "description": "Premium makeup loved by beauty enthusiasts worldwide",
+      "themeColor": "#FF4D8D",
+      "backgroundColor": "#FFFFFF"
     },
     "plugins": ["expo-router", "expo-font", "expo-web-browser"],
     "experiments": {

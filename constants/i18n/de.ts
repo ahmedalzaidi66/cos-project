@@ -245,7 +245,7 @@ export default {
   noProductsFound: 'Noch keine Produkte',
   addFirstProduct: 'Füge dein erstes Produkt hinzu, um zu beginnen',
   searchProducts: 'Produkte suchen...',
-  productNamePlaceholder: 'z.B. Pro-Helm X1',
+  productNamePlaceholder: 'z.B. Velvet Matte Lippenstift',
   descriptionPlaceholder: 'Produktbeschreibung eingeben...',
   imagePreviewHint: 'Gib oben eine Bild-URL ein, um eine Vorschau zu sehen',
   colProduct: 'Produkt',
@@ -840,8 +840,8 @@ export default {
   canopyExplanationFormula: 'Produktempfehlung = Hauttyp + Routine-Schritte:',
   canopyExplanationMin: 'min',
   canopyExplanationMax: 'max',
-  canopyWeightPlaceholderLbs: 'z.B. 185',
-  canopyWeightPlaceholderKg: 'z.B. 84',
+  canopyWeightPlaceholderLbs: 'z.B. Fettig',
+  canopyWeightPlaceholderKg: 'z.B. Trocken',
 
   // Admin reviews
   searchReviews: 'Bewertungen suchen...',

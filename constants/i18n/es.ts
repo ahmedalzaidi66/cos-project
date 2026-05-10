@@ -245,7 +245,7 @@ export default {
   noProductsFound: 'Sin productos aún',
   addFirstProduct: 'Agrega tu primer producto para comenzar',
   searchProducts: 'Buscar productos...',
-  productNamePlaceholder: 'ej. Casco Pro X1',
+  productNamePlaceholder: 'ej. Labial Matte Velvet',
   descriptionPlaceholder: 'Ingresa descripción del producto...',
   imagePreviewHint: 'Ingresa una URL de imagen arriba para previsualizar',
   colProduct: 'Producto',
@@ -840,8 +840,8 @@ export default {
   canopyExplanationFormula: 'Producto ideal = tipo de piel + pasos de rutina:',
   canopyExplanationMin: 'mín',
   canopyExplanationMax: 'máx',
-  canopyWeightPlaceholderLbs: 'ej. 185',
-  canopyWeightPlaceholderKg: 'ej. 84',
+  canopyWeightPlaceholderLbs: 'ej. Graso',
+  canopyWeightPlaceholderKg: 'ej. Seco',
 
   // Admin reviews
   searchReviews: 'Buscar reseñas...',
