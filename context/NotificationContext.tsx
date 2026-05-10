@@ -79,10 +79,66 @@ export async function sendWhatsAppMessage(phone: string, message: string): Promi
   console.log('[sendWhatsApp] TO:', phone, 'MESSAGE:', message.slice(0, 80));
 }
 
-// ─── Push token registration (Expo Notifications — web-safe) ─────────────────
+// ─── Push token registration ──────────────────────────────────────────────────
+
+async function saveToken(userId: string, token: string, provider: 'expo' | 'fcm'): Promise<void> {
+  await supabase.from('user_push_tokens').upsert(
+    {
+      user_id: userId,
+      token,
+      provider,
+      platform: Platform.OS,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,token,provider' }
+  );
+}
+
+async function registerWebFcmToken(userId: string): Promise<void> {
+  try {
+    if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) return;
+
+    const vapidKey = process.env.EXPO_PUBLIC_FCM_WEB_VAPID_KEY;
+    if (!vapidKey) return; // FCM web not configured — skip silently
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    // Register service worker for FCM
+    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => null);
+    if (!reg) return;
+
+    // Dynamically import Firebase Messaging to keep it out of non-web bundles
+    const { initializeApp, getApps } = await import('firebase/app' as any);
+    const { getMessaging, getToken } = await import('firebase/messaging' as any);
+
+    const firebaseConfig = {
+      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+      messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+    };
+
+    // Only initialize if all config values present
+    if (!firebaseConfig.projectId || !firebaseConfig.appId || !firebaseConfig.apiKey) return;
+
+    const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+    const messaging = getMessaging(app);
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg });
+    if (!token) return;
+
+    await saveToken(userId, token, 'fcm');
+  } catch (e) {
+    console.warn('[Push] registerWebFcmToken failed:', e);
+  }
+}
 
 export async function registerPushToken(userId: string): Promise<void> {
-  if (Platform.OS === 'web') return; // Web push requires service workers — not wired here
+  if (Platform.OS === 'web') {
+    await registerWebFcmToken(userId);
+    return;
+  }
   try {
     // Dynamically import so web bundle doesn't break
     const Notifications = await import('expo-notifications');
@@ -97,10 +153,7 @@ export async function registerPushToken(userId: string): Promise<void> {
     const tokenData = await Notifications.getExpoPushTokenAsync();
     const token = tokenData.data;
 
-    await supabase.from('user_push_tokens').upsert(
-      { user_id: userId, token, platform: Platform.OS, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,token' }
-    );
+    await saveToken(userId, token, 'expo');
   } catch (e) {
     console.warn('[Push] registerPushToken failed:', e);
   }
