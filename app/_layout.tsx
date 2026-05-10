@@ -11,15 +11,34 @@ import { LayoutProvider } from '@/context/LayoutContext';
 import { UISizeProvider } from '@/context/UISizeContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { WishlistToastProvider } from '@/context/WishlistToastContext';
-import { ThemeProvider } from '@/context/ThemeContext';
+import { ThemeProvider, useThemeMode } from '@/context/ThemeContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import BeautyChat, { ChatFloatingButton } from '@/components/BeautyChat';
 
-export default function RootLayout() {
-  useFrameworkReady();
+function AppShell() {
   const [chatOpen, setChatOpen] = useState(false);
   const openChat = useCallback(() => setChatOpen(true), []);
   const closeChat = useCallback(() => setChatOpen(false), []);
+  const mode = useThemeMode();
+
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="product/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="checkout" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="admin" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <ChatFloatingButton onPress={openChat} chatOpen={chatOpen} />
+      <BeautyChat visible={chatOpen} onClose={closeChat} />
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
+    </>
+  );
+}
+
+export default function RootLayout() {
+  useFrameworkReady();
 
   return (
     <ThemeProvider>
@@ -33,16 +52,7 @@ export default function RootLayout() {
             <WishlistToastProvider>
               <NotificationProvider>
               <AdminProvider>
-                <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="product/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
-                  <Stack.Screen name="checkout" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
-                  <Stack.Screen name="admin" options={{ headerShown: false }} />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
-                <ChatFloatingButton onPress={openChat} chatOpen={chatOpen} />
-                <BeautyChat visible={chatOpen} onClose={closeChat} />
-                <StatusBar style="light" />
+                <AppShell />
               </AdminProvider>
               </NotificationProvider>
             </WishlistToastProvider>

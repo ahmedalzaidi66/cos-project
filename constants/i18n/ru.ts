@@ -879,4 +879,10 @@ export default {
   reTranslateDesc: 'Перевести английское название и описание на AR, ES, DE и RU с помощью ИИ.',
   translationsUpdated: 'Переводы успешно обновлены',
   translating: 'Перевод...',
+
+  // Theme preference
+  themePreference: 'Внешний вид',
+  themeLight: 'Светлая',
+  themeDark: 'Тёмная',
+  themeSystem: 'Системная',
 };

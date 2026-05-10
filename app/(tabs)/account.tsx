@@ -11,7 +11,7 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake, Palette } from 'lucide-react-native';
 import { Music2 } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
@@ -26,6 +26,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
+import ThemeSelector from '@/components/ThemeSelector';
 
 export default function AccountScreen() {
   const { isAuthenticated, user } = useAuth();
@@ -1517,6 +1518,16 @@ function ProfileView() {
 
         {/* ── Settings list ── */}
         <View style={[styles.menuCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+          <View style={styles.menuRow}>
+            <View style={styles.menuRowLeft}>
+              <Palette size={16} color={Colors.neonBlue} strokeWidth={2} />
+              <Text style={[styles.menuRowLabel, { color: C.textPrimary }]}>{(t as any).themePreference ?? 'Appearance'}</Text>
+            </View>
+          </View>
+          <View style={styles.themeSelectorWrap}>
+            <ThemeSelector />
+          </View>
+          <View style={[styles.divider, { backgroundColor: C.borderLight }]} />
           <MenuRow
             icon={<Globe size={16} color={Colors.neonBlue} strokeWidth={2} />}
             label={t.language}
@@ -2526,6 +2537,10 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: FontSize.sm,
     fontWeight: '600',
+  },
+  themeSelectorWrap: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm + 2,
   },
   divider: {
     height: 1,

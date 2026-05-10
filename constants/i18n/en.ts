@@ -1044,4 +1044,10 @@ export default {
   validEmailAddress: 'Please enter a valid email address.',
   dobFormatHint: 'Date of birth format: DD/MM/YYYY',
   emailLabel: 'Email',
+
+  // Theme preference
+  themePreference: 'Appearance',
+  themeLight: 'Light',
+  themeDark: 'Dark',
+  themeSystem: 'System',
 };

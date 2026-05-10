@@ -332,4 +332,10 @@ export default {
   validEmailAddress: 'تکایە ئادرەسی ئیمەیلی دروست بنووسە.',
   dobFormatHint: 'شێوازی بەرواری لەدایکبوون: ڕۆژ/مانگ/ساڵ',
   emailLabel: 'ئیمەیل',
+
+  // Theme preference
+  themePreference: 'ڕووکار',
+  themeLight: 'ڕووناک',
+  themeDark: 'تاریک',
+  themeSystem: 'سیستەم',
 };

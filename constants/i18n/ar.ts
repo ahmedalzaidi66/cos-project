@@ -1044,4 +1044,10 @@ export default {
   validEmailAddress: 'يرجى إدخال عنوان بريد إلكتروني صحيح.',
   dobFormatHint: 'صيغة تاريخ الميلاد: يوم/شهر/سنة',
   emailLabel: 'البريد الإلكتروني',
+
+  // Theme preference
+  themePreference: 'المظهر',
+  themeLight: 'فاتح',
+  themeDark: 'داكن',
+  themeSystem: 'النظام',
 };

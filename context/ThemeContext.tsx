@@ -1,44 +1,61 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { Platform, Appearance, ColorSchemeName } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { DarkColors, LightColors } from '@/constants/theme';
 
 export type AppThemeMode = 'dark' | 'light';
+export type UserThemePreference = 'light' | 'dark' | 'system';
 
-const THEME_STORAGE_KEY = 'customer_app_theme';
+const USER_PREF_KEY = 'user_theme_preference';
 
-function readPersistedTheme(): AppThemeMode {
-  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-    const v = localStorage.getItem(THEME_STORAGE_KEY);
-    if (v === 'light') return 'light';
-    if (v === 'dark') return 'dark';
-  }
-  return 'dark';
-}
+const DARK_COMPAT  = { primary: '#FF4D8D', background: '#0A0507', text: '#FDE8F0', accent: '#FF4D8D' };
+const LIGHT_COMPAT = { primary: '#FF4D8D', background: '#FFFFFF', text: '#1A0A14', accent: '#FF4D8D' };
 
-function persistTheme(mode: AppThemeMode) {
-  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-    localStorage.setItem(THEME_STORAGE_KEY, mode);
-  }
-}
+export const DEFAULT_THEME = DARK_COMPAT;
 
 type ThemeContextType = {
   mode: AppThemeMode;
+  userPref: UserThemePreference;
+  setUserPref: (pref: UserThemePreference) => void;
   C: typeof DarkColors;
-  theme: { primary: string; background: string; text: string; accent: string };
+  theme: typeof DARK_COMPAT;
 };
-
-const DARK_COMPAT = { primary: '#FF4D8D', background: '#0A0507', text: '#FDE8F0', accent: '#FF4D8D' };
-const LIGHT_COMPAT = { primary: '#FF4D8D', background: '#FFFFFF', text: '#1A0A14', accent: '#FF4D8D' };
-
-// Kept for legacy callers that import DEFAULT_THEME
-export const DEFAULT_THEME = DARK_COMPAT;
 
 const ThemeContext = createContext<ThemeContextType>({
   mode: 'dark',
+  userPref: 'system',
+  setUserPref: () => {},
   C: DarkColors,
   theme: DARK_COMPAT,
 });
+
+// ── Storage helpers ───────────────────────────────────────────────────────────
+
+function readPrefWeb(): UserThemePreference | null {
+  if (typeof localStorage === 'undefined') return null;
+  const v = localStorage.getItem(USER_PREF_KEY);
+  if (v === 'light' || v === 'dark' || v === 'system') return v;
+  return null;
+}
+
+function writePrefWeb(pref: UserThemePreference) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(USER_PREF_KEY, pref);
+}
+
+async function readPrefNative(): Promise<UserThemePreference | null> {
+  try {
+    const v = await AsyncStorage.getItem(USER_PREF_KEY);
+    if (v === 'light' || v === 'dark' || v === 'system') return v;
+  } catch {}
+  return null;
+}
+
+async function writePrefNative(pref: UserThemePreference) {
+  try { await AsyncStorage.setItem(USER_PREF_KEY, pref); } catch {}
+}
+
+// ── CSS vars ──────────────────────────────────────────────────────────────────
 
 function injectCSSVars(C: typeof DarkColors) {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -54,41 +71,76 @@ function injectCSSVars(C: typeof DarkColors) {
   document.body.style.backgroundColor = C.background;
 }
 
-function applyMode(mode: AppThemeMode) {
-  injectCSSVars(mode === 'light' ? LightColors : DarkColors);
-  persistTheme(mode);
+// ── Resolve effective mode ────────────────────────────────────────────────────
+
+function resolveMode(
+  pref: UserThemePreference,
+  systemScheme: ColorSchemeName,
+  adminDefault: AppThemeMode,
+): AppThemeMode {
+  if (pref === 'light') return 'light';
+  if (pref === 'dark')  return 'dark';
+  // system
+  if (systemScheme === 'light') return 'light';
+  if (systemScheme === 'dark')  return 'dark';
+  return adminDefault;
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Read from localStorage synchronously so first render uses the correct theme
-  const [mode, setMode] = useState<AppThemeMode>(() => {
-    const persisted = readPersistedTheme();
-    // Apply CSS vars immediately for web — prevents flash
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      injectCSSVars(persisted === 'light' ? LightColors : DarkColors);
-    }
-    return persisted;
-  });
+// ── Provider ──────────────────────────────────────────────────────────────────
 
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [userPref, setUserPrefState] = useState<UserThemePreference>('system');
+  const [adminDefault, setAdminDefault] = useState<AppThemeMode>('dark');
+  const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(
+    () => Appearance.getColorScheme()
+  );
+
+  // Derive effective mode
+  const mode = resolveMode(userPref, systemScheme, adminDefault);
+  const C = mode === 'light' ? LightColors : DarkColors;
+
+  // Apply CSS vars on mode change (web only, no-op on native)
   useEffect(() => {
-    // Background fetch from Supabase — updates if admin changed value
+    injectCSSVars(C);
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load persisted user pref on mount
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const saved = readPrefWeb();
+      if (saved) {
+        setUserPrefState(saved);
+        // Inject CSS vars immediately to prevent flash
+        const initialMode = resolveMode(saved, Appearance.getColorScheme(), adminDefault);
+        injectCSSVars(initialMode === 'light' ? LightColors : DarkColors);
+      }
+    } else {
+      readPrefNative().then(saved => {
+        if (saved) setUserPrefState(saved);
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for OS theme changes (system mode)
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemScheme(colorScheme);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // Fetch admin default from Supabase + realtime
+  useEffect(() => {
     supabase
       .from('site_settings')
       .select('value')
       .eq('key', 'customer_app_theme')
       .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          console.warn('[ThemeContext] fetch error:', error.message);
-          return;
-        }
+      .then(({ data }) => {
         const raw = data?.value ?? 'dark';
-        const resolved: AppThemeMode = raw === 'light' ? 'light' : 'dark';
-        setMode(resolved);
-        applyMode(resolved);
+        setAdminDefault(raw === 'light' ? 'light' : 'dark');
       });
 
-    // Realtime: update while app is open when admin changes the setting
     const channel = supabase
       .channel('customer_app_theme_watch')
       .on(
@@ -96,9 +148,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         { event: '*', schema: 'public', table: 'site_settings', filter: 'key=eq.customer_app_theme' },
         (payload) => {
           const newVal = (payload.new as { value?: string })?.value;
-          const resolved: AppThemeMode = newVal === 'light' ? 'light' : 'dark';
-          setMode(resolved);
-          applyMode(resolved);
+          setAdminDefault(newVal === 'light' ? 'light' : 'dark');
         }
       )
       .subscribe();
@@ -106,26 +156,34 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => { channel.unsubscribe(); };
   }, []);
 
-  const C = mode === 'light' ? LightColors : DarkColors;
+  const setUserPref = useCallback((pref: UserThemePreference) => {
+    setUserPrefState(pref);
+    if (Platform.OS === 'web') {
+      writePrefWeb(pref);
+    } else {
+      writePrefNative(pref);
+    }
+  }, []);
+
   const compat = mode === 'light' ? LIGHT_COMPAT : DARK_COMPAT;
 
   return (
-    <ThemeContext.Provider value={{ mode, C, theme: compat }}>
+    <ThemeContext.Provider value={{ mode, userPref, setUserPref, C, theme: compat }}>
       {children}
     </ThemeContext.Provider>
   );
 }
 
+// ── Hooks ─────────────────────────────────────────────────────────────────────
+
 export function useTheme() {
   return useContext(ThemeContext);
 }
 
-// Convenience hook — returns just the color palette for the current theme
 export function useAppColors() {
   return useContext(ThemeContext).C;
 }
 
-// Returns mode string — useful for conditional rendering based on theme
 export function useThemeMode(): AppThemeMode {
   return useContext(ThemeContext).mode;
 }

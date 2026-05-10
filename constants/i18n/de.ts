@@ -878,4 +878,10 @@ export default {
   reTranslateDesc: 'Den englischen Namen und die Beschreibung mit KI in AR, ES, DE und RU übersetzen.',
   translationsUpdated: 'Übersetzungen erfolgreich aktualisiert',
   translating: 'Übersetze...',
+
+  // Theme preference
+  themePreference: 'Erscheinungsbild',
+  themeLight: 'Hell',
+  themeDark: 'Dunkel',
+  themeSystem: 'System',
 };

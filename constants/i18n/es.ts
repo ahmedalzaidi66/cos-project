@@ -878,4 +878,10 @@ export default {
   reTranslateDesc: 'Traduce el nombre y descripción en inglés a AR, ES, DE y RU usando IA.',
   translationsUpdated: 'Traducciones actualizadas correctamente',
   translating: 'Traduciendo...',
+
+  // Theme preference
+  themePreference: 'Apariencia',
+  themeLight: 'Claro',
+  themeDark: 'Oscuro',
+  themeSystem: 'Sistema',
 };
