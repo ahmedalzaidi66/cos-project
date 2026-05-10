@@ -13,6 +13,7 @@ import { useAppColors } from '@/context/ThemeContext';
 import { useLanguage } from '@/context/LanguageContext';
 import ProductCard from '@/components/ProductCard';
 import { Radius, Spacing, FontSize } from '@/constants/theme';
+import { SearchResultsSkeleton } from '@/components/Skeleton';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -732,9 +733,7 @@ export default function SearchModal({ visible, onClose, initialQuery = '' }: Pro
 
         {/* ── Skeleton while loading first page ── */}
         {loading && !loadingMore && results.length === 0 && (
-          <View style={smStyles.loadingWrap}>
-            <ActivityIndicator size="large" color={PINK} />
-          </View>
+          <SearchResultsSkeleton />
         )}
       </KeyboardAvoidingView>
 

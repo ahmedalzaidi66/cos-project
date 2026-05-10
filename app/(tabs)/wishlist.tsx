@@ -22,6 +22,7 @@ import AppHeader from '@/components/AppHeader';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
+import { WishlistSkeleton } from '@/components/Skeleton';
 
 export default function WishlistScreen() {
   const { isAuthenticated } = useAuth();
@@ -87,9 +88,7 @@ export default function WishlistScreen() {
       <AppHeader title={t.myWishlist ?? 'My Wishlist'} showBack />
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color={Colors.neonBlue} size="large" />
-        </View>
+        <WishlistSkeleton count={5} />
       ) : wishlistItems.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={[styles.emptyIconWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>

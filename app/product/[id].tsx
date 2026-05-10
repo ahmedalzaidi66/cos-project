@@ -38,6 +38,7 @@ import ImageViewerModal from '@/components/ImageViewerModal';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { useAppColors, useThemeMode } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
+import { ProductDetailSkeleton } from '@/components/Skeleton';
 
 export default function ProductDetailScreen() {
   const { width, height } = useWindowDimensions();
@@ -157,12 +158,9 @@ export default function ProductDetailScreen() {
   if (loading || !product) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: C.background }]}>
-        <View style={[styles.loadingImage, { height: imageContainerHeight, backgroundColor: C.backgroundCard }]} />
-        <View style={styles.loadingContent}>
-          <View style={[styles.loadingLine, { backgroundColor: C.backgroundCard }]} />
-          <View style={[styles.loadingLine, { width: '60%', backgroundColor: C.backgroundCard }]} />
-          <View style={[styles.loadingLine, { width: '40%', backgroundColor: C.backgroundCard }]} />
-        </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <ProductDetailSkeleton />
+        </ScrollView>
       </View>
     );
   }

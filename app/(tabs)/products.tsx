@@ -9,11 +9,11 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   ScrollView,
-  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ShoppingBag, Check, Search } from 'lucide-react-native';
 import SearchModal from '@/components/SearchModal';
+import { ProductGridSkeleton } from '@/components/Skeleton';
 import { fetchProducts, fetchCategories, getProductName, getProductImage, getCategoryName, Product, Category } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import { useCart } from '@/context/CartContext';
@@ -35,36 +35,6 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ─── Skeleton card ────────────────────────────────────────────────────────────
-
-const SkeletonCard = memo(function SkeletonCard({ width: cardW, anim }: { width: number; anim: Animated.Value }) {
-  const imgH = Math.round(cardW * 0.62);
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.55] });
-  return (
-    <Animated.View style={[skStyles.card, { width: cardW, opacity }]}>
-      <View style={[skStyles.image, { height: imgH }]} />
-      <View style={skStyles.body}>
-        <View style={skStyles.line} />
-        <View style={[skStyles.line, { width: '60%' }]} />
-        <View style={[skStyles.line, { width: '40%', backgroundColor: Colors.neonBlueDim, marginTop: 4 }]} />
-      </View>
-    </Animated.View>
-  );
-});
-
-const skStyles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.backgroundCard,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  image: { width: '100%', backgroundColor: Colors.backgroundSecondary },
-  body: { padding: 6, gap: 5 },
-  line: { height: 10, backgroundColor: Colors.navyLight, borderRadius: Radius.sm, width: '80%' },
-});
 
 // ─── Product card (inline, memoized) ─────────────────────────────────────────
 
@@ -169,19 +139,6 @@ export default function ProductsScreen() {
   const GAP = 6;
   const cardW = (width - SIDE_PAD * 2 - GAP * (numCols - 1)) / numCols;
 
-  // Skeleton animation
-  const skAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(skAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(skAnim, { toValue: 0, duration: 800, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [skAnim]);
-
   // When nav param changes, sync the filter
   useEffect(() => {
     setSelectedCategory(categoryParam ?? null);
@@ -248,11 +205,6 @@ export default function ProductsScreen() {
     const cat = categories.find(c => c.slug === selectedCategory);
     return cat ? getCategoryName(cat, language) : capitalize(selectedCategory);
   }, [selectedCategory, categories, language, t]);
-
-  const skeletonData = useMemo(
-    () => Array.from({ length: PAGE_SIZE }, (_, i) => `__sk_${i}`),
-    []
-  );
 
   const renderFooter = useCallback(() => {
     if (!loadingMore) return null;
@@ -342,17 +294,7 @@ export default function ProductsScreen() {
       </View>
 
       {loading ? (
-        // Grid skeleton while first page loads
-        <FlatList
-          data={skeletonData}
-          keyExtractor={item => item}
-          numColumns={numCols}
-          key={`sk-cols-${numCols}`}
-          scrollEnabled={false}
-          contentContainerStyle={[styles.grid, { padding: SIDE_PAD, gap: GAP }]}
-          columnWrapperStyle={numCols > 1 ? { gap: GAP } : undefined}
-          renderItem={() => <SkeletonCard width={cardW} anim={skAnim} />}
-        />
+        <ProductGridSkeleton count={numCols * 3} numCols={numCols} imageHeight={Math.round(cardW * 0.62)} />
       ) : products.length === 0 ? (
         <View style={styles.emptyWrap}>
           <ShoppingBag size={52} color={Colors.textMuted} strokeWidth={1.5} />

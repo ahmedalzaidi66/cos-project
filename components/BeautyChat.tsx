@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ import { supabase, Product, fetchProductById, fetchProductGallery, fetchProductS
 import { extractSkinTone, SkinToneRGB } from '@/lib/colorExtract';
 import ImageViewerModal from '@/components/ImageViewerModal';
 import { useAppColors } from '@/context/ThemeContext';
+import { SkeletonBox } from '@/components/Skeleton';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -1028,7 +1029,7 @@ function ProductQuickViewModal({
           <ScrollView style={s.qsScroll} contentContainerStyle={s.qsScrollContent} showsVerticalScrollIndicator={false}>
             {loadingProduct ? (
               <View style={s.qsImagePlaceholder}>
-                <ActivityIndicator color={Colors.neonBlue} />
+                <SkeletonBox height={200} width="100%" borderRadius={8} />
               </View>
             ) : gallery.length > 0 ? (
               <View>

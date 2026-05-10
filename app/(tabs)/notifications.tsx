@@ -20,6 +20,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import AppHeader from '@/components/AppHeader';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
+import { NotificationsSkeleton } from '@/components/Skeleton';
 
 // ─── Type metadata ────────────────────────────────────────────────────────────
 
@@ -162,9 +163,7 @@ export default function NotificationsScreen() {
       )}
 
       {loading && inboxItems.length === 0 ? (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={Colors.neonBlue} />
-        </View>
+        <NotificationsSkeleton count={6} />
       ) : !isAuthenticated ? (
         <GuestView />
       ) : (

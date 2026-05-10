@@ -37,6 +37,7 @@ import WishlistHeart from '@/components/WishlistHeart';
 import { useWishlistToast } from '@/context/WishlistToastContext';
 import { AutoScrollRow } from '@/components/AutoScrollRow';
 import SearchModal from '@/components/SearchModal';
+import { HomePageSkeleton } from '@/components/Skeleton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export default function ShopScreen() {
   const [sectionMap, setSectionMap] = useState<SectionMap>(new Map());
   const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const committedLanguage = useRef(language);
 
@@ -183,6 +185,7 @@ export default function ShopScreen() {
     const map = await fetchSections(fetchLang);
     if (committedLanguage.current === fetchLang) setSectionMap(map);
     setRefreshing(false);
+    setLoading(false);
   }, [fetchSections]);
 
   useEffect(() => {
@@ -240,35 +243,41 @@ export default function ShopScreen() {
     <View style={[styles.container, { backgroundColor: C.background }]}>
       <AppHeader onSearchPress={() => setSearchOpen(true)} />
       <SearchModal visible={searchOpen} onClose={() => setSearchOpen(false)} />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              committedLanguage.current = language;
-              fetchAll(language);
-              refreshCMS(language);
-            }}
-            tintColor={Colors.neonBlue}
-          />
-        }
-      >
-        {hasBlocks
-          ? visibleBlocks.map(block => renderBlock(block))
-          : (
-            <>
-              <HeroSlider slides={heroSlides} heroContent={heroContent} />
-              <ShopByCategorySection categories={categories} language={language} />
-              <BeautyTryOnHero />
-            </>
-          )
-        }
+      {loading && !refreshing ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <HomePageSkeleton />
+        </ScrollView>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                committedLanguage.current = language;
+                fetchAll(language);
+                refreshCMS(language);
+              }}
+              tintColor={Colors.neonBlue}
+            />
+          }
+        >
+          {hasBlocks
+            ? visibleBlocks.map(block => renderBlock(block))
+            : (
+              <>
+                <HeroSlider slides={heroSlides} heroContent={heroContent} />
+                <ShopByCategorySection categories={categories} language={language} />
+                <BeautyTryOnHero />
+              </>
+            )
+          }
 
-        <View style={{ height: 20 }} />
-      </ScrollView>
+          <View style={{ height: 20 }} />
+        </ScrollView>
+      )}
     </View>
   );
 }

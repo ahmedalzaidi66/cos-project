@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, Upload, RefreshCw, Eye, EyeOff, ImagePlus, Sparkles, CircleAlert as AlertCircle, User, FolderOpen, RotateCcw, Heart, ShoppingCart, X, Check } from 'lucide-react-native';
 import AppHeader from '@/components/AppHeader';
+import { HorizontalRowSkeleton } from '@/components/Skeleton';
 import { useLanguage } from '@/context/LanguageContext';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
@@ -941,7 +942,7 @@ export default function VirtualTryOnScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>{CATEGORY_LABELS[selectedProduct.category]} PRODUCTS</Text>
           {dbLoading ? (
-            <ActivityIndicator color={Colors.neonBlue} size="small" style={{ marginTop: 12 }} />
+            <HorizontalRowSkeleton />
           ) : categoryProducts(selectedProduct.category).length === 0 ? (
             <Text style={[styles.emptyTabText, { color: C.textMuted }]}>No products available</Text>
           ) : (

@@ -27,6 +27,7 @@ import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import ThemeSelector from '@/components/ThemeSelector';
+import { ListItemSkeleton } from '@/components/Skeleton';
 
 export default function AccountScreen() {
   const { isAuthenticated, user } = useAuth();
@@ -1502,7 +1503,9 @@ function ProfileView() {
               </TouchableOpacity>
             </View>
             {loadingOrders ? (
-              <Text style={[styles.dimText, { color: C.textMuted }]}>{t.loadingOrders}</Text>
+              <View style={{ gap: 8, paddingVertical: 4 }}>
+                {[0, 1, 2].map(i => <ListItemSkeleton key={i} imageSize={48} lines={2} />)}
+              </View>
             ) : orders.length === 0 ? (
               <View style={[styles.emptyBlock, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
                 <Package size={32} color={C.textMuted} strokeWidth={1.5} />
