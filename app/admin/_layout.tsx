@@ -30,6 +30,7 @@ export default function AdminLayout() {
       <Stack.Screen name="shipping" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="sections" />
+      <Stack.Screen name="analytics" />
     </Stack>
   );
 }

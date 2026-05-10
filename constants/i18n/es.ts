@@ -205,6 +205,7 @@ export default {
   // Admin nav
   admin: 'Admin',
   dashboard: 'Panel',
+  analytics: 'Analítica',
   products: 'Productos',
   categories: 'Categorías',
   ordersAdmin: 'Pedidos',

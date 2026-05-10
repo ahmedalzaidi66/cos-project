@@ -12,26 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import {
-  LayoutDashboard,
-  Package,
-  ShoppingCart,
-  Users,
-  UserCog,
-  File as FileEdit,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  ShieldCheck,
-  ChevronLeft,
-  MessageSquare,
-  Tag,
-  ShieldAlert,
-  Truck,
-  Bell,
-  LayoutList,
-} from 'lucide-react-native';
+import { LayoutDashboard, Package, ShoppingCart, Users, UserCog, File as FileEdit, Settings, LogOut, Menu, X, ShieldCheck, ChevronLeft, MessageSquare, Tag, ShieldAlert, Truck, Bell, LayoutList, ChartBar as BarChart3 } from 'lucide-react-native';
 import { useAdmin, ROLE_LABELS } from '@/context/AdminContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useLanguage } from '@/context/LanguageContext';
@@ -45,6 +26,7 @@ const USE_NATIVE = Platform.OS !== 'web';
 
 const MOBILE_NAV_ITEMS = [
   { key: 'dashboard',   icon: LayoutDashboard, route: '/admin/dashboard',   permission: 'view_dashboard' },
+  { key: 'analytics',  icon: BarChart3,       route: '/admin/analytics',   permission: 'view_dashboard' },
   { key: 'products',    icon: Package,         route: '/admin/products',    permission: 'manage_products' },
   { key: 'ordersAdmin', icon: ShoppingCart,    route: '/admin/orders',      permission: 'manage_orders' },
   { key: 'customers',       icon: Users,  route: '/admin/customers',       permission: 'manage_customers' },

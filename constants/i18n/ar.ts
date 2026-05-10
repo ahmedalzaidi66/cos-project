@@ -205,6 +205,7 @@ export default {
   // Admin nav
   admin: 'الإدارة',
   dashboard: 'لوحة التحكم',
+  analytics: 'التحليلات',
   products: 'المنتجات',
   categories: 'الفئات',
   ordersAdmin: 'الطلبات',
