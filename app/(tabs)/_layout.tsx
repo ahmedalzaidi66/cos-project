@@ -262,7 +262,7 @@ export default function TabLayout() {
   return (
     <Tabs
       tabBar={() => <CustomTabBar />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, animation: 'fade' }}
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="cart" />

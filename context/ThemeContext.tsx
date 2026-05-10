@@ -57,6 +57,8 @@ async function writePrefNative(pref: UserThemePreference) {
 
 // ── CSS vars ──────────────────────────────────────────────────────────────────
 
+const CSS_TRANSITION = 'background-color 280ms ease, color 280ms ease, border-color 220ms ease, fill 220ms ease';
+
 function injectCSSVars(C: typeof DarkColors) {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
   const root = document.documentElement;
@@ -69,6 +71,8 @@ function injectCSSVars(C: typeof DarkColors) {
   root.style.setProperty('--text-primary',     C.textPrimary);
   root.style.setProperty('--accent-color',     C.neonBlue);
   document.body.style.backgroundColor = C.background;
+  document.body.style.transition = CSS_TRANSITION;
+  root.style.transition = CSS_TRANSITION;
 }
 
 // ── Resolve effective mode ────────────────────────────────────────────────────

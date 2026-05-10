@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  Animated,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -34,6 +35,26 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
   const [activeShade, setActiveShade] = useState<ProductShade | null>(null);
   const [justAdded, setJustAdded] = useState(false);
   const mounted = useRef(true);
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const cartBtnScale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = useCallback(() => {
+    Animated.spring(pressScale, {
+      toValue: 0.965,
+      useNativeDriver: true,
+      speed: 60,
+      bounciness: 0,
+    }).start();
+  }, [pressScale]);
+
+  const handlePressOut = useCallback(() => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 10,
+    }).start();
+  }, [pressScale]);
 
   useEffect(() => {
     mounted.current = true;
@@ -85,14 +106,21 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
     addToCart(product, 1, shadeForCart);
     showCartToast('Added to cart');
     setJustAdded(true);
+    Animated.sequence([
+      Animated.spring(cartBtnScale, { toValue: 1.28, useNativeDriver: true, speed: 80, bounciness: 0 }),
+      Animated.spring(cartBtnScale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 16 }),
+    ]).start();
     setTimeout(() => setJustAdded(false), 1000);
   }, [product, activeShade, shades.length, addToCart, showCartToast, router]);
 
   return (
+    <Animated.View style={{ transform: [{ scale: pressScale }], flex: 1 }}>
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={1}
       style={[styles.card, { borderRadius: cardR }]}
       onPress={() => router.push(`/product/${product.id}`)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
     >
       <View style={[styles.imageContainer, { height: imageH, borderTopLeftRadius: cardR, borderTopRightRadius: cardR }]}>
         <Image
@@ -195,19 +223,22 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
               </Text>
             )}
           </View>
-          <TouchableOpacity
-            style={[styles.addBtn, justAdded && styles.addBtnAdded, isOutOfStock && styles.addBtnOOS, { borderRadius: btnR }]}
-            onPress={handleAddToCart}
-            activeOpacity={isOutOfStock ? 1 : 0.8}
-          >
-            {justAdded
-              ? <Check size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2.5} />
-              : <ShoppingCart size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2} />
-            }
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: cartBtnScale }] }}>
+            <TouchableOpacity
+              style={[styles.addBtn, justAdded && styles.addBtnAdded, isOutOfStock && styles.addBtnOOS, { borderRadius: btnR }]}
+              onPress={handleAddToCart}
+              activeOpacity={isOutOfStock ? 1 : 0.8}
+            >
+              {justAdded
+                ? <Check size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2.5} />
+                : <ShoppingCart size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2} />
+              }
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       </View>
     </TouchableOpacity>
+    </Animated.View>
   );
 }
 

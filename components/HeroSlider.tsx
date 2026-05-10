@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions, Animated } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, useWindowDimensions, Animated, PanResponder } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
@@ -9,6 +9,7 @@ const FALLBACK_IMAGE =
   'https://images.pexels.com/photos/2533266/pexels-photo-2533266.jpeg?auto=compress&cs=tinysrgb&w=1200';
 
 const AUTO_PLAY_MS = 5000;
+const SWIPE_THRESHOLD = 50;
 
 export type HeroSlide = {
   id: string;
@@ -29,6 +30,43 @@ type Props = {
   slides: HeroSlide[];
   heroContent?: Record<string, any>;
 };
+
+// Animated pill dot
+function AnimatedDot({ active, onPress }: { active: boolean; onPress: () => void }) {
+  const widthAnim = useRef(new Animated.Value(active ? 22 : 7)).current;
+  const opacityAnim = useRef(new Animated.Value(active ? 1 : 0.4)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(widthAnim, {
+        toValue: active ? 22 : 7,
+        useNativeDriver: false,
+        speed: 18,
+        bounciness: 4,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: active ? 1 : 0.4,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [active]);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+      <Animated.View
+        style={[
+          styles.dot,
+          {
+            width: widthAnim,
+            opacity: opacityAnim,
+            backgroundColor: active ? '#FF4D8D' : 'rgba(255,255,255,0.55)',
+          },
+        ]}
+      />
+    </TouchableOpacity>
+  );
+}
 
 export default function HeroSlider({ slides, heroContent }: Props) {
   const router = useRouter();
@@ -58,25 +96,67 @@ export default function HeroSlider({ slides, heroContent }: Props) {
 
   const [current, setCurrent] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const contentFade = useRef(new Animated.Value(1)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPaused = useRef(false);
 
   const goTo = useCallback((idx: number) => {
     if (allSlides.length <= 1) return;
-    Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 240, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 360, useNativeDriver: true }),
-    ]).start();
-    setTimeout(() => setCurrent(idx), 240);
-  }, [allSlides.length, fadeAnim]);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(contentFade, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => {
+      setCurrent(idx);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 360, useNativeDriver: true }),
+        Animated.timing(contentFade, { toValue: 1, duration: 420, useNativeDriver: true }),
+      ]).start();
+    });
+  }, [allSlides.length, fadeAnim, contentFade]);
 
   const next = useCallback(() => goTo((current + 1) % allSlides.length), [current, allSlides.length, goTo]);
   const prev = useCallback(() => goTo((current - 1 + allSlides.length) % allSlides.length), [current, allSlides.length, goTo]);
 
+  // Auto-play
   useEffect(() => {
-    if (allSlides.length <= 1) return;
+    if (allSlides.length <= 1 || isPaused.current) return;
     timerRef.current = setTimeout(next, AUTO_PLAY_MS);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [current, allSlides.length, next]);
+
+  // Swipe via PanResponder
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 8 && Math.abs(gs.dx) > Math.abs(gs.dy),
+      onPanResponderGrant: () => {
+        isPaused.current = true;
+        if (timerRef.current) clearTimeout(timerRef.current);
+      },
+      onPanResponderRelease: (_, gs) => {
+        isPaused.current = false;
+        if (gs.dx < -SWIPE_THRESHOLD) {
+          // lazily call next via a ref so we always have fresh value
+          nextRef.current();
+        } else if (gs.dx > SWIPE_THRESHOLD) {
+          prevRef.current();
+        } else {
+          if (timerRef.current) clearTimeout(timerRef.current);
+          timerRef.current = setTimeout(() => nextRef.current(), AUTO_PLAY_MS);
+        }
+      },
+      onPanResponderTerminate: () => {
+        isPaused.current = false;
+      },
+    })
+  ).current;
+
+  // Keep stable refs for pan responder closures
+  const nextRef = useRef(next);
+  const prevRef = useRef(prev);
+  useEffect(() => { nextRef.current = next; }, [next]);
+  useEffect(() => { prevRef.current = prev; }, [prev]);
 
   if (allSlides.length === 0) return null;
 
@@ -91,7 +171,7 @@ export default function HeroSlider({ slides, heroContent }: Props) {
   };
 
   return (
-    <View style={[styles.hero, { height: heroHeight }]}>
+    <View style={[styles.hero, { height: heroHeight }]} {...panResponder.panHandlers}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
         <Image source={{ uri: imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       </Animated.View>
@@ -104,7 +184,7 @@ export default function HeroSlider({ slides, heroContent }: Props) {
         pointerEvents="none"
       />
 
-      <Animated.View style={[styles.heroContent, { opacity: fadeAnim }]}>
+      <Animated.View style={[styles.heroContent, { opacity: contentFade }]}>
         {!!slide.badge_text && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{slide.badge_text.toUpperCase()}</Text>
@@ -129,9 +209,7 @@ export default function HeroSlider({ slides, heroContent }: Props) {
           </TouchableOpacity>
           <View style={styles.dots}>
             {allSlides.map((_, i) => (
-              <TouchableOpacity key={i} onPress={() => goTo(i)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-                <View style={[styles.dot, i === current && styles.dotActive]} />
-              </TouchableOpacity>
+              <AnimatedDot key={i} active={i === current} onPress={() => goTo(i)} />
             ))}
           </View>
         </>
@@ -233,18 +311,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  dotActive: {
-    width: 20,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#FF4D8D',
+    height: 6,
+    borderRadius: 3,
   },
 });

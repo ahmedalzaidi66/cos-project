@@ -31,6 +31,49 @@ type Props = {
   heroContent?: Record<string, any>;
 };
 
+// Animated pill dot component
+function AnimatedDot({
+  active,
+  onPress,
+}: {
+  active: boolean;
+  onPress: () => void;
+}) {
+  const widthAnim = useRef(new Animated.Value(active ? 20 : 6)).current;
+  const opacityAnim = useRef(new Animated.Value(active ? 1 : 0.45)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(widthAnim, {
+        toValue: active ? 20 : 6,
+        useNativeDriver: false,
+        speed: 18,
+        bounciness: 4,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: active ? 1 : 0.45,
+        duration: 200,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [active]);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}>
+      <Animated.View
+        style={[
+          styles.dot,
+          {
+            width: widthAnim,
+            opacity: opacityAnim,
+            backgroundColor: active ? '#FF4D8D' : 'rgba(255,255,255,0.6)',
+          },
+        ]}
+      />
+    </TouchableOpacity>
+  );
+}
+
 export default function HeroSlider({ slides, heroContent }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -66,18 +109,29 @@ export default function HeroSlider({ slides, heroContent }: Props) {
   const [current, setCurrent] = useState(0);
   const [videoFailed, setVideoFailed] = useState<Record<string, boolean>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPaused = useRef(false);
 
-  // Cross-fade animation between slides
+  // Cross-fade animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const contentFade = useRef(new Animated.Value(1)).current;
+
+  // Swipe tracking
+  const dragStartX = useRef<number | null>(null);
+  const isDragging = useRef(false);
 
   const goTo = useCallback((idx: number) => {
     if (allSlides.length <= 1) return;
-    Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 260, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 380, useNativeDriver: true }),
-    ]).start();
-    setTimeout(() => setCurrent(idx), 260);
-  }, [allSlides.length, fadeAnim]);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(contentFade, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => {
+      setCurrent(idx);
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 360, useNativeDriver: true }),
+        Animated.timing(contentFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ]).start();
+    });
+  }, [allSlides.length, fadeAnim, contentFade]);
 
   const next = useCallback(() => {
     goTo((current + 1) % allSlides.length);
@@ -87,9 +141,9 @@ export default function HeroSlider({ slides, heroContent }: Props) {
     goTo((current - 1 + allSlides.length) % allSlides.length);
   }, [current, allSlides.length, goTo]);
 
-  // Auto-play
+  // Auto-play — pauses on hover/drag
   useEffect(() => {
-    if (allSlides.length <= 1) return;
+    if (allSlides.length <= 1 || isPaused.current) return;
     timerRef.current = setTimeout(next, AUTO_PLAY_MS);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [current, allSlides.length, next]);
@@ -107,8 +161,60 @@ export default function HeroSlider({ slides, heroContent }: Props) {
     try { router.push(url as any); } catch { /* ignore */ }
   };
 
+  // Web pointer/touch swipe handlers
+  const onPointerDown = (e: any) => {
+    dragStartX.current = e.clientX ?? e.touches?.[0]?.clientX ?? null;
+    isDragging.current = false;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    isPaused.current = true;
+  };
+
+  const onPointerMove = (e: any) => {
+    if (dragStartX.current === null) return;
+    const x = e.clientX ?? e.touches?.[0]?.clientX ?? dragStartX.current;
+    if (Math.abs(x - dragStartX.current) > 8) isDragging.current = true;
+  };
+
+  const onPointerUp = (e: any) => {
+    if (dragStartX.current === null) return;
+    const x = e.clientX ?? e.changedTouches?.[0]?.clientX ?? dragStartX.current;
+    const delta = x - dragStartX.current;
+    dragStartX.current = null;
+    isPaused.current = false;
+    if (isDragging.current && Math.abs(delta) > 40) {
+      delta < 0 ? next() : prev();
+    } else {
+      // restart timer
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(next, AUTO_PLAY_MS);
+    }
+    isDragging.current = false;
+  };
+
+  const onMouseEnter = () => {
+    isPaused.current = true;
+    if (timerRef.current) clearTimeout(timerRef.current);
+  };
+
+  const onMouseLeave = () => {
+    isPaused.current = false;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(next, AUTO_PLAY_MS);
+  };
+
   return (
-    <View style={[styles.hero, { height: heroHeight }]}>
+    <View
+      style={[styles.hero, { height: heroHeight }]}
+      // @ts-ignore web-only events
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onMouseDown={onPointerDown}
+      onMouseMove={onPointerMove}
+      onMouseUp={onPointerUp}
+      onTouchStart={onPointerDown}
+      onTouchMove={onPointerMove}
+      onTouchEnd={onPointerUp}
+    >
       {/* ── Media layer ─────────────────────────────────────────────── */}
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
         {useVideo ? (
@@ -125,7 +231,7 @@ export default function HeroSlider({ slides, heroContent }: Props) {
             key={`${slide.id}-img`}
             src={imageUrl}
             alt={slide.title || 'hero'}
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', pointerEvents: 'none' }}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', pointerEvents: 'none', userSelect: 'none' } as React.CSSProperties}
           />
         )}
       </Animated.View>
@@ -140,7 +246,7 @@ export default function HeroSlider({ slides, heroContent }: Props) {
       />
 
       {/* ── Content ─────────────────────────────────────────────────── */}
-      <Animated.View style={[styles.heroContent, { opacity: fadeAnim }]}>
+      <Animated.View style={[styles.heroContent, { opacity: contentFade }]}>
         {!!slide.badge_text && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{slide.badge_text.toUpperCase()}</Text>
@@ -169,13 +275,11 @@ export default function HeroSlider({ slides, heroContent }: Props) {
         </>
       )}
 
-      {/* ── Dot indicators ──────────────────────────────────────────── */}
+      {/* ── Animated dot indicators ─────────────────────────────────── */}
       {allSlides.length > 1 && (
         <View style={styles.dots}>
           {allSlides.map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => goTo(i)} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-              <View style={[styles.dot, i === current && styles.dotActive]} />
-            </TouchableOpacity>
+            <AnimatedDot key={i} active={i === current} onPress={() => goTo(i)} />
           ))}
         </View>
       )}
@@ -267,6 +371,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     // @ts-ignore — web-only transform
     transform: [{ translateY: -15 }],
+    cursor: 'pointer',
   },
   arrowLeft: { left: 10 },
   arrowRight: { right: 10 },
@@ -278,18 +383,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   dot: {
-    width: 6,
-    height: 6,
+    height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  dotActive: {
-    width: 18,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FF4D8D',
   },
 });
