@@ -179,6 +179,8 @@ export type Order = {
   status: string;
   created_at: string;
   updated_at?: string;
+  tracking_number?: string | null;
+  completed_at?: string | null;
 };
 
 export type OrderItem = {

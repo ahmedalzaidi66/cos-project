@@ -47,6 +47,9 @@ type Order = {
   payment_method?: string;
   payment_status?: string;
   created_at: string;
+  updated_at?: string;
+  tracking_number?: string | null;
+  completed_at?: string | null;
   delivery_address_text?: string;
   delivery_latitude?: number | null;
   delivery_longitude?: number | null;
@@ -132,12 +135,17 @@ function OrderDetailModal({
   const [loadingItems, setLoadingItems] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(order.status);
+  const [trackingNumber, setTrackingNumber] = useState(order.tracking_number ?? '');
+  const [trackingEditing, setTrackingEditing] = useState(false);
+  const [savingTracking, setSavingTracking] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setCurrentStatus(order.status);
+    setTrackingNumber(order.tracking_number ?? '');
+    setTrackingEditing(false);
     setSuccessMsg('');
     setCopied(false);
     setLoadingItems(true);
@@ -157,12 +165,33 @@ function OrderDetailModal({
       });
   }, [visible, order.id, order.status]);
 
+  const handleSaveTracking = async () => {
+    setSavingTracking(true);
+    const { error } = await adminSupabase()
+      .from('orders')
+      .update({ tracking_number: trackingNumber || null, updated_at: new Date().toISOString() })
+      .eq('id', order.id);
+    setSavingTracking(false);
+    if (!error) {
+      setTrackingEditing(false);
+      setSuccessMsg('تم حفظ رقم التتبع');
+      setTimeout(() => setSuccessMsg(''), 2500);
+    }
+  };
+
   const handleUpdateStatus = async (newStatus: string) => {
     if (newStatus === currentStatus) return;
     setUpdatingStatus(true);
+    const updateData: Record<string, unknown> = {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    };
+    if (newStatus === 'delivered' && !order.completed_at) {
+      updateData.completed_at = new Date().toISOString();
+    }
     const { error } = await adminSupabase()
       .from('orders')
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', order.id);
     setUpdatingStatus(false);
     if (!error) {
@@ -365,6 +394,14 @@ function OrderDetailModal({
               </View>
             ) : null}
 
+            {/* Cancelled banner */}
+            {currentStatus === 'cancelled' && (
+              <View style={[modal.cancelBanner, { backgroundColor: Colors.error + '14', borderColor: Colors.error + '40' }]}>
+                <X size={13} color={Colors.error} strokeWidth={2.5} />
+                <Text style={[modal.cancelBannerText, { color: Colors.error }]}>تم إلغاء هذا الطلب</Text>
+              </View>
+            )}
+
             {/* Timeline */}
             <View style={modal.timeline}>
               {STATUS_FLOW.filter((s) => s !== 'cancelled').map((s, idx, arr) => {
@@ -388,26 +425,78 @@ function OrderDetailModal({
                       >
                         {isDone
                           ? <Check size={10} color={statusColor(s)} strokeWidth={3} />
-                          : <View style={[modal.timelineDotInner, { backgroundColor: isActive ? color : Colors.border }]} />
+                          : isActive
+                          ? <View style={[modal.timelineDotInner, { backgroundColor: color }]} />
+                          : <View style={[modal.timelineDotInner, { backgroundColor: Colors.border }]} />
                         }
                       </TouchableOpacity>
-                      {!isLast && <View style={[modal.timelineConnector, { backgroundColor: isDone ? statusColor(arr[idx]) : Colors.border }]} />}
+                      {!isLast && <View style={[modal.timelineConnector, { backgroundColor: isDone ? statusColor(arr[idx]) + '80' : Colors.border + '50' }]} />}
                     </View>
-                    <TouchableOpacity
-                      onPress={() => handleUpdateStatus(s)}
-                      activeOpacity={0.7}
-                      disabled={updatingStatus}
-                      style={modal.timelineLabelWrap}
-                    >
-                      <Text style={[modal.timelineLabel, { color: isActive ? statusColor(s) : isDone ? Colors.textSecondary : Colors.textMuted, fontWeight: isActive ? '800' : '600' }]}>
-                        {statusLabel(s)}
-                      </Text>
-                      {isActive && (
-                        <View style={[modal.timelineActiveBadge, { backgroundColor: statusColor(s) + '20', borderColor: statusColor(s) + '50' }]}>
-                          <Text style={[modal.timelineActiveBadgeText, { color: statusColor(s) }]}>الحالة الحالية</Text>
+                    <View style={[modal.timelineLabelCol, !isLast && modal.timelineLabelColGap]}>
+                      <TouchableOpacity
+                        onPress={() => handleUpdateStatus(s)}
+                        activeOpacity={0.7}
+                        disabled={updatingStatus}
+                        style={modal.timelineLabelWrap}
+                      >
+                        <Text style={[modal.timelineLabel, { color: isActive ? statusColor(s) : isDone ? Colors.textSecondary : Colors.textMuted, fontWeight: isActive ? '800' : isDone ? '600' : '400' }]}>
+                          {statusLabel(s)}
+                        </Text>
+                        {isActive && (
+                          <View style={[modal.timelineActiveBadge, { backgroundColor: statusColor(s) + '20', borderColor: statusColor(s) + '50' }]}>
+                            <Text style={[modal.timelineActiveBadgeText, { color: statusColor(s) }]}>الحالة الحالية</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                      {/* Meta: tracking number on shipped step */}
+                      {s === 'shipped' && (isActive || isDone) && (
+                        <View style={modal.timelineMeta}>
+                          {trackingEditing ? (
+                            <View style={modal.trackingInputRow}>
+                              <TextInput
+                                style={modal.trackingInput}
+                                value={trackingNumber}
+                                onChangeText={setTrackingNumber}
+                                placeholder="أدخل رقم التتبع"
+                                placeholderTextColor={Colors.textMuted}
+                                autoFocus
+                              />
+                              <TouchableOpacity
+                                onPress={handleSaveTracking}
+                                disabled={savingTracking}
+                                style={modal.trackingSaveBtn}
+                                activeOpacity={0.8}
+                              >
+                                {savingTracking
+                                  ? <ActivityIndicator size={12} color="#fff" />
+                                  : <Check size={12} color="#fff" strokeWidth={3} />
+                                }
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => { setTrackingEditing(false); setTrackingNumber(order.tracking_number ?? ''); }}
+                                style={modal.trackingCancelBtn}
+                                activeOpacity={0.8}
+                              >
+                                <X size={12} color={Colors.textMuted} strokeWidth={2.5} />
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <TouchableOpacity onPress={() => setTrackingEditing(true)} activeOpacity={0.7} style={modal.trackingRow}>
+                              <Text style={modal.trackingLabel}>رقم التتبع: </Text>
+                              <Text style={[modal.trackingValue, !trackingNumber && { color: Colors.textMuted, fontStyle: 'italic' }]}>
+                                {trackingNumber || 'اضغط للإضافة'}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       )}
-                    </TouchableOpacity>
+                      {/* Meta: completion date on delivered step */}
+                      {s === 'delivered' && isActive && order.completed_at && (
+                        <Text style={modal.timelineMetaText}>
+                          تاريخ التسليم: {new Date(order.completed_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 );
               })}
@@ -429,21 +518,23 @@ function OrderDetailModal({
                     <View style={[modal.timelineDotInner, { backgroundColor: currentStatus === 'cancelled' ? Colors.error : Colors.border }]} />
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => handleUpdateStatus('cancelled')}
-                  activeOpacity={0.7}
-                  disabled={updatingStatus}
-                  style={modal.timelineLabelWrap}
-                >
-                  <Text style={[modal.timelineLabel, { color: currentStatus === 'cancelled' ? Colors.error : Colors.textMuted, fontWeight: currentStatus === 'cancelled' ? '800' : '600' }]}>
-                    {statusLabel('cancelled')}
-                  </Text>
-                  {currentStatus === 'cancelled' && (
-                    <View style={[modal.timelineActiveBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error + '50' }]}>
-                      <Text style={[modal.timelineActiveBadgeText, { color: Colors.error }]}>الحالة الحالية</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+                <View style={modal.timelineLabelCol}>
+                  <TouchableOpacity
+                    onPress={() => handleUpdateStatus('cancelled')}
+                    activeOpacity={0.7}
+                    disabled={updatingStatus}
+                    style={modal.timelineLabelWrap}
+                  >
+                    <Text style={[modal.timelineLabel, { color: currentStatus === 'cancelled' ? Colors.error : Colors.textMuted, fontWeight: currentStatus === 'cancelled' ? '800' : '400' }]}>
+                      {statusLabel('cancelled')}
+                    </Text>
+                    {currentStatus === 'cancelled' && (
+                      <View style={[modal.timelineActiveBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error + '50' }]}>
+                        <Text style={[modal.timelineActiveBadgeText, { color: Colors.error }]}>الحالة الحالية</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
 
@@ -554,7 +645,7 @@ function OrdersContent() {
     try {
       const { data, error } = await adminSupabase()
         .from('orders')
-        .select('id, customer_first_name, customer_last_name, customer_email, customer_phone, street, city, state, zip, country, governorate, area, notes, subtotal, shipping, total, status, payment_method, payment_status, created_at, delivery_address_text, delivery_latitude, delivery_longitude, delivery_location_link')
+        .select('id, customer_first_name, customer_last_name, customer_email, customer_phone, street, city, state, zip, country, governorate, area, notes, subtotal, shipping, total, status, payment_method, payment_status, created_at, updated_at, tracking_number, completed_at, delivery_address_text, delivery_latitude, delivery_longitude, delivery_location_link')
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       setOrders(data ?? []);
@@ -1116,16 +1207,22 @@ const modal = StyleSheet.create({
     marginVertical: 2,
     borderRadius: 1,
   },
-  timelineLabelWrap: {
+  timelineLabelCol: {
     flex: 1,
+    paddingTop: 4,
+  },
+  timelineLabelColGap: {
+    paddingBottom: 16,
+  },
+  timelineLabelWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
-    paddingTop: 5,
-    paddingBottom: Spacing.sm,
   },
   timelineLabel: {
     fontSize: FontSize.sm,
+    paddingTop: 1,
   },
   timelineActiveBadge: {
     paddingHorizontal: 8,
@@ -1136,6 +1233,80 @@ const modal = StyleSheet.create({
   timelineActiveBadgeText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  timelineMeta: {
+    marginTop: 4,
+  },
+  timelineMetaText: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  cancelBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  cancelBannerText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    flex: 1,
+  },
+  trackingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trackingLabel: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  trackingValue: {
+    fontSize: FontSize.xs,
+    color: Colors.neonBlue,
+    fontWeight: '700',
+  },
+  trackingInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  trackingInput: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: FontSize.xs,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: Colors.backgroundInput,
+    textAlign: 'left',
+  },
+  trackingSaveBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trackingCancelBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.backgroundSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
 });
 

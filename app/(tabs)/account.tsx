@@ -28,6 +28,7 @@ import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import ThemeSelector from '@/components/ThemeSelector';
 import { ListItemSkeleton } from '@/components/Skeleton';
+import OrderTimeline from '@/components/OrderTimeline';
 
 export default function AccountScreen() {
   const { isAuthenticated, user } = useAuth();
@@ -1333,7 +1334,7 @@ function ProfileView() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, customer_email, customer_first_name, customer_last_name, customer_phone, street, city, state, zip, country, payment_method, subtotal, shipping, total, status, created_at, updated_at')
+        .select('id, customer_email, customer_first_name, customer_last_name, customer_phone, street, city, state, zip, country, payment_method, subtotal, shipping, total, status, created_at, updated_at, tracking_number, completed_at')
         .eq('customer_email', email)
         .order('created_at', { ascending: false });
       if (!error && data) setOrders(data);
@@ -1363,7 +1364,17 @@ function ProfileView() {
         (payload) => {
           const updated = payload.new as Order;
           setOrders((prev) =>
-            prev.map((o) => (o.id === updated.id ? { ...o, status: updated.status, updated_at: updated.updated_at } : o))
+            prev.map((o) =>
+              o.id === updated.id
+                ? {
+                    ...o,
+                    status: updated.status,
+                    updated_at: updated.updated_at,
+                    tracking_number: updated.tracking_number,
+                    completed_at: updated.completed_at,
+                  }
+                : o
+            )
           );
         }
       )
@@ -1634,26 +1645,59 @@ function MenuRow({
 // ─── Order card ───────────────────────────────────────────────────────────────
 
 function OrderCard({ order }: { order: Order }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const C = useAppColors();
-  const date = new Date(order.created_at).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'short', day: 'numeric',
-  });
+  const [expanded, setExpanded] = React.useState(false);
+
   const sc = ORDER_STATUS_COLORS[order.status] ?? C.textMuted;
   const sl = ORDER_STATUS_LABELS[order.status] ?? (order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—');
 
+  const date = new Date(order.created_at).toLocaleDateString(
+    language === 'ar' ? 'ar-EG' : 'en-US',
+    { year: 'numeric', month: 'short', day: 'numeric' }
+  );
+
   return (
-    <View style={[styles.orderCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
-      <View style={styles.orderTopRow}>
-        <Text style={[styles.orderId, { color: C.textPrimary }]}>#{order.id.slice(0, 8).toUpperCase()}</Text>
-        <View style={[styles.statusBadge, { borderColor: sc, backgroundColor: sc + '18' }]}>
-          <Text style={[styles.statusText, { color: sc }]}>{sl}</Text>
+    <View style={[styles.orderCard, { backgroundColor: C.backgroundCard, borderColor: order.status === 'cancelled' ? Colors.error + '40' : C.border }]}>
+      <TouchableOpacity
+        onPress={() => setExpanded(v => !v)}
+        activeOpacity={0.8}
+        style={{ gap: 4 }}
+      >
+        <View style={styles.orderTopRow}>
+          <Text style={[styles.orderId, { color: C.textPrimary }]}>#{order.id.slice(0, 8).toUpperCase()}</Text>
+          <View style={styles.orderTopRight}>
+            <View style={[styles.statusBadge, { borderColor: sc, backgroundColor: sc + '18' }]}>
+              <Text style={[styles.statusText, { color: sc }]}>{sl}</Text>
+            </View>
+            <ChevronRight
+              size={14}
+              color={C.textMuted}
+              strokeWidth={2}
+              style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
+            />
+          </View>
         </View>
-      </View>
-      <View style={styles.orderBottom}>
-        <Text style={[styles.orderDate, { color: C.textMuted }]}>{date}</Text>
-        <Text style={styles.orderTotal}>{formatPrice(order.total, language)}</Text>
-      </View>
+        <View style={styles.orderBottom}>
+          <Text style={[styles.orderDate, { color: C.textMuted }]}>{date}</Text>
+          <Text style={styles.orderTotal}>{formatPrice(order.total, language)}</Text>
+        </View>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={[styles.timelineWrap, { borderTopColor: C.borderLight }]}>
+          <Text style={[styles.timelineTitle, { color: C.textSecondary }]}>
+            {t.orderTimeline ?? 'Order Timeline'}
+          </Text>
+          <OrderTimeline
+            status={order.status as any}
+            trackingNumber={order.tracking_number}
+            completedAt={order.completed_at}
+            createdAt={order.created_at}
+            compact={false}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -2640,6 +2684,24 @@ const styles = StyleSheet.create({
     color: Colors.neonBlue,
     fontSize: FontSize.sm,
     fontWeight: '900',
+  },
+  orderTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timelineWrap: {
+    borderTopWidth: 1,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    gap: 8,
+  },
+  timelineTitle: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
 
   // ── Modals ──

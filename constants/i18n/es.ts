@@ -109,6 +109,17 @@ export default {
   loadingOrders: 'Cargando pedidos...',
   noOrdersYet: 'Sin pedidos aún',
   purchasesWillAppear: 'Tus compras aparecerán aquí',
+  orderStatusNew: 'Nuevo',
+  orderStatusConfirmed: 'Confirmado',
+  orderStatusPreparing: 'En preparación',
+  orderStatusShipped: 'Enviado',
+  orderStatusDelivered: 'Entregado',
+  orderStatusCancelled: 'Cancelado',
+  orderCurrentStatus: 'Estado actual',
+  orderCancelledNote: 'Este pedido ha sido cancelado',
+  orderCompletedOn: 'Entregado el',
+  orderTrackingNumber: 'Número de seguimiento',
+  orderTimeline: 'Historial del pedido',
 
   // Canopy
   canopyAdvisor: 'Cuidado de Piel',

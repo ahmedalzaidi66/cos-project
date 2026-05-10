@@ -109,6 +109,17 @@ export default {
   loadingOrders: 'Loading orders...',
   noOrdersYet: 'No orders yet',
   purchasesWillAppear: 'Your purchases will appear here',
+  orderStatusNew: 'New',
+  orderStatusConfirmed: 'Confirmed',
+  orderStatusPreparing: 'Preparing',
+  orderStatusShipped: 'Shipped',
+  orderStatusDelivered: 'Delivered',
+  orderStatusCancelled: 'Cancelled',
+  orderCurrentStatus: 'Current Status',
+  orderCancelledNote: 'This order has been cancelled',
+  orderCompletedOn: 'Delivered on',
+  orderTrackingNumber: 'Tracking Number',
+  orderTimeline: 'Order Timeline',
 
   // Skincare Section
   canopyAdvisor: 'Skincare',

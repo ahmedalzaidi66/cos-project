@@ -109,6 +109,17 @@ export default {
   loadingOrders: 'Загрузка заказов...',
   noOrdersYet: 'Заказов пока нет',
   purchasesWillAppear: 'Ваши покупки появятся здесь',
+  orderStatusNew: 'Новый',
+  orderStatusConfirmed: 'Подтверждён',
+  orderStatusPreparing: 'Готовится',
+  orderStatusShipped: 'Отправлен',
+  orderStatusDelivered: 'Доставлен',
+  orderStatusCancelled: 'Отменён',
+  orderCurrentStatus: 'Текущий статус',
+  orderCancelledNote: 'Этот заказ был отменён',
+  orderCompletedOn: 'Доставлен',
+  orderTrackingNumber: 'Номер отслеживания',
+  orderTimeline: 'История заказа',
 
   // Canopy
   canopyAdvisor: 'Уход за кожей',

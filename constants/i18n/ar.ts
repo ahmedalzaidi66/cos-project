@@ -109,6 +109,17 @@ export default {
   loadingOrders: 'جاري تحميل الطلبات...',
   noOrdersYet: 'لا توجد طلبات بعد',
   purchasesWillAppear: 'ستظهر مشترياتك هنا',
+  orderStatusNew: 'جديد',
+  orderStatusConfirmed: 'مؤكد',
+  orderStatusPreparing: 'قيد التحضير',
+  orderStatusShipped: 'مشحون',
+  orderStatusDelivered: 'مُسلَّم',
+  orderStatusCancelled: 'ملغى',
+  orderCurrentStatus: 'الحالة الحالية',
+  orderCancelledNote: 'تم إلغاء هذا الطلب',
+  orderCompletedOn: 'تم التسليم في',
+  orderTrackingNumber: 'رقم التتبع',
+  orderTimeline: 'مسار الطلب',
 
   // Canopy
   canopyAdvisor: 'العناية بالبشرة',

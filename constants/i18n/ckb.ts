@@ -109,6 +109,17 @@ export default {
   loadingOrders: 'بارکردنی داواکاریەکان...',
   noOrdersYet: 'هیچ داواکاریەک نییە',
   purchasesWillAppear: 'کڕینەکانت لێرە دەرکەوێت',
+  orderStatusNew: 'نوێ',
+  orderStatusConfirmed: 'پشتڕاستکراو',
+  orderStatusPreparing: 'ئامادەکردن',
+  orderStatusShipped: 'نێردراو',
+  orderStatusDelivered: 'گەیاندراو',
+  orderStatusCancelled: 'هەڵوەشاندراوە',
+  orderCurrentStatus: 'حاڵەتی ئێستا',
+  orderCancelledNote: 'ئەم داواکاریە هەڵوەشاندراوەتەوە',
+  orderCompletedOn: 'گەیاندران لە',
+  orderTrackingNumber: 'ژمارەی شوێنکەوتن',
+  orderTimeline: 'هێڵی کاتی داواکاری',
 
   // Product Detail
   selectShade: 'ڕەنگێک هەڵبژێرە',

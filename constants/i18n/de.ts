@@ -109,6 +109,17 @@ export default {
   loadingOrders: 'Bestellungen werden geladen...',
   noOrdersYet: 'Noch keine Bestellungen',
   purchasesWillAppear: 'Deine Käufe erscheinen hier',
+  orderStatusNew: 'Neu',
+  orderStatusConfirmed: 'Bestätigt',
+  orderStatusPreparing: 'In Vorbereitung',
+  orderStatusShipped: 'Versandt',
+  orderStatusDelivered: 'Geliefert',
+  orderStatusCancelled: 'Storniert',
+  orderCurrentStatus: 'Aktueller Status',
+  orderCancelledNote: 'Diese Bestellung wurde storniert',
+  orderCompletedOn: 'Geliefert am',
+  orderTrackingNumber: 'Sendungsnummer',
+  orderTimeline: 'Bestellverlauf',
 
   // Canopy
   canopyAdvisor: 'Hautpflege',
