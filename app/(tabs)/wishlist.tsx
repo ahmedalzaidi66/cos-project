@@ -4,13 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   Animated,
   ActivityIndicator,
   Alert,
   useWindowDimensions,
 } from 'react-native';
+import OptimizedImage from '@/components/OptimizedImage';
 import { useRouter } from 'expo-router';
 import { Heart, ShoppingCart, Trash2, ArrowLeft, X } from 'lucide-react-native';
 import { useWishlist, WishlistItem } from '@/context/WishlistContext';
@@ -202,11 +202,12 @@ function WishlistCard({
     >
       {/* Product image */}
       <TouchableOpacity onPress={onView} activeOpacity={0.9} style={styles.cardImageWrap}>
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.cardImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.cardImage, styles.cardImagePlaceholder, { backgroundColor: C.backgroundSecondary }]} />
-        )}
+        <OptimizedImage
+          source={imageUri ? { uri: imageUri } : null}
+          displayWidth={72}
+          style={styles.cardImage}
+          resizeMode="cover"
+        />
         {product.badge && (
           <View style={styles.cardBadge}>
             <Text style={styles.cardBadgeText}>{product.badge}</Text>

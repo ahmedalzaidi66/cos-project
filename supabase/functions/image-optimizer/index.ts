@@ -151,6 +151,8 @@ Deno.serve(async (req: Request) => {
         .upload(variantPath, variantBytes, {
           contentType: outputFormat,
           upsert: true,
+          // 1-year immutable cache: variants never change once generated
+          cacheControl: "public, max-age=31536000, immutable",
         });
 
       if (uploadErr) {

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   RefreshControl,
   useWindowDimensions,
@@ -31,6 +30,8 @@ import { useAppColors, useThemeMode } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import HeroSlider, { HeroSlide } from '@/components/HeroSlider';
 import { getProductName, getProductImage } from '@/lib/supabase';
+import OptimizedImage from '@/components/OptimizedImage';
+import { prefetchVariants } from '@/lib/imageVariants';
 import StarRating from '@/components/StarRating';
 import { useCart } from '@/context/CartContext';
 import WishlistHeart from '@/components/WishlistHeart';
@@ -183,7 +184,13 @@ export default function ShopScreen() {
     }
 
     const map = await fetchSections(fetchLang);
-    if (committedLanguage.current === fetchLang) setSectionMap(map);
+    if (committedLanguage.current === fetchLang) {
+      setSectionMap(map);
+      // Prefetch image variants for all visible product images so cards load fast
+      const allProducts = Array.from(map.values()).flatMap(s => s.products);
+      const imageUrls = allProducts.map(p => getProductImage(p)).filter(Boolean) as string[];
+      prefetchVariants(imageUrls);
+    }
     setRefreshing(false);
     setLoading(false);
   }, [fetchSections]);
@@ -554,8 +561,9 @@ const HomeSectionCard = memo(function HomeSectionCard({
     <View style={[styles.card, cardBg ? { backgroundColor: cardBg } : undefined]}>
       <View style={[styles.cardImageWrap, imageWrapBg ? { backgroundColor: imageWrapBg } : undefined]}>
         <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={styles.cardImageTouchable}>
-          <Image
-            source={imgUri ? { uri: imgUri } : undefined}
+          <OptimizedImage
+            source={imgUri ? { uri: imgUri } : null}
+            displayWidth={106}
             style={styles.cardImage}
             resizeMode="cover"
           />

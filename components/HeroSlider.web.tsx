@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Radius } from '@/constants/theme';
-import { useOptimizedImage } from '@/lib/imageVariants';
+import { useOptimizedImage, preloadImage } from '@/lib/imageVariants';
 
 const FALLBACK_IMAGE =
   'https://images.pexels.com/photos/2533266/pexels-photo-2533266.jpeg?auto=compress&cs=tinysrgb&w=1200';
@@ -106,6 +106,14 @@ export default function HeroSlider({ slides, heroContent }: Props) {
     : null;
 
   const allSlides = activeSlides.length > 0 ? activeSlides : legacySlide ? [legacySlide] : [];
+
+  // Preload the first visible hero image for LCP performance
+  useEffect(() => {
+    const firstImageSlide = allSlides.find(s => s.media_type !== 'video' && s.image_url);
+    if (firstImageSlide?.image_url) {
+      preloadImage(firstImageSlide.image_url);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [current, setCurrent] = useState(0);
   const [videoFailed, setVideoFailed] = useState<Record<string, boolean>>({});

@@ -12,6 +12,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import OptimizedImage from '@/components/OptimizedImage';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useRouter } from 'expo-router';
 import {
@@ -852,7 +853,7 @@ function WebProductsScreen() {
             <View key={p.id} style={[styles.productCard, isLowStock && styles.productCardLowStock]}>
               <View style={styles.productThumb}>
                 {p.image_url ? (
-                  <Image source={{ uri: p.image_url }} style={styles.thumbImg} resizeMode="cover" />
+                  <OptimizedImage source={{ uri: p.image_url }} displayWidth={52} style={styles.thumbImg} resizeMode="cover" />
                 ) : (
                   <Package size={24} color={Colors.textMuted} strokeWidth={1.5} />
                 )}

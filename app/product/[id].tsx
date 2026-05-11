@@ -9,6 +9,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import OptimizedImage from '@/components/OptimizedImage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ShoppingCart, Package, Shield, Star, ChevronRight, Sparkles, Share2 } from 'lucide-react-native';
@@ -226,8 +227,9 @@ export default function ProductDetailScreen() {
             activeOpacity={0.95}
             onPress={() => setImageViewerVisible(true)}
           >
-            <Image
+            <OptimizedImage
               source={{ uri: activeImage }}
+              displayWidth={800}
               style={styles.image}
               resizeMode="contain"
             />
@@ -269,8 +271,9 @@ export default function ProductDetailScreen() {
                   idx === activeImageIndex && styles.thumbnailActive,
                 ]}
               >
-                <Image
+                <OptimizedImage
                   source={{ uri: img }}
+                  displayWidth={60}
                   style={styles.thumbnailImage}
                   resizeMode="cover"
                 />

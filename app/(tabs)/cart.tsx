@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Image,
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import OptimizedImage from '@/components/OptimizedImage';
 import { useRouter } from 'expo-router';
 import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react-native';
 import { useCart, CartItem, CartShade } from '@/context/CartContext';
@@ -120,8 +120,9 @@ function CartItemCard({
 
   return (
     <View style={[styles.card, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
-      <Image
-        source={displayImage ? { uri: displayImage } : undefined}
+      <OptimizedImage
+        source={displayImage ? { uri: displayImage } : null}
+        displayWidth={100}
         style={styles.cardImage}
         resizeMode="cover"
       />

@@ -14,6 +14,7 @@ import {
   useWindowDimensions,
   Animated,
 } from 'react-native';
+import OptimizedImage from '@/components/OptimizedImage';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '@/context/LanguageContext';
 import {
@@ -912,11 +913,12 @@ function ProductChatCard({ s, product, onAddToCart, added, compact, onPress }: {
   const C = useAppColors();
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[s.productCard, compact && s.productCardCompact]}>
-      {product.image ? (
-        <Image source={{ uri: product.image }} style={[s.productImage, compact && s.productImageCompact]} resizeMode="cover" />
-      ) : (
-        <View style={[s.productImage, compact && s.productImageCompact, { backgroundColor: C.backgroundSecondary }]} />
-      )}
+      <OptimizedImage
+        source={product.image ? { uri: product.image } : null}
+        displayWidth={compact ? 52 : 72}
+        style={compact ? s.productImageCompact : s.productImage}
+        resizeMode="cover"
+      />
       <View style={s.productInfo}>
         <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
         {product.reason ? (
@@ -1034,7 +1036,7 @@ function ProductQuickViewModal({
             ) : gallery.length > 0 ? (
               <View>
                 <TouchableOpacity activeOpacity={0.92} onPress={() => setImageViewerOpen(true)}>
-                  <Image source={{ uri: gallery[activeImg] }} style={s.qsMainImage} resizeMode="cover" />
+                  <OptimizedImage source={{ uri: gallery[activeImg] }} displayWidth={400} style={s.qsMainImage} resizeMode="cover" />
                   <View style={s.qsExpandHint}>
                     <ExternalLink size={13} color="rgba(255,255,255,0.7)" strokeWidth={2} />
                   </View>
@@ -1044,7 +1046,7 @@ function ProductQuickViewModal({
                     {gallery.map((uri, i) => (
                       <TouchableOpacity key={i} onPress={() => { setActiveImg(i); setImageViewerOpen(true); }} activeOpacity={0.8}
                         style={[s.qsThumb, activeImg === i && s.qsThumbActive]}>
-                        <Image source={{ uri }} style={s.qsThumbImg} resizeMode="cover" />
+                        <OptimizedImage source={{ uri }} displayWidth={48} style={s.qsThumbImg} resizeMode="cover" />
                       </TouchableOpacity>
                     ))}
                   </View>
