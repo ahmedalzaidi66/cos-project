@@ -13,6 +13,7 @@ import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useRouter } from 'expo-router';
 import { Search, Star, CircleCheck as CheckCircle, X, Trash2, MessageSquare, Clock, CircleX as XCircle } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -31,7 +32,7 @@ const STATUS_CONFIG = {
 };
 
 function ReviewsScreen() {
-  const { isAdminAuthenticated } = useAdmin();
+  const { isAdminAuthenticated, admin } = useAdmin();
   const { t } = useLanguage();
   const router = useRouter();
   const { isMobile } = useAdminLayout();
@@ -67,6 +68,7 @@ function ReviewsScreen() {
 
   const updateStatus = async (id: string, status: Review['status']) => {
     if (!guardAction()) { showToast('Permission denied: manage_reviews required', 'error'); return; }
+    const review = reviews.find((r) => r.id === id);
     const { error: err } = await adminSupabase().from('reviews').update({ status }).eq('id', id);
     setReviews((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
     if (selectedReview?.id === id) {
@@ -76,16 +78,19 @@ function ReviewsScreen() {
       showToast(t.reviewUpdateFailed, 'error');
     } else {
       showToast(status === 'approved' ? t.reviewApprovedMsg : t.reviewRejectedMsg);
+      logAdminAction({ action: 'status_change', entityType: 'review', entityId: id, entityLabel: review?.customer_name, afterData: { status }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!guardAction()) { showToast('Permission denied: manage_reviews required', 'error'); return; }
+    const review = reviews.find((r) => r.id === id);
     await adminSupabase().from('reviews').delete().eq('id', id);
     setDeleteId(null);
     setSelectedReview(null);
     setReviews((prev) => prev.filter((r) => r.id !== id));
     showToast(t.reviewDeletedMsg);
+    logAdminAction({ action: 'delete', entityType: 'review', entityId: id, entityLabel: review?.customer_name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const filtered = reviews.filter((r) => {

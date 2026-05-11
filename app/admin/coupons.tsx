@@ -14,6 +14,7 @@ import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useRouter } from 'expo-router';
 import { Plus, Pencil, Trash2, Search, X, Tag, Percent, DollarSign, Calendar } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -35,7 +36,7 @@ const EMPTY_FORM = {
 };
 
 function CouponsScreen() {
-  const { isAdminAuthenticated } = useAdmin();
+  const { isAdminAuthenticated, admin } = useAdmin();
   const { isMobile } = useAdminLayout();
   const { t, language } = useLanguage();
   const router = useRouter();
@@ -122,14 +123,17 @@ function CouponsScreen() {
     setSaving(false);
     setModalVisible(false);
     showToast(editingCoupon ? 'Coupon updated' : 'Coupon created');
+    logAdminAction({ action: editingCoupon ? 'update' : 'create', entityType: 'coupon', entityId: editingCoupon?.id, entityLabel: payload.code, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const handleDelete = async (id: string) => {
     if (!guardAction()) { showToast('Permission denied: manage_coupons required', 'error'); return; }
+    const coupon = coupons.find((c) => c.id === id);
     await adminSupabase().from('coupons').delete().eq('id', id);
     setDeleteId(null);
     setCoupons((prev) => prev.filter((c) => c.id !== id));
     showToast('Coupon deleted');
+    logAdminAction({ action: 'delete', entityType: 'coupon', entityId: id, entityLabel: coupon?.code, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const isExpired = (coupon: Coupon) => {

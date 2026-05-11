@@ -39,6 +39,7 @@ import {
   Layers,
 } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
@@ -975,7 +976,7 @@ const heroStyles = StyleSheet.create({
 
 function ContentScreen() {
   const { isMobile } = useAdminLayout();
-  const { isAdminAuthenticated } = useAdmin();
+  const { isAdminAuthenticated, admin } = useAdmin();
   const router = useRouter();
   const { guard: guardAction } = useActionPermission('manage_cms');
   const { refresh: refreshCMS } = useCMS();
@@ -1069,6 +1070,7 @@ function ContentScreen() {
       await refreshCMS(language);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      logAdminAction({ action: 'update', entityType: 'content', entityLabel: `CMS Content (${language})`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     } catch (err: any) {
       console.error('[Content] handleSave error:', err?.message ?? err);
     } finally {

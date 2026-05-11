@@ -32,6 +32,7 @@ export default function AdminLayout() {
       <Stack.Screen name="sections" />
       <Stack.Screen name="analytics" />
       <Stack.Screen name="loyalty" />
+      <Stack.Screen name="audit-logs" />
     </Stack>
   );
 }

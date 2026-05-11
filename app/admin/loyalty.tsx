@@ -13,6 +13,8 @@ import {
 import { Coins, TrendingUp, Users, Gift, ChevronDown, ChevronUp, Plus, Minus, X, Check, Settings2, Crown, Truck, Star, Zap, Percent, PartyPopper } from 'lucide-react-native';
 import { adminSupabase } from '@/lib/supabase';
 import { useActionPermission } from '@/hooks/useActionPermission';
+import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminGuard from '@/components/admin/AdminGuard';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
@@ -47,6 +49,7 @@ function LoyaltyContent() {
   const { t, language } = useLanguage();
   const { isDesktop } = useAdminLayout();
   const { guard: guardAction } = useActionPermission('manage_settings');
+  const { admin } = useAdmin();
   const DashboardShell = isDesktop ? AdminWebDashboard : AdminMobileDashboard;
   const shellTitle = (t as any).loyaltyAdmin ?? 'Loyalty & Rewards';
 
@@ -169,6 +172,7 @@ function LoyaltyContent() {
     } else {
       setSettingsMsg((t as any).loyaltySettingsSaved ?? 'Settings saved successfully');
       setTimeout(() => setSettingsMsg(''), 3000);
+      logAdminAction({ action: 'update', entityType: 'loyalty', entityLabel: 'Loyalty Settings', afterData: payload as any, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     }
   };
 

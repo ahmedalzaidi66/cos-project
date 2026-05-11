@@ -15,6 +15,7 @@ import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useRouter } from 'expo-router';
 import { Save, Store, Mail, DollarSign, Globe, Share2, Package, Camera, RefreshCw, Upload, Trash2, Sun, Moon, Smartphone } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
@@ -468,7 +469,7 @@ const SETTING_GROUPS = [
 ];
 
 function SettingsScreen() {
-  const { isAdminAuthenticated } = useAdmin();
+  const { isAdminAuthenticated, admin } = useAdmin();
   const router = useRouter();
   const { isMobile } = useAdminLayout();
   const { t } = useLanguage();
@@ -542,6 +543,7 @@ function SettingsScreen() {
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+    logAdminAction({ action: 'update', entityType: 'settings', entityLabel: 'Site Settings', adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const Shell = isMobile ? AdminMobileDashboard : AdminWebDashboard;

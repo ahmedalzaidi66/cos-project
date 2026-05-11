@@ -33,6 +33,7 @@ import {
   Pipette,
 } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -175,6 +176,7 @@ function WebProductsScreen() {
   const { t, language } = useLanguage();
   const router = useRouter();
   const { guard: guardAction } = useActionPermission('manage_products');
+  const { admin } = useAdmin();
   const [products, setProducts] = useState<Product[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -697,6 +699,7 @@ function WebProductsScreen() {
     setSaving(false);
     setShowForm(false);
     showToast(editProduct ? 'Product updated' : 'Product created');
+    logAdminAction({ action: editProduct ? 'update' : 'create', entityType: 'product', entityId: editProduct?.id, entityLabel: form.name_ar || form.name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const handleDelete = async (p: Product) => {
@@ -707,6 +710,7 @@ function WebProductsScreen() {
     setDeleting(null);
     setConfirmDelete(null);
     showToast('Product deleted');
+    logAdminAction({ action: 'delete', entityType: 'product', entityId: p.id, entityLabel: p.name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const handleQuickStockSave = async (productId: string) => {
@@ -1407,6 +1411,7 @@ function WebProductsScreen() {
 function MobileProductsScreen() {
   const { t, language } = useLanguage();
   const { guard: guardAction } = useActionPermission('manage_products');
+  const { admin } = useAdmin();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -1468,6 +1473,7 @@ function MobileProductsScreen() {
     await fetchProducts();
     showToast('Product saved');
     setTimeout(() => setEditProduct(null), 400);
+    logAdminAction({ action: 'update', entityType: 'product', entityId: editProduct.id, entityLabel: editForm.name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const filtered = products.filter(

@@ -20,6 +20,8 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { supabase, adminSupabase } from '@/lib/supabase';
 import { useActionPermission } from '@/hooks/useActionPermission';
+import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 import { printOrder, downloadOrderPdf, type PrintOrder, type PrintOrderItem } from '@/components/admin/OrderPrintView';
@@ -141,6 +143,7 @@ function OrderDetailModal({
 }) {
   const { language } = useLanguage();
   const { guard: guardAction } = useActionPermission('manage_orders');
+  const { admin } = useAdmin();
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -275,6 +278,7 @@ function OrderDetailModal({
     onStatusUpdated(order.id, newStatus);
     setSuccessMsg('تم تحديث الحالة بنجاح');
     setTimeout(() => setSuccessMsg(''), 3000);
+    logAdminAction({ action: 'status_change', entityType: 'order', entityId: order.id, entityLabel: `#${order.id.slice(0, 8)}`, beforeData: { status: currentStatus }, afterData: { status: newStatus }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
 
     // Send customer notifications in background (non-blocking)
     const emailOrder = {

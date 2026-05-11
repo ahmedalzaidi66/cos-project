@@ -61,6 +61,7 @@ export const PERMISSION_ROUTES: Record<string, string> = {
   manage_theme:        '/admin/sizes',
   manage_settings:     '/admin/settings',
   manage_permissions:  '/admin/permissions',
+  view_audit_logs:     '/admin/audit-logs',
 };
 
 // Which permission key is required to access each route
@@ -78,6 +79,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   '/admin/sizes':       'manage_layout',
   '/admin/settings':    'manage_settings',
   '/admin/permissions': 'manage_permissions',
+  '/admin/audit-logs':  'view_audit_logs',
 };
 
 /** Ordered list used to pick the first permitted route after employee login. */
@@ -91,6 +93,7 @@ export const EMPLOYEE_DEFAULT_ROUTES: { permission: string; route: string }[] = 
   { permission: 'manage_coupons',   route: '/admin/coupons' },
   { permission: 'manage_cms',       route: '/admin/content' },
   { permission: 'manage_settings',  route: '/admin/settings' },
+  { permission: 'view_audit_logs',  route: '/admin/audit-logs' },
 ];
 
 type AdminContextType = {
@@ -108,7 +111,7 @@ const ALL_PERMISSIONS = [
   'view_dashboard', 'manage_products', 'manage_orders', 'manage_customers',
   'manage_employees', 'manage_reviews', 'manage_coupons', 'manage_cms',
   'manage_cms_builder', 'manage_layout', 'manage_theme', 'manage_settings',
-  'manage_permissions',
+  'manage_permissions', 'view_audit_logs',
 ];
 
 function buildAdminUser(): AdminUser {

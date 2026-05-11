@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Plus, Pencil, Trash2, Search, X, UserCog, Calendar, Eye, EyeOff, Lock } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -105,7 +106,7 @@ async function callEmployeeAuthFn(
 
 function EmployeesScreen() {
   const { isMobile } = useAdminLayout();
-  const { isAdminAuthenticated } = useAdmin();
+  const { isAdminAuthenticated, admin } = useAdmin();
   const { t } = useLanguage();
   const router = useRouter();
   const { guard: guardAction, permissionError: actionPermErr, clearPermissionError } = useActionPermission('manage_employees');
@@ -260,6 +261,7 @@ function EmployeesScreen() {
       await fetchEmployees();
       const pwMsg = changePassword && form.password ? ' and password changed' : '';
       showToast('Employee updated' + pwMsg);
+      logAdminAction({ action: 'update', entityType: 'employee', entityId: editingEmployee.id, entityLabel: form.full_name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     } else {
       // Create Supabase Auth account first
       const { data: authData, error: authErr } = await callEmployeeAuthFn('create', {
@@ -290,6 +292,7 @@ function EmployeesScreen() {
       setModalVisible(false);
       await fetchEmployees();
       showToast('Employee created — they can now log in with their email and password');
+      logAdminAction({ action: 'create', entityType: 'employee', entityLabel: form.full_name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     }
   };
 
@@ -306,6 +309,7 @@ function EmployeesScreen() {
     setDeleteId(null);
     await fetchEmployees();
     showToast(t.deleted ?? 'Employee removed');
+    logAdminAction({ action: 'delete', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const filtered = employees.filter((e) =>
