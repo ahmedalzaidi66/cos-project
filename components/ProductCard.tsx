@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { ShoppingCart, Check } from 'lucide-react-native';
 import { Product, ProductShade, getProductName, getProductImage, fetchProductShades } from '@/lib/supabase';
+import { useOptimizedImage } from '@/lib/imageVariants';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import StarRating from './StarRating';
@@ -72,7 +73,9 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
     };
   }, [product.id]);
 
-  const displayImage = activeShade?.product_image || getProductImage(product) || undefined;
+  const rawImage = activeShade?.product_image || getProductImage(product) || null;
+  // imageH is set below but we need a width estimate; product cards are ~200px wide
+  const { src: displayImage } = useOptimizedImage(rawImage, 200);
   const isOutOfStock = product.in_stock === false || (product.stock === 0 && product.in_stock !== true);
 
   const imageH = productCardSizes.imageHeight;

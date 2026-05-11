@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Radius } from '@/constants/theme';
+import { useOptimizedImage } from '@/lib/imageVariants';
 
 const FALLBACK_IMAGE =
   'https://images.pexels.com/photos/2533266/pexels-photo-2533266.jpeg?auto=compress&cs=tinysrgb&w=1200';
@@ -148,15 +149,20 @@ export default function HeroSlider({ slides, heroContent }: Props) {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [current, allSlides.length, next]);
 
+  const slide = allSlides[Math.min(current, allSlides.length - 1)] ?? null;
+
+  // Resolve optimized hero image (large variant ~ 1200px, falls back to original)
+  const rawHeroUrl = slide?.image_url || FALLBACK_IMAGE;
+  const { src: optimizedHeroUrl } = useOptimizedImage(rawHeroUrl, width);
+
   if (allSlides.length === 0) return null;
 
-  const slide = allSlides[Math.min(current, allSlides.length - 1)];
-  const overlayColor = `rgba(0,0,0,${(slide.overlay_opacity ?? 0.55).toFixed(2)})`;
-  const useVideo = slide.media_type === 'video' && !!slide.video_url && !videoFailed[slide.id];
-  const imageUrl = slide.image_url || FALLBACK_IMAGE;
+  const overlayColor = `rgba(0,0,0,${(slide!.overlay_opacity ?? 0.55).toFixed(2)})`;
+  const useVideo = slide!.media_type === 'video' && !!slide!.video_url && !videoFailed[slide!.id];
+  const imageUrl = optimizedHeroUrl || rawHeroUrl;
 
   const handleCta = () => {
-    const url = slide.cta_url;
+    const url = slide!.cta_url;
     if (!url) return;
     try { router.push(url as any); } catch { /* ignore */ }
   };

@@ -499,19 +499,23 @@ export default function ImageEditorModal({
     }
     ctx.filter = 'none';
 
+    // Always output WebP for best compression; PNG only when source has transparency
     const isPng = sourceFile.name.toLowerCase().endsWith('.png');
-    const mime  = isPng ? 'image/png' : 'image/jpeg';
+    const mime  = isPng ? 'image/png' : 'image/webp';
+    const fileExt = isPng ? 'png' : 'webp';
+    // WebP: 0.90 quality (visually lossless at typical product dimensions)
+    const outputQuality = isPng ? undefined : 0.90;
 
     offscreen.toBlob((blob) => {
       if (!blob) { setProcessing(false); return; }
-      const file = new File([blob], `edited-${Date.now()}.${isPng ? 'png' : 'jpg'}`, { type: mime });
+      const file = new File([blob], `edited-${Date.now()}.${fileExt}`, { type: mime });
       const reader = new FileReader();
       reader.onload = (ev) => {
         setProcessing(false);
         onSave(file, ev.target?.result as string);
       };
       reader.readAsDataURL(file);
-    }, mime, 0.92);
+    }, mime, outputQuality);
   };
 
   // ── Open file picker (replace) ────────────────────────────────────────────────
