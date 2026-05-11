@@ -1,16 +1,3 @@
-/**
- * OptimizedImage
- *
- * Drop-in replacement for React Native <Image> that:
- *  1. Serves the correct size variant (thumbnail/small/medium/large) based on display width
- *  2. Shows a lightweight placeholder while the image loads
- *  3. Fades in once loaded to eliminate layout shifts
- *  4. On web: uses <img> with WebP + lazy loading for CDN caching
- *  5. Falls back to original URL if no variant exists yet
- *
- * Usage:
- *   <OptimizedImage source={{ uri: product.image_url }} displayWidth={100} style={styles.img} />
- */
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Image,
@@ -26,17 +13,12 @@ import { useOptimizedImage } from '@/lib/imageVariants';
 type ResizeMode = 'cover' | 'contain' | 'stretch' | 'center';
 
 type Props = {
-  /** { uri: string } — same interface as RN Image source */
   source: { uri?: string | null } | null | undefined;
-  /** Intended render width in layout pixels — used to pick the right variant */
   displayWidth: number;
   style?: ImageStyle | ImageStyle[];
   resizeMode?: ResizeMode;
-  /** Accessible label */
   alt?: string;
-  /** Whether to skip variant resolution (e.g., for shade swatches < 32px) */
   noVariants?: boolean;
-  /** Extra container style */
   containerStyle?: ViewStyle;
 };
 
@@ -51,33 +33,54 @@ export default function OptimizedImage({
 }: Props) {
   const originalUrl = source?.uri ?? null;
 
-  // Resolve best variant (or use original if noVariants)
   const { src } = useOptimizedImage(noVariants ? null : originalUrl, displayWidth);
   const activeSrc = noVariants ? (originalUrl ?? '') : (src || originalUrl || '');
 
   const [loaded, setLoaded] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const shimmerLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    // Reset when image URL changes
     setLoaded(false);
     fadeAnim.setValue(0);
   }, [activeSrc, fadeAnim]);
+
+  // Start shimmer when not loaded, stop when loaded
+  useEffect(() => {
+    if (!loaded && activeSrc) {
+      shimmerLoop.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+          Animated.timing(shimmerAnim, { toValue: 0, duration: 900, useNativeDriver: true }),
+        ])
+      );
+      shimmerLoop.current.start();
+    } else {
+      shimmerLoop.current?.stop();
+      shimmerAnim.setValue(0);
+    }
+    return () => { shimmerLoop.current?.stop(); };
+  }, [loaded, activeSrc, shimmerAnim]);
 
   const handleLoad = () => {
     setLoaded(true);
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 180,
+      duration: 200,
       useNativeDriver: true,
     }).start();
   };
+
+  const shimmerOpacity = shimmerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.45],
+  });
 
   if (!activeSrc) {
     return <View style={[styles.placeholder, style as ViewStyle, containerStyle]} />;
   }
 
-  // ── Web: use native <img> for best CDN cache + lazy loading ──────────────
   if (Platform.OS === 'web') {
     return (
       <WebOptimizedImage
@@ -91,9 +94,14 @@ export default function OptimizedImage({
     );
   }
 
-  // ── Native: Animated.Image with fade-in ──────────────────────────────────
   return (
     <View style={[styles.placeholder, containerStyle]}>
+      {/* Skeleton shimmer shown while image loads */}
+      {!loaded && (
+        <Animated.View
+          style={[StyleSheet.absoluteFillObject, styles.shimmer, { opacity: shimmerOpacity }]}
+        />
+      )}
       <Animated.Image
         source={{ uri: activeSrc }}
         style={[styles.fill, style, { opacity: fadeAnim }]}
@@ -119,11 +127,28 @@ type WebProps = {
 function WebOptimizedImage({ src, originalSrc, resizeMode, alt, style, containerStyle }: WebProps) {
   const [imgSrc, setImgSrc] = useState(src);
   const [visible, setVisible] = useState(false);
+  const [shimmerPhase, setShimmerPhase] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setImgSrc(src);
     setVisible(false);
+    setShimmerPhase(true);
   }, [src]);
+
+  // CSS shimmer pulse via interval (avoids RN Animated on web)
+  useEffect(() => {
+    if (visible) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      return;
+    }
+    intervalRef.current = setInterval(() => {
+      setShimmerPhase(p => !p);
+    }, 900);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [visible]);
 
   const flatStyle = StyleSheet.flatten(style) ?? {};
   const containerFlat = StyleSheet.flatten(containerStyle) ?? {};
@@ -136,7 +161,8 @@ function WebOptimizedImage({ src, originalSrc, resizeMode, alt, style, container
   const containerCss: React.CSSProperties = {
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: 'rgba(30, 15, 24, 0.4)',
+    backgroundColor: shimmerPhase ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+    transition: 'background-color 0.9s ease',
     ...(containerFlat as any),
     ...(flatStyle as any),
   };
@@ -149,7 +175,7 @@ function WebOptimizedImage({ src, originalSrc, resizeMode, alt, style, container
     height: '100%',
     objectFit,
     objectPosition: 'center',
-    transition: 'opacity 0.18s ease',
+    transition: 'opacity 0.2s ease',
     opacity: visible ? 1 : 0,
     userSelect: 'none',
   };
@@ -166,7 +192,6 @@ function WebOptimizedImage({ src, originalSrc, resizeMode, alt, style, container
         style={imgCss}
         onLoad={() => setVisible(true)}
         onError={() => {
-          // Fallback to original if variant fails
           if (imgSrc !== originalSrc && originalSrc) {
             setImgSrc(originalSrc);
           }
@@ -178,8 +203,11 @@ function WebOptimizedImage({ src, originalSrc, resizeMode, alt, style, container
 
 const styles = StyleSheet.create({
   placeholder: {
-    backgroundColor: 'rgba(30, 15, 24, 0.4)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     overflow: 'hidden',
+  },
+  shimmer: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   fill: {
     position: 'absolute',

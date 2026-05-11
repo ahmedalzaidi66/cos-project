@@ -16,6 +16,7 @@ import {
   GripVertical,
   CircleCheck as CheckCircle,
   CircleAlert as AlertCircle,
+  TrendingDown,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import {
@@ -24,7 +25,9 @@ import {
   validateImageIntegrity,
   readFileAsDataUrl,
   SUPPORTED_TYPES,
+  formatFileSize,
 } from '@/lib/imageUpload';
+import { fetchVariants, SizeName } from '@/lib/imageVariants';
 import ImageEditorModal from '@/components/admin/ImageEditorModal';
 
 type ImageItem = {
@@ -40,6 +43,13 @@ type Props = {
 
 type CardStatus = 'idle' | 'uploading' | 'error';
 type CardProgress = { percent: number };
+
+type VariantMeta = {
+  originalBytes: number;
+  optimizedBytes: number;
+  format: string;
+  savingsPct: number;
+};
 
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -59,6 +69,8 @@ export default function ProductImageGallery({ images, onChange }: Props) {
   const [cardStatus, setCardStatus] = useState<Record<string, CardStatus>>({});
   const [cardProgress, setCardProgress] = useState<Record<string, number>>({});
   const [cardError, setCardError] = useState<Record<string, string>>({});
+  const [cardVariants, setCardVariants] = useState<Record<string, VariantMeta>>({});
+  const [originalFileSizes, setOriginalFileSizes] = useState<Record<string, number>>({});
   const [globalError, setGlobalError] = useState('');
   const [globalSuccess, setGlobalSuccess] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -114,6 +126,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
   const handleEditorSave = useCallback(async (editedFile: File, _previewDataUrl?: string) => {
     setEditorVisible(false);
     const replaceId = pendingReplaceId;
+    const originalSize = editedFile.size;
     setPendingFile(null);
     setPendingDataUrl('');
     setPendingReplaceId(undefined);
@@ -122,6 +135,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
     setCardStatus(s => ({ ...s, [tempId]: 'uploading' }));
     setCardProgress(p => ({ ...p, [tempId]: 0 }));
     setCardError(e => { const n = { ...e }; delete n[tempId]; return n; });
+    setOriginalFileSizes(s => ({ ...s, [tempId]: originalSize }));
     setGlobalError('');
 
     const result = await uploadImageToSupabase(editedFile, {
@@ -139,6 +153,30 @@ export default function ProductImageGallery({ images, onChange }: Props) {
 
     setCardStatus(s => { const n = { ...s }; delete n[tempId]; return n; });
     setCardProgress(p => { const n = { ...p }; delete n[tempId]; return n; });
+
+    // Fetch variant metadata for compression savings display (non-blocking)
+    const targetId = replaceId ?? tempId;
+    fetchVariants(result.url!).then((variants) => {
+      // Pick the medium or largest available variant for savings comparison
+      const order: SizeName[] = ['medium', 'large', 'small', 'thumbnail', 'original'];
+      let bestVariant = null;
+      for (const size of order) {
+        const v = variants.get(size);
+        if (v) { bestVariant = v; break; }
+      }
+      if (bestVariant && bestVariant.bytes > 0 && originalSize > 0) {
+        const savingsPct = Math.round((1 - bestVariant.bytes / originalSize) * 100);
+        setCardVariants(prev => ({
+          ...prev,
+          [targetId]: {
+            originalBytes: originalSize,
+            optimizedBytes: bestVariant!.bytes,
+            format: bestVariant!.format,
+            savingsPct: Math.max(0, savingsPct),
+          },
+        }));
+      }
+    }).catch(() => {});
 
     if (replaceId) {
       onChange(images.map(img => img.id === replaceId ? { ...img, url: result.url! } : img));
@@ -276,6 +314,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
             status={cardStatus[img.id] ?? 'idle'}
             progress={cardProgress[img.id] ?? 0}
             error={cardError[img.id]}
+            variantMeta={cardVariants[img.id]}
             isHovered={hoveredId === img.id}
             isDraggedOver={dragOverId === img.id}
             onHover={(id) => setHoveredId(id)}
@@ -361,6 +400,7 @@ type CardProps = {
   status: CardStatus;
   progress: number;
   error?: string;
+  variantMeta?: VariantMeta;
   isHovered: boolean;
   isDraggedOver: boolean;
   onHover: (id: string | null) => void;
@@ -373,7 +413,7 @@ type CardProps = {
 };
 
 function ImageCard({
-  img, index, status, progress, error, isHovered, isDraggedOver,
+  img, index, status, progress, error, variantMeta, isHovered, isDraggedOver,
   onHover, onSetMain, onReplace, onRemove, onDragStart, onDragOver, onDragEnd,
 }: CardProps) {
   const [imgErr, setImgErr] = useState(false);
@@ -444,6 +484,13 @@ function ImageCard({
         <Text style={cs.indexText}>{index + 1}</Text>
       </View>
 
+      {variantMeta && variantMeta.savingsPct > 0 && !isHovered && status !== 'uploading' && (
+        <View style={cs.savingsBadge}>
+          <TrendingDown size={8} color="#00E676" strokeWidth={2.5} />
+          <Text style={cs.savingsText}>-{variantMeta.savingsPct}%</Text>
+        </View>
+      )}
+
       {error && (
         <View style={cs.errorTooltip}>
           <Text style={cs.errorTooltipText} numberOfLines={2}>{error}</Text>
@@ -453,7 +500,7 @@ function ImageCard({
       <div
         style={{
           position: 'absolute', inset: 0,
-          background: 'rgba(5,10,20,0.75)',
+          background: 'rgba(5,10,20,0.82)',
           display: 'flex',
           flexDirection: 'column' as any,
           alignItems: 'center',
@@ -463,6 +510,19 @@ function ImageCard({
           transition: 'opacity 0.15s ease',
         }}
       >
+        {variantMeta && variantMeta.savingsPct > 0 && (
+          <div style={{
+            display: 'flex', flexDirection: 'column' as any, alignItems: 'center',
+            gap: 1, marginBottom: 2,
+          }}>
+            <span style={{ color: '#00E676', fontSize: 10, fontWeight: 700 }}>
+              -{variantMeta.savingsPct}% optimized
+            </span>
+            <span style={{ color: Colors.textMuted, fontSize: 9 }}>
+              {formatFileSize(variantMeta.originalBytes)} → {formatFileSize(variantMeta.optimizedBytes)} · {variantMeta.format.replace('image/', '').toUpperCase()}
+            </span>
+          </div>
+        )}
         {!img.isMain && (
           <button
             onClick={(e) => { e.stopPropagation(); onSetMain(); }}
@@ -551,6 +611,14 @@ const cs = StyleSheet.create({
   indexText: { color: Colors.textSecondary, fontSize: 9, fontWeight: '700' },
   errorTooltip: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.errorDim, padding: 4 },
   errorTooltipText: { color: Colors.error, fontSize: 8 },
+  savingsBadge: {
+    position: 'absolute', bottom: 5, right: 5,
+    backgroundColor: 'rgba(0,230,118,0.15)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 5, paddingVertical: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+  },
+  savingsText: { color: '#00E676', fontSize: 8, fontWeight: '800' },
 });
 
 const styles = StyleSheet.create({
