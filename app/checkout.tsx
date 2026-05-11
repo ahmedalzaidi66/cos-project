@@ -29,7 +29,6 @@ const WHATSAPP_NUMBER = '9647XXXXXXXX';
 
 type ShippingRule = {
   id: string;
-  continent: string;
   country: string;
   governorate: string;
   area: string;
@@ -99,8 +98,6 @@ function matchRule(
     if (!isWild(r.country))        s += 40;
     if (!isWild(r.governorate))    s += 20;
     if (!isWild(r.area))           s += 10;
-    // continent bonus — only relevant for continent-level rules
-    if (r.continent && !isWild(r.continent)) s += 5;
     return s;
   }
 
@@ -190,9 +187,14 @@ export default function CheckoutScreen() {
   useEffect(() => {
     supabase
       .from('shipping_rules')
-      .select('id, continent, country, governorate, area, shipping_fee, free_shipping_minimum, is_active')
+      .select('id, country, governorate, area, shipping_fee, free_shipping_minimum, is_active')
       .eq('is_active', true)
-      .then(({ data }) => setAllRules(data ?? []));
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[Checkout] Failed to load shipping rules:', error.message, error);
+        }
+        setAllRules(data ?? []);
+      });
   }, []);
 
   // Re-evaluate shipping whenever location or subtotal changes

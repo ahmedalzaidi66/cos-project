@@ -23,7 +23,6 @@ import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
 type ShippingRule = {
   id: string;
-  continent: string;
   country: string;
   governorate: string;
   area: string;
@@ -34,7 +33,6 @@ type ShippingRule = {
 };
 
 const EMPTY_FORM = {
-  continent: '',
   country: '',
   governorate: '',
   area: '',
@@ -48,7 +46,6 @@ const WILDCARD_HINT = 'اكتب الكل أو all أو * لتطبيقها على
 function ruleScope(rule: ShippingRule): string {
   const isWild = (v: string) => isWildcard(v);
   const parts: string[] = [];
-  if (rule.continent && !isWild(rule.continent)) parts.push(rule.continent);
   if (rule.country)     parts.push(isWild(rule.country)     ? 'كل الدول'       : rule.country);
   if (rule.governorate) parts.push(isWild(rule.governorate) ? 'كل المحافظات'   : rule.governorate);
   if (rule.area)        parts.push(isWild(rule.area)        ? 'كل المناطق'     : rule.area);
@@ -94,7 +91,6 @@ function ShippingScreen() {
     const { data, error } = await db
       .from('shipping_rules')
       .select('*')
-      .order('continent')
       .order('country')
       .order('governorate')
       .order('area');
@@ -115,7 +111,6 @@ function ShippingScreen() {
   const openEdit = (r: ShippingRule) => {
     setEditingRule(r);
     setForm({
-      continent: r.continent,
       country: r.country,
       governorate: r.governorate,
       area: r.area,
@@ -129,9 +124,9 @@ function ShippingScreen() {
 
   const handleSave = async () => {
     // At least one location field must be filled
-    const hasLocation = form.continent.trim() || form.country.trim() || form.governorate.trim();
+    const hasLocation = form.country.trim() || form.governorate.trim();
     if (!hasLocation) {
-      setFormError('يجب تحديد القارة أو الدولة أو المحافظة على الأقل');
+      setFormError('يجب تحديد الدولة أو المحافظة على الأقل');
       return;
     }
     const fee = parseFloat(form.shipping_fee);
@@ -150,7 +145,6 @@ function ShippingScreen() {
 
     const db = adminSupabase();
     const payload = {
-      continent: form.continent.trim(),
       country: form.country.trim(),
       governorate: form.governorate.trim(),
       area: form.area.trim(),
@@ -190,7 +184,6 @@ function ShippingScreen() {
   const filtered = rules.filter((r) => {
     const q = search.toLowerCase();
     return (
-      r.continent.toLowerCase().includes(q) ||
       r.country.toLowerCase().includes(q) ||
       r.governorate.toLowerCase().includes(q) ||
       r.area.toLowerCase().includes(q)
@@ -316,12 +309,6 @@ function ShippingScreen() {
                 <Text style={styles.hintText}>{WILDCARD_HINT}</Text>
               </View>
 
-              <FormField
-                label="القارة (اختياري)"
-                value={form.continent}
-                onChange={(v) => setForm((f) => ({ ...f, continent: v }))}
-                placeholder="مثال: Asia — أو اتركه فارغاً"
-              />
               <FormField
                 label="الدولة"
                 value={form.country}
