@@ -121,6 +121,27 @@ export default {
   orderTrackingNumber: 'Номер отслеживания',
   orderTimeline: 'История заказа',
 
+  // Баллы лояльности и бонусы
+  loyaltyPoints: 'Баллы лояльности',
+  loyaltyBalance: 'Баланс баллов',
+  loyaltyTier: 'Уровень',
+  loyaltyTierBronze: 'Бронза',
+  loyaltyTierSilver: 'Серебро',
+  loyaltyTierGold: 'Золото',
+  loyaltyTierPlatinum: 'Платина',
+  loyaltyEarnBadge: 'Получи {{n}} баллов',
+  loyaltyEarnPercentBadge: '+{{n}}% Бонус',
+  loyaltyPointsEarnedOnOrder: 'Вы получите {{n}} бонусных баллов',
+  loyaltyPointsBalance: '{{n}} баллов',
+  loyaltyNoPoints: 'Баллов пока нет',
+  loyaltyPointsHistory: 'История баллов',
+  loyaltyBonusEnabled: 'Включить бонусные баллы',
+  loyaltyBonusPoints: 'Фиксированные бонусные баллы',
+  loyaltyBonusPercentage: 'Процент бонуса (%)',
+  loyaltyBonusMode: 'Режим бонуса',
+  loyaltyBonusModeFixed: 'Фиксированные баллы',
+  loyaltyBonusModePercent: 'Процент',
+
   // Canopy
   canopyAdvisor: 'Уход за кожей',
   canopySubtitle: 'Наша премиальная коллекция по уходу за кожей скоро появится. Следите за персональными рекомендациями.',

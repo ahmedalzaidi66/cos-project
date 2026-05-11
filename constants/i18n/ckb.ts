@@ -121,6 +121,27 @@ export default {
   orderTrackingNumber: 'ژمارەی شوێنکەوتن',
   orderTimeline: 'هێڵی کاتی داواکاری',
 
+  // خاڵی دڵسۆزی و خەڵات
+  loyaltyPoints: 'خاڵی دڵسۆزی',
+  loyaltyBalance: 'باڵانسی خاڵ',
+  loyaltyTier: 'ئاست',
+  loyaltyTierBronze: 'بڕۆنز',
+  loyaltyTierSilver: 'زیو',
+  loyaltyTierGold: 'زێڕ',
+  loyaltyTierPlatinum: 'پلاتینیۆم',
+  loyaltyEarnBadge: 'بەدەستهێنانی {{n}} خاڵ',
+  loyaltyEarnPercentBadge: '+{{n}}% بۆنەس',
+  loyaltyPointsEarnedOnOrder: '{{n}} خاڵی بۆنەستان دەبەخشێتەوە',
+  loyaltyPointsBalance: '{{n}} خاڵ',
+  loyaltyNoPoints: 'هیچ خاڵێک نییە',
+  loyaltyPointsHistory: 'مێژووی خاڵ',
+  loyaltyBonusEnabled: 'چالاککردنی خاڵی بۆنەس',
+  loyaltyBonusPoints: 'خاڵی بۆنەسی دیاریکراو',
+  loyaltyBonusPercentage: 'ڕێژەی بۆنەس (%)',
+  loyaltyBonusMode: 'جۆری بۆنەس',
+  loyaltyBonusModeFixed: 'خاڵی دیاریکراو',
+  loyaltyBonusModePercent: 'ڕێژەی سەدی',
+
   // Product Detail
   selectShade: 'ڕەنگێک هەڵبژێرە',
   pleaseSelectShade: 'تکایە پێش زیادکردن بۆ سەبەتە ڕەنگێک هەڵبژێرە',

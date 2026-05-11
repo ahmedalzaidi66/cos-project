@@ -19,6 +19,7 @@ import { Colors, Radius, Spacing, FontSize, Shadow } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 import { useUISize } from '@/context/UISizeContext';
 import { useWishlistToast } from '@/context/WishlistToastContext';
+import { hasBonusPoints, getBonusBadgeLabel } from '@/lib/loyalty';
 
 type Props = {
   product: Product;
@@ -28,7 +29,7 @@ type Props = {
 function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
   const router = useRouter();
   const { addToCart } = useCart();
-  const { language, isRTL } = useLanguage();
+  const { language, isRTL, t } = useLanguage();
   const { productCardSizes, globalSizes } = useUISize();
   const { showCartToast } = useWishlistToast();
   const [shades, setShades] = useState<ProductShade[]>([]);
@@ -236,6 +237,13 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
             </TouchableOpacity>
           </Animated.View>
         </View>
+        {hasBonusPoints(product) && (
+          <View style={[styles.bonusBadge, isRTL && styles.bonusBadgeRTL]}>
+            <Text style={styles.bonusBadgeText}>
+              {getBonusBadgeLabel(product, t as unknown as Record<string, string>)}
+            </Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
     </Animated.View>
@@ -374,6 +382,25 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     marginLeft: 1,
+  },
+  bonusBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.gold + '20',
+    borderWidth: 1,
+    borderColor: Colors.gold + '50',
+    borderRadius: Radius.full,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginTop: 3,
+  },
+  bonusBadgeRTL: {
+    alignSelf: 'flex-end',
+  },
+  bonusBadgeText: {
+    color: Colors.gold,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });
 

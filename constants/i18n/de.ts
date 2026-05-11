@@ -121,6 +121,27 @@ export default {
   orderTrackingNumber: 'Sendungsnummer',
   orderTimeline: 'Bestellverlauf',
 
+  // Treuepunkte & Boni
+  loyaltyPoints: 'Treuepunkte',
+  loyaltyBalance: 'Punkteguthaben',
+  loyaltyTier: 'Stufe',
+  loyaltyTierBronze: 'Bronze',
+  loyaltyTierSilver: 'Silber',
+  loyaltyTierGold: 'Gold',
+  loyaltyTierPlatinum: 'Platin',
+  loyaltyEarnBadge: '{{n}} Pkt. sammeln',
+  loyaltyEarnPercentBadge: '+{{n}}% Bonus',
+  loyaltyPointsEarnedOnOrder: 'Du sammelst {{n}} Bonuspunkte',
+  loyaltyPointsBalance: '{{n}} Punkte',
+  loyaltyNoPoints: 'Noch keine Punkte',
+  loyaltyPointsHistory: 'Punktehistorie',
+  loyaltyBonusEnabled: 'Bonuspunkte aktivieren',
+  loyaltyBonusPoints: 'Feste Bonuspunkte',
+  loyaltyBonusPercentage: 'Bonusprozentsatz (%)',
+  loyaltyBonusMode: 'Bonusart',
+  loyaltyBonusModeFixed: 'Feste Punkte',
+  loyaltyBonusModePercent: 'Prozentsatz',
+
   // Canopy
   canopyAdvisor: 'Hautpflege',
   canopySubtitle: 'Unsere Premium-Hautpflegekollektion kommt bald. Bleibe dran für personalisierte Empfehlungen.',

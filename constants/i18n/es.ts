@@ -121,6 +121,27 @@ export default {
   orderTrackingNumber: 'Número de seguimiento',
   orderTimeline: 'Historial del pedido',
 
+  // Puntos de fidelidad y bonificaciones
+  loyaltyPoints: 'Puntos de fidelidad',
+  loyaltyBalance: 'Saldo de puntos',
+  loyaltyTier: 'Nivel',
+  loyaltyTierBronze: 'Bronce',
+  loyaltyTierSilver: 'Plata',
+  loyaltyTierGold: 'Oro',
+  loyaltyTierPlatinum: 'Platino',
+  loyaltyEarnBadge: 'Gana {{n}} pts',
+  loyaltyEarnPercentBadge: '+{{n}}% Bono',
+  loyaltyPointsEarnedOnOrder: 'Ganarás {{n}} puntos de bonificación',
+  loyaltyPointsBalance: '{{n}} puntos',
+  loyaltyNoPoints: 'Sin puntos aún',
+  loyaltyPointsHistory: 'Historial de puntos',
+  loyaltyBonusEnabled: 'Activar puntos de bonificación',
+  loyaltyBonusPoints: 'Puntos de bonificación fijos',
+  loyaltyBonusPercentage: 'Porcentaje de bonificación (%)',
+  loyaltyBonusMode: 'Modo de bonificación',
+  loyaltyBonusModeFixed: 'Puntos fijos',
+  loyaltyBonusModePercent: 'Porcentaje',
+
   // Canopy
   canopyAdvisor: 'Cuidado de Piel',
   canopySubtitle: 'Nuestra colección premium de cuidado de piel llegará pronto. Estén atentos para recomendaciones personalizadas.',

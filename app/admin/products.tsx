@@ -129,6 +129,10 @@ const EMPTY_FORM = {
   description_de: '',
   description_ru: '',
   description_ckb: '',
+  bonus_enabled: false,
+  bonus_points: '',
+  bonus_percentage: '',
+  bonus_mode: 'fixed' as 'fixed' | 'percent',
 };
 
 type FormState = typeof EMPTY_FORM;
@@ -527,6 +531,10 @@ function WebProductsScreen() {
         description_de: transMap['de']?.description ?? p.description_de ?? '',
         description_ru: transMap['ru']?.description ?? '',
         description_ckb: transMap['ku']?.description ?? '',
+        bonus_enabled: (p as any).bonus_enabled ?? false,
+        bonus_points: String((p as any).bonus_points ?? ''),
+        bonus_percentage: String((p as any).bonus_percentage ?? ''),
+        bonus_mode: ((p as any).bonus_percentage != null && (p as any).bonus_percentage > 0) ? 'percent' : 'fixed' as 'fixed' | 'percent',
       });
       setGalleryImages(mapped);
       setShades(
@@ -564,6 +572,15 @@ function WebProductsScreen() {
     const primaryUrl = mainGalleryImg?.url || form.image_url.trim() || null;
     const galleryUrls = galleryImages.map((g) => g.url);
 
+    // Compute bonus values
+    const bonusEnabled = form.bonus_enabled;
+    const bonusPoints = form.bonus_mode === 'fixed'
+      ? (parseInt(form.bonus_points) || 0)
+      : 0;
+    const bonusPercentage = form.bonus_mode === 'percent'
+      ? (parseFloat(form.bonus_percentage) || null)
+      : null;
+
     const payload = {
       name: enName,
       price: parseFloat(form.price),
@@ -585,6 +602,9 @@ function WebProductsScreen() {
       description_ar: arDesc || null,
       description_es: form.description_es.trim() || null,
       description_de: form.description_de.trim() || null,
+      bonus_enabled: bonusEnabled,
+      bonus_points: bonusPoints,
+      bonus_percentage: bonusPercentage,
     };
 
     const db = adminSupabase();
@@ -1074,6 +1094,76 @@ function WebProductsScreen() {
                     trackColor={{ false: Colors.border, true: Colors.neonBlueBorder }}
                   />
                 </View>
+
+                {/* ── Bonus Points Section ── */}
+                <View style={styles.bonusSection}>
+                  <View style={styles.switchRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.fieldLabel}>{(t as any).loyaltyBonusEnabled ?? 'Enable Bonus Points'}</Text>
+                      <Text style={[styles.bonusSectionSub]}>Customers earn points after this order is completed</Text>
+                    </View>
+                    <Switch
+                      value={form.bonus_enabled}
+                      onValueChange={(v) => setForm((f) => ({ ...f, bonus_enabled: v }))}
+                      thumbColor={form.bonus_enabled ? Colors.gold : Colors.textMuted}
+                      trackColor={{ false: Colors.border, true: Colors.gold + '50' }}
+                    />
+                  </View>
+                  {form.bonus_enabled && (
+                    <>
+                      <Text style={styles.fieldLabel}>{(t as any).loyaltyBonusMode ?? 'Bonus Mode'}</Text>
+                      <View style={styles.bonusModeRow}>
+                        <TouchableOpacity
+                          style={[styles.bonusModeBtn, form.bonus_mode === 'fixed' && styles.bonusModeBtnActive]}
+                          onPress={() => setForm((f) => ({ ...f, bonus_mode: 'fixed' }))}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.bonusModeBtnText, form.bonus_mode === 'fixed' && styles.bonusModeBtnTextActive]}>
+                            {(t as any).loyaltyBonusModeFixed ?? 'Fixed Points'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.bonusModeBtn, form.bonus_mode === 'percent' && styles.bonusModeBtnActive]}
+                          onPress={() => setForm((f) => ({ ...f, bonus_mode: 'percent' }))}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.bonusModeBtnText, form.bonus_mode === 'percent' && styles.bonusModeBtnTextActive]}>
+                            {(t as any).loyaltyBonusModePercent ?? 'Percentage'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      {form.bonus_mode === 'fixed' ? (
+                        <FormField
+                          label={(t as any).loyaltyBonusPoints ?? 'Bonus Points'}
+                          value={form.bonus_points}
+                          onChangeText={(v) => setForm((f) => ({ ...f, bonus_points: v }))}
+                          placeholder="e.g. 500"
+                          keyboardType="number-pad"
+                        />
+                      ) : (
+                        <FormField
+                          label={(t as any).loyaltyBonusPercentage ?? 'Bonus Percentage (%)'}
+                          value={form.bonus_percentage}
+                          onChangeText={(v) => setForm((f) => ({ ...f, bonus_percentage: v }))}
+                          placeholder="e.g. 5"
+                          keyboardType="decimal-pad"
+                        />
+                      )}
+                      <View style={styles.bonusPreview}>
+                        <Text style={styles.bonusPreviewText}>
+                          Preview:{' '}
+                          {form.bonus_mode === 'fixed'
+                            ? `Customer earns ${parseInt(form.bonus_points) || 0} pts`
+                            : form.price
+                            ? `Customer earns ${Math.floor(parseFloat(form.price) * (parseFloat(form.bonus_percentage) || 0) / 100)} pts (${form.bonus_percentage || 0}% of ${form.price} IQD)`
+                            : 'Enter price to preview'
+                          }
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+
                 {!editProduct && (
                   <TouchableOpacity
                     style={styles.notifyRow}
@@ -2225,6 +2315,56 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.md,
+  },
+  bonusSection: {
+    borderWidth: 1,
+    borderColor: Colors.gold + '40',
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.gold + '08',
+  },
+  bonusSectionSub: {
+    color: Colors.textMuted,
+    fontSize: FontSize.xs,
+    marginTop: 2,
+  },
+  bonusModeRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  bonusModeBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  bonusModeBtnActive: {
+    borderColor: Colors.gold,
+    backgroundColor: Colors.gold + '18',
+  },
+  bonusModeBtnText: {
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  bonusModeBtnTextActive: {
+    color: Colors.gold,
+  },
+  bonusPreview: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    marginTop: 4,
+  },
+  bonusPreviewText: {
+    color: Colors.gold,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
   },
   notifyRow: {
     flexDirection: 'row',

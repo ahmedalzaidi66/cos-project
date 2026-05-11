@@ -83,6 +83,10 @@ export type Product = {
   specifications: Record<string, any> | null;
   try_on_type: string | null;
   makeup_subcategory: 'lips' | 'face' | 'eye' | 'nail' | null;
+  // Loyalty / bonus
+  bonus_enabled: boolean;
+  bonus_points: number;
+  bonus_percentage: number | null;
   // Legacy translation columns (kept for backwards compat)
   name_ar: string | null;
   name_es: string | null;

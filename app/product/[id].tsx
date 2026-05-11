@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ShoppingCart, Package, Shield, Star, ChevronRight, Sparkles, Share2 } from 'lucide-react-native';
 import { shareContent, buildProductSharePayload } from '@/lib/share';
+import { hasBonusPoints, getBonusBadgeLabel, getProductBonusPoints } from '@/lib/loyalty';
 import {
   fetchProductById,
   fetchProductGallery,
@@ -365,6 +366,22 @@ export default function ProductDetailScreen() {
               <Text style={styles.comparePrice}>{formatPrice(product.compare_price, language)}</Text>
             )}
           </View>
+
+          {hasBonusPoints(product) && (
+            <View style={styles.bonusRow}>
+              <View style={styles.bonusPill}>
+                <Text style={styles.bonusPillText}>
+                  {getBonusBadgeLabel(product, t as unknown as Record<string, string>)}
+                </Text>
+              </View>
+              <Text style={[styles.bonusEarnText, { color: C.textMuted }]}>
+                {((t as any).loyaltyPointsEarnedOnOrder ?? 'You will earn {{n}} bonus points').replace(
+                  '{{n}}',
+                  getProductBonusPoints(product).toLocaleString()
+                )}
+              </Text>
+            </View>
+          )}
 
           {product.sku && (
             <Text style={[styles.sku, { color: C.textMuted }]}>{t.skuLabel}: {product.sku}</Text>
@@ -734,6 +751,31 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: '500',
     textDecorationLine: 'line-through',
+  },
+  bonusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+    flexWrap: 'wrap',
+  },
+  bonusPill: {
+    backgroundColor: Colors.gold + '20',
+    borderWidth: 1,
+    borderColor: Colors.gold + '60',
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  bonusPillText: {
+    color: Colors.gold,
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  bonusEarnText: {
+    fontSize: FontSize.sm,
+    fontWeight: '500',
   },
   sku: {
     color: Colors.textMuted,

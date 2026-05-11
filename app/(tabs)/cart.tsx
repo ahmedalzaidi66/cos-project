@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react-native';
 import { useCart, CartItem, CartShade } from '@/context/CartContext';
+import { calcCartBonusPoints, getProductBonusPoints, getBonusBadgeLabel, hasBonusPoints } from '@/lib/loyalty';
 import { useLanguage } from '@/context/LanguageContext';
 import AppHeader from '@/components/AppHeader';
 import GlossyButton from '@/components/GlossyButton';
@@ -31,6 +32,7 @@ export default function CartScreen() {
 
   const shipping = subtotal >= SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
   const total = subtotal + shipping;
+  const totalBonusPoints = calcCartBonusPoints(items);
 
   if (items.length === 0) {
     return (
@@ -73,6 +75,13 @@ export default function CartScreen() {
               <Text style={styles.totalLabel}>{t.total}</Text>
               <Text style={styles.totalValue}>{formatPrice(total, language)}</Text>
             </View>
+            {totalBonusPoints > 0 && (
+              <View style={[styles.bonusSummary, { borderColor: '#FFD70040', backgroundColor: '#FFD70010' }]}>
+                <Text style={styles.bonusSummaryText}>
+                  {((t as any).loyaltyPointsEarnedOnOrder ?? 'You will earn {{n}} bonus points').replace('{{n}}', totalBonusPoints.toLocaleString())}
+                </Text>
+              </View>
+            )}
           </View>
         }
         renderItem={({ item }) => (
@@ -134,6 +143,13 @@ function CartItemCard({
           <Text style={styles.cardCategory}>
             {item.product.category.toUpperCase()}
           </Text>
+        )}
+        {hasBonusPoints(item.product) && (
+          <View style={styles.itemBonusBadge}>
+            <Text style={styles.itemBonusBadgeText}>
+              {'+ ' + (getProductBonusPoints(item.product) * item.quantity).toLocaleString() + ' pts'}
+            </Text>
+          </View>
         )}
         <View style={styles.cardBottomRow}>
           <QuantitySelector
@@ -334,6 +350,37 @@ const styles = StyleSheet.create({
     color: Colors.neonBlue,
     fontSize: FontSize.xl + 4,
     fontWeight: '900',
+  },
+  bonusSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  bonusSummaryText: {
+    color: '#FFD700',
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    flex: 1,
+  },
+  itemBonusBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFD70015',
+    borderWidth: 1,
+    borderColor: '#FFD70040',
+    borderRadius: Radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+  },
+  itemBonusBadgeText: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: '700',
   },
   footer: {
     padding: Spacing.md,

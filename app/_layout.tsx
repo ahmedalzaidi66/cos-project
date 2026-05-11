@@ -13,6 +13,7 @@ import { WishlistProvider } from '@/context/WishlistContext';
 import { WishlistToastProvider } from '@/context/WishlistToastContext';
 import { ThemeProvider, useThemeMode } from '@/context/ThemeContext';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { LoyaltyProvider } from '@/context/LoyaltyContext';
 import BeautyChat, { ChatFloatingButton } from '@/components/BeautyChat';
 
 function AppShell() {
@@ -51,9 +52,11 @@ export default function RootLayout() {
           <WishlistProvider>
             <WishlistToastProvider>
               <NotificationProvider>
+              <LoyaltyProvider>
               <AdminProvider>
                 <AppShell />
               </AdminProvider>
+              </LoyaltyProvider>
               </NotificationProvider>
             </WishlistToastProvider>
           </WishlistProvider>

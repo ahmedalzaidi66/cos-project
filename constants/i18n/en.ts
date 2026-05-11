@@ -121,6 +121,27 @@ export default {
   orderTrackingNumber: 'Tracking Number',
   orderTimeline: 'Order Timeline',
 
+  // Loyalty & Bonus Points
+  loyaltyPoints: 'Loyalty Points',
+  loyaltyBalance: 'Points Balance',
+  loyaltyTier: 'Tier',
+  loyaltyTierBronze: 'Bronze',
+  loyaltyTierSilver: 'Silver',
+  loyaltyTierGold: 'Gold',
+  loyaltyTierPlatinum: 'Platinum',
+  loyaltyEarnBadge: 'Earn {{n}} pts',
+  loyaltyEarnPercentBadge: '+{{n}}% Bonus',
+  loyaltyPointsEarnedOnOrder: 'You will earn {{n}} bonus points',
+  loyaltyPointsBalance: '{{n}} points',
+  loyaltyNoPoints: 'No points yet',
+  loyaltyPointsHistory: 'Points History',
+  loyaltyBonusEnabled: 'Enable Bonus Points',
+  loyaltyBonusPoints: 'Fixed Bonus Points',
+  loyaltyBonusPercentage: 'Bonus Percentage (%)',
+  loyaltyBonusMode: 'Bonus Mode',
+  loyaltyBonusModeFixed: 'Fixed Points',
+  loyaltyBonusModePercent: 'Percentage',
+
   // Skincare Section
   canopyAdvisor: 'Skincare',
   canopySubtitle: 'Our premium skincare collection is coming soon. Stay tuned for personalized recommendations.',

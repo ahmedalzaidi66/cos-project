@@ -121,6 +121,27 @@ export default {
   orderTrackingNumber: 'رقم التتبع',
   orderTimeline: 'مسار الطلب',
 
+  // نقاط الولاء والمكافآت
+  loyaltyPoints: 'نقاط الولاء',
+  loyaltyBalance: 'رصيد النقاط',
+  loyaltyTier: 'المستوى',
+  loyaltyTierBronze: 'برونزي',
+  loyaltyTierSilver: 'فضي',
+  loyaltyTierGold: 'ذهبي',
+  loyaltyTierPlatinum: 'بلاتيني',
+  loyaltyEarnBadge: 'اكسبي {{n}} نقطة',
+  loyaltyEarnPercentBadge: '+{{n}}% مكافأة',
+  loyaltyPointsEarnedOnOrder: 'ستكسبين {{n}} نقطة مكافأة',
+  loyaltyPointsBalance: '{{n}} نقطة',
+  loyaltyNoPoints: 'لا توجد نقاط بعد',
+  loyaltyPointsHistory: 'سجل النقاط',
+  loyaltyBonusEnabled: 'تفعيل نقاط المكافأة',
+  loyaltyBonusPoints: 'نقاط المكافأة الثابتة',
+  loyaltyBonusPercentage: 'نسبة المكافأة (%)',
+  loyaltyBonusMode: 'نوع المكافأة',
+  loyaltyBonusModeFixed: 'نقاط ثابتة',
+  loyaltyBonusModePercent: 'نسبة مئوية',
+
   // Canopy
   canopyAdvisor: 'العناية بالبشرة',
   canopySubtitle: 'مجموعتنا الفاخرة للعناية بالبشرة قادمة قريباً. ترقبي التوصيات المخصصة.',

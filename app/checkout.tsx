@@ -22,6 +22,7 @@ import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { sendOrderConfirmation, sendOrderAdminNotification } from '@/lib/email';
+import { calcCartBonusPoints } from '@/lib/loyalty';
 
 const WHATSAPP_NUMBER = '9647XXXXXXXX';
 
@@ -187,6 +188,7 @@ export default function CheckoutScreen() {
     shippingState.status === 'paid' ? shippingState.fee : 0;
 
   const total = subtotal + shippingFee;
+  const totalBonusPoints = calcCartBonusPoints(items);
 
   const setField = (key: keyof FormData, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -496,6 +498,16 @@ export default function CheckoutScreen() {
             <Text style={[styles.totalLabel, { color: C.textPrimary }]}>{t.total}</Text>
             <Text style={styles.totalValue}>{formatPrice(total, language)}</Text>
           </View>
+          {totalBonusPoints > 0 && (
+            <View style={styles.checkoutBonusBanner}>
+              <Text style={styles.checkoutBonusBannerText}>
+                {((t as any).loyaltyPointsEarnedOnOrder ?? 'You will earn {{n}} bonus points').replace(
+                  '{{n}}',
+                  totalBonusPoints.toLocaleString()
+                )}
+              </Text>
+            </View>
+          )}
         </View>
 
         <GlossyButton
@@ -1091,6 +1103,24 @@ const styles = StyleSheet.create({
     color: Colors.neonBlue,
     fontSize: FontSize.xl,
     fontWeight: '900',
+  },
+  checkoutBonusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFD70012',
+    borderWidth: 1,
+    borderColor: '#FFD70040',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  checkoutBonusBannerText: {
+    color: '#FFD700',
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    flex: 1,
   },
   successContainer: {
     flex: 1,
