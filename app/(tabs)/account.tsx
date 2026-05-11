@@ -11,7 +11,7 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake, Palette } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake, Palette, Coins, TrendingUp, History, ChevronDown } from 'lucide-react-native';
 import { Music2 } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
@@ -29,6 +29,8 @@ import { formatPrice } from '@/lib/currency';
 import ThemeSelector from '@/components/ThemeSelector';
 import { ListItemSkeleton } from '@/components/Skeleton';
 import OrderTimeline from '@/components/OrderTimeline';
+import { useLoyalty } from '@/context/LoyaltyContext';
+import { TIER_COLORS } from '@/lib/loyalty';
 
 export default function AccountScreen() {
   const { isAuthenticated, user } = useAuth();
@@ -1324,7 +1326,9 @@ function ProfileView() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [pwModalOpen, setPwModalOpen] = useState(false);
   const [ordersExpanded, setOrdersExpanded] = useState(false);
+  const [walletExpanded, setWalletExpanded] = useState(false);
   const ordersChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const loyalty = useLoyalty();
 
   const isPhoneUser = user?.isPhoneUser ?? false;
   const profileIncomplete = isPhoneUser && (!user?.firstName || !user?.lastName);
@@ -1497,6 +1501,12 @@ function ProfileView() {
             label={t.paymentLabel}
             onPress={() => {}}
           />
+          <QuickTile
+            icon={<Coins size={18} color={Colors.gold} strokeWidth={1.8} />}
+            label={(t as any).wallet ?? 'Wallet'}
+            badge={loyalty.totalPoints > 0 ? String(loyalty.totalPoints) : undefined}
+            onPress={() => setWalletExpanded(v => !v)}
+          />
         </View>
 
         {/* ── Orders (expandable) ── */}
@@ -1529,6 +1539,9 @@ function ProfileView() {
             )}
           </View>
         )}
+
+        {/* ── Wallet (expandable) ── */}
+        {walletExpanded && <WalletSection loyalty={loyalty} />}
 
         {/* ── Settings list ── */}
         <View style={[styles.menuCard, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
@@ -1639,6 +1652,126 @@ function MenuRow({
     <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
       {inner}
     </TouchableOpacity>
+  );
+}
+
+// ─── Wallet section ──────────────────────────────────────────────────────────
+
+function WalletSection({ loyalty }: { loyalty: ReturnType<typeof useLoyalty> }) {
+  const { t, language, isRTL } = useLanguage();
+  const C = useAppColors();
+  const tierColor = loyalty.tierColor;
+  const tierLabel = (t as any)[`loyaltyTier${loyalty.tier.charAt(0).toUpperCase() + loyalty.tier.slice(1)}`] ?? loyalty.tier;
+
+  const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum'] as const;
+  const currentIdx = TIER_ORDER.indexOf(loyalty.tier as any);
+  const nextTier = TIER_ORDER[currentIdx + 1] ?? null;
+  const NEXT_THRESHOLDS: Record<string, number> = { silver: 2000, gold: 5000, platinum: 15000 };
+  const nextThreshold = nextTier ? NEXT_THRESHOLDS[nextTier] : null;
+  const progressPct = nextThreshold
+    ? Math.min(100, Math.round((loyalty.lifetimePoints / nextThreshold) * 100))
+    : 100;
+
+  const txLabel = (type: string) => {
+    const map: Record<string, string> = {
+      earn:   (t as any).walletTransactionEarn ?? 'Earned',
+      redeem: (t as any).walletTransactionRedeem ?? 'Redeemed',
+      adjust: (t as any).walletTransactionAdjust ?? 'Adjusted',
+      expire: (t as any).walletTransactionExpire ?? 'Expired',
+    };
+    return map[type] ?? type;
+  };
+
+  return (
+    <View style={[styles.section, { gap: 10 }]}>
+      <Text style={[styles.sectionTitle, { color: C.textSecondary }]}>{(t as any).wallet ?? 'Rewards Wallet'}</Text>
+
+      {/* Stats cards row */}
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={[walletStyles.statCard, { backgroundColor: C.backgroundCard, borderColor: C.border, flex: 1 }]}>
+          <Coins size={16} color={Colors.gold} strokeWidth={1.8} />
+          <Text style={[walletStyles.statValue, { color: Colors.gold }]}>{loyalty.totalPoints.toLocaleString()}</Text>
+          <Text style={[walletStyles.statLabel, { color: C.textMuted }]}>{(t as any).walletBalance ?? 'Available'}</Text>
+        </View>
+        <View style={[walletStyles.statCard, { backgroundColor: C.backgroundCard, borderColor: C.border, flex: 1 }]}>
+          <TrendingUp size={16} color={Colors.neonBlue} strokeWidth={1.8} />
+          <Text style={[walletStyles.statValue, { color: Colors.neonBlue }]}>{loyalty.lifetimePoints.toLocaleString()}</Text>
+          <Text style={[walletStyles.statLabel, { color: C.textMuted }]}>{(t as any).walletLifetime ?? 'Lifetime'}</Text>
+        </View>
+        <View style={[walletStyles.statCard, { backgroundColor: C.backgroundCard, borderColor: C.border, flex: 1 }]}>
+          <View style={[walletStyles.tierBadge, { backgroundColor: tierColor + '20', borderColor: tierColor + '50' }]}>
+            <Text style={[walletStyles.tierLabel, { color: tierColor }]}>{tierLabel}</Text>
+          </View>
+          <Text style={[walletStyles.statLabel, { color: C.textMuted }]}>{(t as any).loyaltyTier ?? 'Tier'}</Text>
+        </View>
+      </View>
+
+      {/* Tier progress bar */}
+      {nextTier && (
+        <View style={[walletStyles.progressWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+            <Text style={[walletStyles.progressLabel, { color: C.textMuted }]}>
+              {((t as any).walletTierProgress ?? 'Progress to {{tier}}').replace('{{tier}}', (t as any)[`loyaltyTier${nextTier.charAt(0).toUpperCase() + nextTier.slice(1)}`] ?? nextTier)}
+            </Text>
+            <Text style={[walletStyles.progressLabel, { color: Colors.gold }]}>{progressPct}%</Text>
+          </View>
+          <View style={[walletStyles.progressTrack, { backgroundColor: C.backgroundSecondary }]}>
+            <View style={[walletStyles.progressFill, { width: `${progressPct}%` as any, backgroundColor: tierColor }]} />
+          </View>
+          <Text style={[walletStyles.progressSubtitle, { color: C.textMuted }]}>
+            {((t as any).walletNextTier ?? 'Next tier at {{n}} lifetime pts').replace('{{n}}', nextThreshold!.toLocaleString())}
+          </Text>
+        </View>
+      )}
+      {!nextTier && (
+        <View style={[walletStyles.progressWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+          <Text style={[walletStyles.progressLabel, { color: Colors.gold }]}>{(t as any).walletAtTopTier ?? "You've reached the highest tier!"}</Text>
+        </View>
+      )}
+
+      {/* Transaction history */}
+      <View style={[walletStyles.historyWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+          <History size={14} color={C.textSecondary} strokeWidth={2} />
+          <Text style={[walletStyles.historyTitle, { color: C.textSecondary }]}>{(t as any).walletHistory ?? 'Points History'}</Text>
+        </View>
+        {loyalty.loading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+            <Text style={[walletStyles.emptyText, { color: C.textMuted }]}>{t.loading}</Text>
+          </View>
+        ) : loyalty.transactions.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 20, gap: 6 }}>
+            <Coins size={28} color={C.textMuted} strokeWidth={1.5} />
+            <Text style={[walletStyles.emptyText, { color: C.textMuted }]}>{(t as any).walletEmpty ?? 'No points activity yet'}</Text>
+            <Text style={[walletStyles.emptySubText, { color: C.textMuted }]}>{(t as any).walletEmptySub ?? 'Complete orders to earn points'}</Text>
+          </View>
+        ) : (
+          loyalty.transactions.slice(0, 20).map(tx => {
+            const isEarn = tx.type === 'earn' || (tx.type === 'adjust' && tx.points > 0);
+            const isRedeem = tx.type === 'redeem' || (tx.type === 'adjust' && tx.points < 0);
+            const ptColor = isEarn ? Colors.success : isRedeem ? Colors.error : C.textSecondary;
+            const ptPrefix = tx.points > 0 ? '+' : '';
+            const txDate = new Date(tx.created_at).toLocaleDateString(
+              language === 'ar' ? 'ar-EG' : 'en-US',
+              { month: 'short', day: 'numeric', year: 'numeric' }
+            );
+            return (
+              <View key={tx.id} style={[walletStyles.txRow, { borderTopColor: C.borderLight }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[walletStyles.txType, { color: C.textPrimary }]}>{txLabel(tx.type)}</Text>
+                  {tx.note ? <Text style={[walletStyles.txNote, { color: C.textMuted }]} numberOfLines={1}>{tx.note}</Text> : null}
+                  <Text style={[walletStyles.txDate, { color: C.textMuted }]}>{txDate}</Text>
+                </View>
+                <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
+                  <Text style={[walletStyles.txPoints, { color: ptColor }]}>{ptPrefix}{tx.points} pts</Text>
+                  <Text style={[walletStyles.txBalance, { color: C.textMuted }]}>{tx.balance_after.toLocaleString()} pts</Text>
+                </View>
+              </View>
+            );
+          })
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -2280,6 +2413,114 @@ const bannerStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     lineHeight: 18,
+  },
+});
+
+// ─── Wallet styles ────────────────────────────────────────────────────────────
+
+const walletStyles = StyleSheet.create({
+  statCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: Spacing.sm,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: FontSize.md,
+    fontWeight: '800',
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  tierBadge: {
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  tierLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  progressWrap: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: Spacing.md,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  progressFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  progressSubtitle: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  historyWrap: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: Spacing.md,
+  },
+  historyTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  txRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+  },
+  txType: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+  txNote: {
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 1,
+  },
+  txDate: {
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 1,
+  },
+  txPoints: {
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+  },
+  txBalance: {
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 1,
+  },
+  emptyText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: 11,
+    fontWeight: '400',
+    textAlign: 'center',
   },
 });
 

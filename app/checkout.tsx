@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CreditCard, Smartphone, Globe, Banknote, CircleCheck as CheckCircle, ArrowLeft, MapPin, User, Phone, Mail, Truck, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { CreditCard, Smartphone, Globe, Banknote, CircleCheck as CheckCircle, ArrowLeft, MapPin, User, Phone, Mail, Truck, CircleAlert as AlertCircle, Coins, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
@@ -23,6 +23,7 @@ import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { sendOrderConfirmation, sendOrderAdminNotification } from '@/lib/email';
 import { calcCartBonusPoints } from '@/lib/loyalty';
+import { useLoyalty } from '@/context/LoyaltyContext';
 
 const WHATSAPP_NUMBER = '9647XXXXXXXX';
 
@@ -131,6 +132,27 @@ export default function CheckoutScreen() {
     { id: 'apple',  label: t.applePay,             sublabel: null,                          icon: Smartphone },
   ] as const;
 
+  const loyalty = useLoyalty();
+  const [loyaltySettings, setLoyaltySettings] = useState<{
+    redeeming_enabled: boolean;
+    iqd_per_point: number;
+    min_points_to_redeem: number;
+    max_redeem_percent: number;
+  } | null>(null);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeemOpen, setRedeemOpen] = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from('loyalty_settings')
+      .select('redeeming_enabled, iqd_per_point, min_points_to_redeem, max_redeem_percent')
+      .eq('id', 1)
+      .maybeSingle()
+      .then(({ data }) => setLoyaltySettings(data));
+  }, []);
+
+  const pointsDiscount = pointsToRedeem * (loyaltySettings?.iqd_per_point ?? 1);
   const [form, setForm] = useState<FormData>({
     firstName:     user?.firstName ?? '',
     lastName:      user?.lastName ?? '',
@@ -187,7 +209,7 @@ export default function CheckoutScreen() {
     shippingState.status === 'free' ? 0 :
     shippingState.status === 'paid' ? shippingState.fee : 0;
 
-  const total = subtotal + shippingFee;
+  const total = Math.max(0, subtotal + shippingFee - pointsDiscount);
   const totalBonusPoints = calcCartBonusPoints(items);
 
   const setField = (key: keyof FormData, value: string) => {
@@ -239,6 +261,7 @@ export default function CheckoutScreen() {
           subtotal,
           shipping:            shippingFee,
           total,
+          points_redeemed:     pointsToRedeem,
           status:              'new',
         })
         .select()
@@ -266,6 +289,24 @@ export default function CheckoutScreen() {
       if (itemsError) {
         setErrors({ email: 'Failed to save order items. Please try again.' });
         return;
+      }
+
+      // Deduct redeemed points from customer balance
+      if (pointsToRedeem > 0 && user?.id) {
+        const newBalance = Math.max(0, loyalty.totalPoints - pointsToRedeem);
+        await supabase.from('customer_loyalty').update({
+          total_points: newBalance,
+          updated_at: new Date().toISOString(),
+        }).eq('user_id', user.id);
+        await supabase.from('loyalty_transactions').insert({
+          user_id:      user.id,
+          order_id:     order.id,
+          type:         'redeem',
+          points:       -pointsToRedeem,
+          balance_after: newBalance,
+          note:         `Redeemed for order #${order.id.slice(0, 8).toUpperCase()}`,
+        });
+        loyalty.refresh();
       }
 
       const shortId = order.id.slice(0, 8).toUpperCase();
@@ -494,6 +535,85 @@ export default function CheckoutScreen() {
                formatPrice(shippingState.fee, language)}
             </Text>
           </View>
+          {/* Points Redemption */}
+          {loyalty.totalPoints >= (loyaltySettings?.min_points_to_redeem ?? 100) && loyaltySettings?.redeeming_enabled && (
+            <View style={styles.redeemSection}>
+              {!redeemOpen ? (
+                <TouchableOpacity
+                  style={styles.redeemOpenBtn}
+                  onPress={() => setRedeemOpen(true)}
+                  activeOpacity={0.8}
+                >
+                  <Coins size={14} color={Colors.gold} strokeWidth={2} />
+                  <Text style={styles.redeemOpenBtnText}>
+                    {((t as any).applyPoints ?? 'Apply Points')} — {loyalty.totalPoints.toLocaleString()} {(t as any).loyaltyPoints ?? 'pts'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.redeemBox}>
+                  <View style={styles.redeemHeader}>
+                    <Coins size={14} color={Colors.gold} strokeWidth={2} />
+                    <Text style={styles.redeemTitle}>{(t as any).usePoints ?? 'Use Points'}</Text>
+                    <TouchableOpacity onPress={() => { setRedeemOpen(false); setPointsToRedeem(0); setRedeemInput(''); }} style={{ marginLeft: 'auto' }}>
+                      <X size={14} color={Colors.textMuted} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.redeemAvail}>
+                    {((t as any).availablePoints ?? 'Available: {{n}} pts').replace('{{n}}', loyalty.totalPoints.toLocaleString())}
+                  </Text>
+                  <Text style={styles.redeemRate}>
+                    {((t as any).pointsValue ?? '{{n}} pts = {{amount}}')
+                      .replace('{{n}}', '1')
+                      .replace('{{amount}}', formatPrice(loyaltySettings?.iqd_per_point ?? 1, language))}
+                  </Text>
+                  {loyaltySettings?.max_redeem_percent > 0 && (
+                    <Text style={styles.redeemMaxNote}>
+                      {((t as any).maxRedeemNote ?? 'Max {{pct}}% of order total').replace('{{pct}}', String(loyaltySettings.max_redeem_percent))}
+                    </Text>
+                  )}
+                  <View style={styles.redeemInputRow}>
+                    <Coins size={13} color={Colors.gold} />
+                    <TextInput
+                      style={styles.redeemInput}
+                      value={redeemInput}
+                      onChangeText={(v) => {
+                        const digits = v.replace(/\D/g, '');
+                        setRedeemInput(digits);
+                        const parsed = parseInt(digits, 10) || 0;
+                        const maxByBalance = loyalty.totalPoints;
+                        const maxByPct = loyaltySettings.max_redeem_percent > 0
+                          ? Math.floor((subtotal + shippingFee) * loyaltySettings.max_redeem_percent / 100 / (loyaltySettings.iqd_per_point ?? 1))
+                          : Infinity;
+                        const capped = Math.min(parsed, maxByBalance, maxByPct);
+                        setPointsToRedeem(capped);
+                      }}
+                      placeholder="0"
+                      placeholderTextColor={Colors.textMuted}
+                      keyboardType="number-pad"
+                    />
+                    <Text style={styles.redeemPtsLabel}>{(t as any).loyaltyPoints ?? 'pts'}</Text>
+                  </View>
+                  {pointsToRedeem > 0 && (
+                    <View style={styles.redeemSummary}>
+                      <Text style={styles.redeemSummaryText}>
+                        {((t as any).pointsUsed ?? '{{n}} pts used').replace('{{n}}', pointsToRedeem.toLocaleString())}
+                        {'  '}={'  '}{formatPrice(pointsDiscount, language)} off
+                      </Text>
+                      <Text style={styles.redeemRemainingText}>
+                        {((t as any).pointsRemaining ?? '{{n}} pts remaining').replace('{{n}}', (loyalty.totalPoints - pointsToRedeem).toLocaleString())}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+          {pointsToRedeem > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: Colors.gold }]}>{(t as any).pointsDiscount ?? 'Points Discount'}</Text>
+              <Text style={[styles.summaryValue, { color: Colors.gold }]}>-{formatPrice(pointsDiscount, language)}</Text>
+            </View>
+          )}
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={[styles.totalLabel, { color: C.textPrimary }]}>{t.total}</Text>
             <Text style={styles.totalValue}>{formatPrice(total, language)}</Text>
@@ -1121,6 +1241,103 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '700',
     flex: 1,
+  },
+  redeemSection: {
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  redeemOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFD70010',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#FFD70035',
+  },
+  redeemOpenBtnText: {
+    color: Colors.gold,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    flex: 1,
+  },
+  redeemBox: {
+    backgroundColor: '#FFD70008',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#FFD70035',
+    padding: Spacing.sm,
+    gap: 6,
+  },
+  redeemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  redeemTitle: {
+    color: Colors.gold,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+  },
+  redeemAvail: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  redeemRate: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  redeemMaxNote: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '400',
+    fontStyle: 'italic',
+  },
+  redeemInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#FFD70050',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  redeemInput: {
+    flex: 1,
+    color: Colors.gold,
+    fontSize: FontSize.md,
+    fontWeight: '700',
+    padding: 0,
+  },
+  redeemPtsLabel: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  redeemSummary: {
+    backgroundColor: '#4ade8010',
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: '#4ade8030',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 2,
+  },
+  redeemSummaryText: {
+    color: '#4ade80',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  redeemRemainingText: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    fontWeight: '500',
   },
   successContainer: {
     flex: 1,

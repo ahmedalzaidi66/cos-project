@@ -31,6 +31,7 @@ export default function AdminLayout() {
       <Stack.Screen name="notifications" />
       <Stack.Screen name="sections" />
       <Stack.Screen name="analytics" />
+      <Stack.Screen name="loyalty" />
     </Stack>
   );
 }
