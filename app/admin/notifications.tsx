@@ -10,6 +10,8 @@ import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
 import Toast from '@/components/admin/Toast';
 import { adminSupabase, supabase } from '@/lib/supabase';
+import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import {
   adminSendNotification,
   type NotificationType,
@@ -62,6 +64,8 @@ function NotificationsContent() {
   const [customerSearch, setCustomerSearch] = useState('');
 
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const { admin } = useAdmin();
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -146,9 +150,12 @@ function NotificationsContent() {
   };
 
   const handleDelete = async (id: string) => {
+    const notif = history.find(n => n.id === id);
     await adminSupabase().from('notifications').delete().eq('id', id);
     setHistory(prev => prev.filter(n => n.id !== id));
-    showToast('Deleted');
+    setConfirmDeleteId(null);
+    showToast('Notification deleted');
+    logAdminAction({ action: 'delete', entityType: 'notification', entityId: id, entityLabel: notif?.title, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const filteredCustomers = customers.filter(c => {
@@ -330,7 +337,7 @@ function NotificationsContent() {
                 </View>
               </View>
               <TouchableOpacity
-                onPress={() => handleDelete(n.id)}
+                onPress={() => setConfirmDeleteId(n.id)}
                 style={styles.deleteBtn}
                 activeOpacity={0.7}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -388,6 +395,42 @@ function NotificationsContent() {
                   ? <ActivityIndicator size="small" color="#fff" />
                   : <><Send size={15} color="#fff" strokeWidth={2.5} /><Text style={styles.sendBtnText}>SEND NOW</Text></>}
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Delete Confirm Modal ── */}
+      <Modal visible={!!confirmDeleteId} transparent animationType="fade" onRequestClose={() => setConfirmDeleteId(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.previewModal, { maxWidth: 360 }]}>
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewTitle}>Delete Notification?</Text>
+              <TouchableOpacity onPress={() => setConfirmDeleteId(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={18} color={Colors.textMuted} strokeWidth={2} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: Spacing.lg }}>
+              <Text style={{ color: Colors.textMuted, fontSize: FontSize.sm, marginBottom: Spacing.lg }}>
+                {history.find(n => n.id === confirmDeleteId)?.title ?? ''}
+              </Text>
+              <Text style={{ color: Colors.warning, fontSize: FontSize.xs, marginBottom: Spacing.lg }}>
+                This notification record will be permanently removed.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                <TouchableOpacity
+                  style={{ flex: 1, height: 44, borderRadius: Radius.md, backgroundColor: Colors.backgroundSecondary, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => setConfirmDeleteId(null)}
+                >
+                  <Text style={{ color: Colors.textSecondary, fontWeight: '600', fontSize: FontSize.sm }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, height: 44, borderRadius: Radius.md, backgroundColor: Colors.error, justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => confirmDeleteId && handleDelete(confirmDeleteId)}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: FontSize.sm }}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>

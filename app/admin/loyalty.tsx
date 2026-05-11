@@ -248,6 +248,16 @@ function LoyaltyContent() {
       setAdjustMsg((t as any).adjustFailed ?? 'Failed to adjust points');
     } else {
       setAdjustMsg((t as any).adjustSuccess ?? 'Points adjusted');
+      logAdminAction({
+        action: 'update',
+        entityType: 'loyalty',
+        entityId: adjustMember.id,
+        entityLabel: adjustMember.email,
+        beforeData: { total_points: adjustMember.total_points, tier: adjustMember.tier } as any,
+        afterData: { total_points: newTotal, tier: newTier, delta, note: adjustNote.trim() || 'Admin adjustment' } as any,
+        adminUserId: admin?.id ?? '',
+        adminEmail: admin?.email ?? '',
+      });
       fetchData();
       setTimeout(() => {
         setAdjustMember(null);

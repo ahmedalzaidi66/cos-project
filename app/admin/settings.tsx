@@ -76,6 +76,7 @@ function TryOnModelSection({
   onSaved: (url: string) => void;
 }) {
   const { guard: guardAction } = useActionPermission('manage_settings');
+  const { admin } = useAdmin();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [preview, setPreview]   = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -196,6 +197,7 @@ function TryOnModelSection({
       onSaved('');
       setPreview(null);
       setStatus('ok');
+      logAdminAction({ action: 'delete', entityType: 'settings', entityLabel: 'Virtual Try-On Model Image', metadata: { setting: TRYON_SETTING_KEY }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
       setTimeout(() => setStatus('idle'), 2500);
     } catch (err: any) {
       console.error('[TryOn] handleReset error:', err);

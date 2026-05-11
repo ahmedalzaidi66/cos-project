@@ -26,6 +26,7 @@ import {
   Search,
 } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
@@ -89,6 +90,7 @@ export default function AdminSectionsPage() {
 
 function SectionsContent() {
   const { language } = useLanguage();
+  const { admin } = useAdmin();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [sections, setSections] = useState<Section[]>([]);
@@ -178,6 +180,7 @@ function SectionsContent() {
         .eq('type', 'section_row')
         .filter('content->>section_id', 'eq', editingSection.id);
       showToast('تم حفظ التعديلات');
+      logAdminAction({ action: 'update', entityType: 'content', entityId: editingSection.id, entityLabel: form.title_en || form.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     } else {
       const nextOrder = sections.length > 0 ? Math.max(...sections.map(s => s.sort_order)) + 1 : 1;
       const { data: newSection, error } = await db
@@ -208,6 +211,7 @@ function SectionsContent() {
         });
       }
       showToast('تم إنشاء القسم');
+    logAdminAction({ action: 'create', entityType: 'content', entityLabel: form.title_en || form.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     }
 
     setModalVisible(false);
@@ -216,6 +220,7 @@ function SectionsContent() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    const section = sections.find(s => s.id === deleteId);
     const db = adminSupabase();
     // Remove corresponding page_blocks entry first
     await db
@@ -227,6 +232,7 @@ function SectionsContent() {
     setDeleteId(null);
     if (error) { showToast('فشل الحذف: ' + error.message, 'error'); return; }
     showToast('تم حذف القسم');
+    logAdminAction({ action: 'delete', entityType: 'content', entityId: deleteId, entityLabel: section?.title_en || section?.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     fetchSections();
   };
 

@@ -14,6 +14,7 @@ import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useRouter } from 'expo-router';
 import { Plus, Pencil, Trash2, Search, X, Truck, MapPin, Globe } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { logAdminAction } from '@/lib/auditLog';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
@@ -58,7 +59,7 @@ function isWildcard(val: string): boolean {
 }
 
 function ShippingScreen() {
-  const { isAdminAuthenticated } = useAdmin();
+  const { isAdminAuthenticated, admin } = useAdmin();
   const { isMobile } = useAdminLayout();
   const router = useRouter();
 
@@ -169,15 +170,18 @@ function ShippingScreen() {
 
     setModalVisible(false);
     showToast(editingRule ? 'تم تحديث قاعدة الشحن' : 'تمت إضافة قاعدة الشحن');
+    logAdminAction({ action: editingRule ? 'update' : 'create', entityType: 'shipping', entityId: editingRule?.id, entityLabel: [payload.country, payload.governorate, payload.area].filter(Boolean).join(' / '), afterData: payload as any, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     fetchRules();
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    const rule = rules.find(r => r.id === deleteId);
     const { error } = await adminSupabase().from('shipping_rules').delete().eq('id', deleteId);
     setDeleteId(null);
     if (error) { showToast('فشل الحذف: ' + error.message, 'error'); return; }
     showToast('تم حذف القاعدة');
+    logAdminAction({ action: 'delete', entityType: 'shipping', entityId: deleteId, entityLabel: rule ? [rule.country, rule.governorate, rule.area].filter(Boolean).join(' / ') : deleteId, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
     fetchRules();
   };
 
