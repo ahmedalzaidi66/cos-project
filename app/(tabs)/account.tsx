@@ -11,11 +11,12 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake, Palette, Coins, TrendingUp, History, ChevronDown, Crown, Percent, Star, Zap } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake, Palette, Coins, TrendingUp, History, ChevronDown, Crown, Percent, Star, Zap, ShoppingCart, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { Music2 } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
-import { supabase, Order } from '@/lib/supabase';
+import { supabase, Order, Product } from '@/lib/supabase';
+import { useCart } from '@/context/CartContext';
 import { useNotifications } from '@/context/NotificationContext';
 import { useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -1338,7 +1339,7 @@ function ProfileView() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, customer_email, customer_first_name, customer_last_name, customer_phone, street, city, state, zip, country, payment_method, subtotal, shipping, total, status, created_at, updated_at, tracking_number, completed_at')
+        .select('id, customer_email, customer_first_name, customer_last_name, customer_phone, street, city, state, zip, country, payment_method, subtotal, shipping, total, status, created_at, updated_at, tracking_number, completed_at, cancelled_at, cancelled_by, cancel_reason, previous_status, original_order_id, reorder_count')
         .eq('customer_email', email)
         .order('created_at', { ascending: false });
       if (!error && data) setOrders(data);
@@ -1376,6 +1377,9 @@ function ProfileView() {
                     updated_at: updated.updated_at,
                     tracking_number: updated.tracking_number,
                     completed_at: updated.completed_at,
+                    cancelled_at: updated.cancelled_at,
+                    cancelled_by: updated.cancelled_by,
+                    cancel_reason: updated.cancel_reason,
                   }
                 : o
             )
@@ -1895,8 +1899,13 @@ function WalletSection({ loyalty }: { loyalty: ReturnType<typeof useLoyalty> }) 
 function OrderCard({ order }: { order: Order }) {
   const { language, t } = useLanguage();
   const C = useAppColors();
+  const router = useRouter();
+  const { addToCart } = useCart();
   const [expanded, setExpanded] = React.useState(false);
+  const [reordering, setReordering] = React.useState(false);
+  const [reorderToast, setReorderToast] = React.useState<{ added: number; skipped: number } | null>(null);
 
+  const isCancelled = order.status === 'cancelled';
   const sc = ORDER_STATUS_COLORS[order.status] ?? C.textMuted;
   const sl = ORDER_STATUS_LABELS[order.status] ?? (order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : '—');
 
@@ -1905,8 +1914,71 @@ function OrderCard({ order }: { order: Order }) {
     { year: 'numeric', month: 'short', day: 'numeric' }
   );
 
+  const cancelledDate = order.cancelled_at
+    ? new Date(order.cancelled_at).toLocaleDateString(
+        language === 'ar' ? 'ar-EG' : 'en-US',
+        { year: 'numeric', month: 'short', day: 'numeric' }
+      )
+    : null;
+
+  const handleReorder = async () => {
+    setReordering(true);
+    setReorderToast(null);
+    try {
+      const { data: items, error: itemsErr } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, shade_name, shade_hex, shade_image, shade_product_image')
+        .eq('order_id', order.id);
+
+      if (itemsErr || !items || items.length === 0) {
+        setReordering(false);
+        return;
+      }
+
+      const productIds = [...new Set(items.map((i: any) => i.product_id))];
+      const { data: products } = await supabase
+        .from('products')
+        .select('*')
+        .in('id', productIds)
+        .eq('status', 'active')
+        .eq('in_stock', true);
+
+      const productMap = new Map<string, Product>((products ?? []).map((p: Product) => [p.id, p]));
+
+      let added = 0;
+      let skipped = 0;
+
+      for (const item of items) {
+        const product = productMap.get(item.product_id);
+        if (!product) { skipped++; continue; }
+
+        const shade = item.shade_hex
+          ? {
+              id: item.shade_hex,
+              name: item.shade_name ?? '',
+              color_hex: item.shade_hex,
+              shade_image: item.shade_image ?? '',
+              product_image: item.shade_product_image ?? '',
+            }
+          : null;
+
+        addToCart(product, item.quantity ?? 1, shade);
+        added++;
+      }
+
+      setReorderToast({ added, skipped });
+      setTimeout(() => setReorderToast(null), 4000);
+
+      if (added > 0) {
+        setTimeout(() => router.push('/(tabs)/cart'), 800);
+      }
+    } finally {
+      setReordering(false);
+    }
+  };
+
   return (
-    <View style={[styles.orderCard, { backgroundColor: C.backgroundCard, borderColor: order.status === 'cancelled' ? Colors.error + '40' : C.border }]}>
+    <View style={[styles.orderCard, { backgroundColor: C.backgroundCard, borderColor: isCancelled ? Colors.error + '40' : C.border }]}>
       <TouchableOpacity
         onPress={() => setExpanded(v => !v)}
         activeOpacity={0.8}
@@ -1932,7 +2004,54 @@ function OrderCard({ order }: { order: Order }) {
         </View>
       </TouchableOpacity>
 
-      {expanded && (
+      {isCancelled && (
+        <View style={[orderCardStyles.cancelBanner, { borderTopColor: C.borderLight }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+            <AlertTriangle size={13} color={Colors.error} strokeWidth={2} style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[orderCardStyles.cancelLabel, { color: Colors.error }]}>
+                {(t as any).orderCancelReason ?? 'Cancellation Reason'}
+              </Text>
+              <Text style={[orderCardStyles.cancelText, { color: C.textSecondary }]}>
+                {order.cancel_reason ?? (t as any).orderNoCancelReason ?? 'No reason provided'}
+              </Text>
+              {cancelledDate && (
+                <Text style={[orderCardStyles.cancelDate, { color: C.textMuted }]}>
+                  {(t as any).orderCancelledOn ?? 'Cancelled on'}: {cancelledDate}
+                </Text>
+              )}
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={handleReorder}
+            disabled={reordering}
+            style={[orderCardStyles.reorderBtn, { borderColor: Colors.neonBlue, opacity: reordering ? 0.6 : 1 }]}
+            activeOpacity={0.75}
+          >
+            <ShoppingCart size={13} color={Colors.neonBlue} strokeWidth={2} />
+            <Text style={[orderCardStyles.reorderText, { color: Colors.neonBlue }]}>
+              {reordering ? '...' : ((t as any).reorder ?? 'Reorder')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {reorderToast && (
+        <View style={[orderCardStyles.reorderToast, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
+          <CheckCircle size={13} color={Colors.success} strokeWidth={2} />
+          <Text style={[orderCardStyles.reorderToastText, { color: C.textPrimary }]}>
+            {(t as any).reorderAdded ?? 'Items added to cart'}
+            {reorderToast.skipped > 0 && (
+              <Text style={{ color: Colors.warning }}>
+                {' · '}
+                {((t as any).reorderSkipped ?? '{{n}} item(s) unavailable').replace('{{n}}', String(reorderToast.skipped))}
+              </Text>
+            )}
+          </Text>
+        </View>
+      )}
+
+      {expanded && !isCancelled && (
         <View style={[styles.timelineWrap, { borderTopColor: C.borderLight }]}>
           <Text style={[styles.timelineTitle, { color: C.textSecondary }]}>
             {t.orderTimeline ?? 'Order Timeline'}
@@ -2769,6 +2888,59 @@ const walletStyles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '500',
     flex: 1,
+  },
+});
+
+// ─── Order Card Styles ────────────────────────────────────────────────────────
+
+const orderCardStyles = StyleSheet.create({
+  cancelBanner: {
+    borderTopWidth: 1,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    gap: 10,
+  },
+  cancelLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  cancelText: {
+    fontSize: FontSize.xs,
+    lineHeight: 16,
+  },
+  cancelDate: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  reorderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
+    alignSelf: 'flex-start',
+  },
+  reorderText: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+  },
+  reorderToast: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    padding: Spacing.xs,
+    marginTop: 4,
+  },
+  reorderToastText: {
+    fontSize: FontSize.xs,
+    flex: 1,
+    lineHeight: 16,
   },
 });
 

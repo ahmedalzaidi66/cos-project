@@ -177,7 +177,12 @@ export type Order = {
   state: string;
   zip: string;
   country: string;
+  governorate?: string;
+  area?: string;
+  notes?: string | null;
+  admin_notes?: string | null;
   payment_method: string;
+  payment_status?: string;
   subtotal: number;
   shipping: number;
   total: number;
@@ -186,6 +191,12 @@ export type Order = {
   updated_at?: string;
   tracking_number?: string | null;
   completed_at?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
+  previous_status?: string | null;
+  original_order_id?: string | null;
+  reorder_count?: number;
   points_earned?: number;
   points_redeemed?: number;
 };
@@ -198,6 +209,10 @@ export type OrderItem = {
   product_image: string;
   quantity: number;
   unit_price: number;
+  shade_name?: string;
+  shade_hex?: string;
+  shade_image?: string;
+  shade_product_image?: string;
   created_at: string;
 };
 

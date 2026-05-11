@@ -50,6 +50,12 @@ type Order = {
   updated_at?: string;
   tracking_number?: string | null;
   completed_at?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
+  previous_status?: string | null;
+  original_order_id?: string | null;
+  reorder_count?: number;
   delivery_address_text?: string;
   delivery_latitude?: number | null;
   delivery_longitude?: number | null;
@@ -144,6 +150,11 @@ function OrderDetailModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Cancel confirmation modal
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonError, setCancelReasonError] = useState('');
+
   useEffect(() => {
     if (!visible) return;
     setCurrentStatus(order.status);
@@ -152,6 +163,9 @@ function OrderDetailModal({
     setSuccessMsg('');
     setErrorMsg('');
     setCopied(false);
+    setCancelModalVisible(false);
+    setCancelReason('');
+    setCancelReasonError('');
     setLoadingItems(true);
     supabase
       .from('order_items')
@@ -187,23 +201,55 @@ function OrderDetailModal({
     }
   };
 
-  const handleUpdateStatus = async (newStatus: string) => {
+  // Opens the cancel confirmation modal instead of directly cancelling
+  const handleUpdateStatus = (newStatus: string) => {
     if (newStatus === currentStatus) return;
+    if (newStatus === 'cancelled') {
+      setCancelReason('');
+      setCancelReasonError('');
+      setCancelModalVisible(true);
+      return;
+    }
+    commitStatusUpdate(newStatus);
+  };
+
+  const handleConfirmCancel = () => {
+    if (!cancelReason.trim()) {
+      setCancelReasonError('يرجى إدخال سبب الإلغاء');
+      return;
+    }
+    setCancelModalVisible(false);
+    commitStatusUpdate('cancelled', cancelReason.trim());
+  };
+
+  const commitStatusUpdate = async (newStatus: string, reason?: string) => {
     setUpdatingStatus(true);
     setErrorMsg('');
     setSuccessMsg('');
 
+    const now = new Date().toISOString();
     const updateData: Record<string, unknown> = {
       status: newStatus,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
-    // Set completed_at when marking as delivered (use currentStatus, not stale order prop)
     if (newStatus === 'delivered') {
-      updateData.completed_at = new Date().toISOString();
+      updateData.completed_at = now;
     }
-    // Clear completed_at if moving away from delivered (e.g. back to shipped)
     if (newStatus !== 'delivered' && currentStatus === 'delivered') {
       updateData.completed_at = null;
+    }
+    if (newStatus === 'cancelled') {
+      updateData.cancelled_at = now;
+      updateData.cancelled_by = 'admin';
+      updateData.cancel_reason = reason ?? '';
+      updateData.previous_status = currentStatus;
+    }
+    // Clear cancel fields if un-cancelling
+    if (newStatus !== 'cancelled' && currentStatus === 'cancelled') {
+      updateData.cancelled_at = null;
+      updateData.cancelled_by = null;
+      updateData.cancel_reason = null;
+      updateData.previous_status = null;
     }
 
     const { error } = await adminSupabase()
@@ -425,11 +471,23 @@ function OrderDetailModal({
               </View>
             ) : null}
 
-            {/* Cancelled banner */}
+            {/* Cancelled banner with reason */}
             {currentStatus === 'cancelled' && (
               <View style={[modal.cancelBanner, { backgroundColor: Colors.error + '14', borderColor: Colors.error + '40' }]}>
                 <X size={13} color={Colors.error} strokeWidth={2.5} />
-                <Text style={[modal.cancelBannerText, { color: Colors.error }]}>تم إلغاء هذا الطلب</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[modal.cancelBannerText, { color: Colors.error }]}>تم إلغاء هذا الطلب</Text>
+                  {order.cancel_reason ? (
+                    <Text style={[modal.cancelBannerText, { color: Colors.error, fontWeight: '400', fontSize: FontSize.xs, marginTop: 2 }]}>
+                      السبب: {order.cancel_reason}
+                    </Text>
+                  ) : null}
+                  {order.cancelled_at ? (
+                    <Text style={[modal.cancelBannerText, { color: Colors.textMuted, fontWeight: '400', fontSize: FontSize.xs, marginTop: 1 }]}>
+                      {new Date(order.cancelled_at).toLocaleString('ar-EG')}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             )}
 
@@ -646,6 +704,66 @@ function OrderDetailModal({
           <View style={{ height: 32 }} />
         </ScrollView>
       </View>
+
+      {/* Cancel confirmation modal */}
+      <Modal
+        visible={cancelModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !updatingStatus && setCancelModalVisible(false)}
+      >
+        <View style={cancelModal.overlay}>
+          <View style={cancelModal.box}>
+            <View style={cancelModal.header}>
+              <AlertCircle size={20} color={Colors.error} strokeWidth={2} />
+              <Text style={cancelModal.title}>إلغاء الطلب</Text>
+              {!updatingStatus && (
+                <TouchableOpacity onPress={() => setCancelModalVisible(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={18} color={Colors.textMuted} strokeWidth={2} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={cancelModal.subtitle}>
+              هل أنت متأكد من إلغاء الطلب #{order.id.slice(0, 8).toUpperCase()}؟
+            </Text>
+            <Text style={cancelModal.label}>سبب الإلغاء *</Text>
+            <TextInput
+              style={[cancelModal.input, cancelReasonError ? cancelModal.inputError : null]}
+              value={cancelReason}
+              onChangeText={(v) => { setCancelReason(v); if (cancelReasonError) setCancelReasonError(''); }}
+              placeholder="أدخل سبب الإلغاء..."
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              numberOfLines={3}
+              autoFocus
+            />
+            {cancelReasonError ? (
+              <Text style={cancelModal.errorText}>{cancelReasonError}</Text>
+            ) : null}
+            <View style={cancelModal.actions}>
+              <TouchableOpacity
+                style={cancelModal.cancelBtn}
+                onPress={() => setCancelModalVisible(false)}
+                disabled={updatingStatus}
+                activeOpacity={0.8}
+              >
+                <Text style={cancelModal.cancelBtnText}>تراجع</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[cancelModal.confirmBtn, updatingStatus && { opacity: 0.6 }]}
+                onPress={handleConfirmCancel}
+                disabled={updatingStatus}
+                activeOpacity={0.8}
+              >
+                {updatingStatus
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={cancelModal.confirmBtnText}>تأكيد الإلغاء</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -678,7 +796,7 @@ function OrdersContent() {
     try {
       const { data, error } = await adminSupabase()
         .from('orders')
-        .select('id, customer_first_name, customer_last_name, customer_email, customer_phone, street, city, state, zip, country, governorate, area, notes, subtotal, shipping, total, status, payment_method, payment_status, created_at, updated_at, tracking_number, completed_at, delivery_address_text, delivery_latitude, delivery_longitude, delivery_location_link')
+        .select('id, customer_first_name, customer_last_name, customer_email, customer_phone, street, city, state, zip, country, governorate, area, notes, subtotal, shipping, total, status, payment_method, payment_status, created_at, updated_at, tracking_number, completed_at, cancelled_at, cancelled_by, cancel_reason, previous_status, original_order_id, reorder_count, delivery_address_text, delivery_latitude, delivery_longitude, delivery_location_link')
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       setOrders(data ?? []);
@@ -1342,6 +1460,102 @@ const modal = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+});
+
+// ── Cancel confirmation modal styles ─────────────────────────────────────────
+const cancelModal = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  box: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.error + '40',
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 420,
+    gap: Spacing.sm,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: 4,
+  },
+  title: {
+    flex: 1,
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.error,
+  },
+  subtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  label: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  input: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  inputError: {
+    borderColor: Colors.error,
+  },
+  errorText: {
+    fontSize: FontSize.xs,
+    color: Colors.error,
+    fontWeight: '600',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  confirmBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
 
