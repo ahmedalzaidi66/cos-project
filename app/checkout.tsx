@@ -22,7 +22,7 @@ import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import { sendOrderConfirmation, sendOrderAdminNotification } from '@/lib/email';
-import { calcCartBonusPoints } from '@/lib/loyalty';
+import { calcCartBonusPoints, TIER_COLORS } from '@/lib/loyalty';
 import { useLoyalty } from '@/context/LoyaltyContext';
 
 const WHATSAPP_NUMBER = '9647XXXXXXXX';
@@ -153,6 +153,13 @@ export default function CheckoutScreen() {
   }, []);
 
   const pointsDiscount = pointsToRedeem * (loyaltySettings?.iqd_per_point ?? 1);
+
+  // Tier benefit: flat discount percentage applied to subtotal
+  const tierBenefits = loyalty.tierBenefits;
+  const tierDiscountPct = tierBenefits?.discount_pct ?? 0;
+  const tierDiscount = tierDiscountPct > 0 ? Math.floor(subtotal * tierDiscountPct / 100) : 0;
+  // Tier benefit: free shipping override
+  const tierFreeShipping = tierBenefits?.free_shipping ?? false;
   const [form, setForm] = useState<FormData>({
     firstName:     user?.firstName ?? '',
     lastName:      user?.lastName ?? '',
@@ -206,10 +213,11 @@ export default function CheckoutScreen() {
   }, [form.country, form.governorate, form.area, subtotal, allRules]);
 
   const shippingFee: number =
+    tierFreeShipping ? 0 :
     shippingState.status === 'free' ? 0 :
     shippingState.status === 'paid' ? shippingState.fee : 0;
 
-  const total = Math.max(0, subtotal + shippingFee - pointsDiscount);
+  const total = Math.max(0, subtotal + shippingFee - tierDiscount - pointsDiscount);
   const totalBonusPoints = calcCartBonusPoints(items);
 
   const setField = (key: keyof FormData, value: string) => {
@@ -529,6 +537,28 @@ export default function CheckoutScreen() {
                formatPrice(shippingState.fee, language)}
             </Text>
           </View>
+          {/* Tier benefit: free shipping badge */}
+          {tierFreeShipping && user && (
+            <View style={styles.tierBenefitBadge}>
+              <Coins size={12} color={TIER_COLORS[loyalty.tier]} strokeWidth={2} />
+              <Text style={[styles.tierBenefitBadgeText, { color: TIER_COLORS[loyalty.tier] }]}>
+                {loyalty.tier.charAt(0).toUpperCase() + loyalty.tier.slice(1)} benefit: Free shipping applied
+              </Text>
+            </View>
+          )}
+
+          {/* Tier discount row */}
+          {tierDiscount > 0 && user && (
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: TIER_COLORS[loyalty.tier] }]}>
+                {loyalty.tier.charAt(0).toUpperCase() + loyalty.tier.slice(1)} Discount ({tierDiscountPct}%)
+              </Text>
+              <Text style={[styles.summaryValue, { color: TIER_COLORS[loyalty.tier] }]}>
+                -{formatPrice(tierDiscount, language)}
+              </Text>
+            </View>
+          )}
+
           {/* Points Redemption */}
           {loyalty.totalPoints >= (loyaltySettings?.min_points_to_redeem ?? 100) && loyaltySettings?.redeeming_enabled && (
             <View style={styles.redeemSection}>
@@ -1235,6 +1265,23 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '700',
     flex: 1,
+  },
+  tierBenefitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    backgroundColor: 'rgba(255,215,0,0.08)',
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.25)',
+    marginBottom: 2,
+  },
+  tierBenefitBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   redeemSection: {
     marginTop: 4,

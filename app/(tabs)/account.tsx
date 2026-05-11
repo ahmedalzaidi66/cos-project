@@ -30,7 +30,7 @@ import ThemeSelector from '@/components/ThemeSelector';
 import { ListItemSkeleton, WalletSkeleton } from '@/components/Skeleton';
 import OrderTimeline from '@/components/OrderTimeline';
 import { useLoyalty } from '@/context/LoyaltyContext';
-import { TIER_COLORS } from '@/lib/loyalty';
+import { TIER_COLORS, getTierBenefitLines } from '@/lib/loyalty';
 
 export default function AccountScreen() {
   const { isAuthenticated, user } = useAuth();
@@ -1655,6 +1655,53 @@ function MenuRow({
   );
 }
 
+// ─── Tier benefits card (shown inside wallet) ────────────────────────────────
+
+function TierBenefitsCard({
+  loyalty, C, tierColor, tierLabel,
+}: {
+  loyalty: ReturnType<typeof useLoyalty>;
+  C: any;
+  tierColor: string;
+  tierLabel: string;
+}) {
+  const benefits = loyalty.tierBenefits;
+  const lines = getTierBenefitLines(benefits);
+
+  return (
+    <View style={[walletStyles.benefitsWrap, { borderColor: tierColor + '40', backgroundColor: C.backgroundCard }]}>
+      {/* Header */}
+      <View style={[walletStyles.benefitsHeader, { backgroundColor: tierColor + '12' }]}>
+        <View style={[walletStyles.benefitsBadge, { backgroundColor: tierColor + '25', borderColor: tierColor + '50' }]}>
+          <Text style={[walletStyles.benefitsBadgeText, { color: tierColor }]}>{tierLabel}</Text>
+        </View>
+        <Text style={[walletStyles.benefitsTitle, { color: C.textSecondary }]}>Your Benefits</Text>
+      </View>
+
+      {/* Description */}
+      {benefits.description ? (
+        <Text style={[walletStyles.benefitsDesc, { color: C.textMuted }]}>{benefits.description}</Text>
+      ) : null}
+
+      {/* Perk lines */}
+      {lines.length === 0 ? (
+        <Text style={[walletStyles.benefitsEmpty, { color: C.textMuted }]}>
+          Earn points to unlock Silver, Gold & Platinum benefits.
+        </Text>
+      ) : (
+        <View style={[{ gap: 6 }, walletStyles.benefitsBodyPad]}>
+          {lines.map((line, i) => (
+            <View key={i} style={walletStyles.benefitsRow}>
+              <View style={[walletStyles.benefitsDot, { backgroundColor: tierColor }]} />
+              <Text style={[walletStyles.benefitsLine, { color: C.textPrimary }]}>{line}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ─── Wallet section ──────────────────────────────────────────────────────────
 
 function WalletSection({ loyalty }: { loyalty: ReturnType<typeof useLoyalty> }) {
@@ -1728,6 +1775,9 @@ function WalletSection({ loyalty }: { loyalty: ReturnType<typeof useLoyalty> }) 
           <Text style={[walletStyles.progressLabel, { color: Colors.gold }]}>{(t as any).walletAtTopTier ?? "You've reached the highest tier!"}</Text>
         </View>
       )}
+
+      {/* Current tier benefits */}
+      <TierBenefitsCard loyalty={loyalty} C={C} tierColor={tierColor} tierLabel={tierLabel} />
 
       {/* Transaction history */}
       <View style={[walletStyles.historyWrap, { backgroundColor: C.backgroundCard, borderColor: C.border }]}>
@@ -2519,6 +2569,69 @@ const walletStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '400',
     textAlign: 'center',
+  },
+
+  // ── Tier benefits card ──
+  benefitsWrap: {
+    borderWidth: 1.5,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  benefitsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+  },
+  benefitsBadge: {
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  benefitsBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  benefitsTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+  },
+  benefitsDesc: {
+    fontSize: 11,
+    fontWeight: '400',
+    lineHeight: 16,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 4,
+  },
+  benefitsEmpty: {
+    fontSize: 11,
+    fontWeight: '400',
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  benefitsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 2,
+  },
+  benefitsDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  benefitsLine: {
+    fontSize: FontSize.sm,
+    fontWeight: '500',
+    flex: 1,
+  },
+  benefitsBodyPad: {
+    paddingBottom: Spacing.md,
   },
 });
 

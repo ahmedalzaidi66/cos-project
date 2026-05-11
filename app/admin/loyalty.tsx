@@ -10,7 +10,7 @@ import {
   Modal,
   Switch,
 } from 'react-native';
-import { Coins, TrendingUp, Users, Gift, ChevronDown, ChevronUp, Plus, Minus, X, Check, Settings2 } from 'lucide-react-native';
+import { Coins, TrendingUp, Users, Gift, ChevronDown, ChevronUp, Plus, Minus, X, Check, Settings2, Crown, Truck, Star, Zap, Percent, PartyPopper } from 'lucide-react-native';
 import { adminSupabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminGuard from '@/components/admin/AdminGuard';
@@ -19,7 +19,7 @@ import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
-import { TIER_COLORS, getTierFromLifetime, LoyaltyTier } from '@/lib/loyalty';
+import { TIER_COLORS, getTierFromLifetime, LoyaltyTier, TierBenefits, DEFAULT_TIER_BENEFITS } from '@/lib/loyalty';
 
 type LoyaltyMember = {
   id: string;
@@ -63,6 +63,12 @@ function LoyaltyContent() {
   const [settingsMsg, setSettingsMsg] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Tier benefits
+  const [tierBenefits, setTierBenefits] = useState<Record<LoyaltyTier, TierBenefits>>(DEFAULT_TIER_BENEFITS);
+  const [tierBenOpen, setTierBenOpen] = useState(false);
+  const [tierBenSaving, setTierBenSaving] = useState(false);
+  const [tierBenMsg, setTierBenMsg] = useState('');
+
   // Adjust modal
   const [adjustMember, setAdjustMember] = useState<LoyaltyMember | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
@@ -86,6 +92,16 @@ function LoyaltyContent() {
         .maybeSingle();
 
       if (settingsData) setSettings(settingsData);
+
+      const { data: tierBenData } = await adminSupabase()
+        .from('loyalty_tier_benefits')
+        .select('*');
+
+      if (tierBenData && tierBenData.length > 0) {
+        const map = { ...DEFAULT_TIER_BENEFITS };
+        tierBenData.forEach((row: TierBenefits) => { map[row.tier] = row; });
+        setTierBenefits(map);
+      }
 
       if (!loyaltyData) { setLoading(false); return; }
 
@@ -136,6 +152,25 @@ function LoyaltyContent() {
     } else {
       setSettingsMsg((t as any).loyaltySettingsSaved ?? 'Settings saved');
       setTimeout(() => setSettingsMsg(''), 2000);
+    }
+  };
+
+  const saveTierBenefits = async () => {
+    setTierBenSaving(true);
+    setTierBenMsg('');
+    const rows = Object.values(tierBenefits).map(b => ({
+      ...b,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await adminSupabase()
+      .from('loyalty_tier_benefits')
+      .upsert(rows, { onConflict: 'tier' });
+    setTierBenSaving(false);
+    if (error) {
+      setTierBenMsg('Failed to save tier benefits');
+    } else {
+      setTierBenMsg('Tier benefits saved');
+      setTimeout(() => setTierBenMsg(''), 2000);
     }
   };
 
@@ -292,6 +327,172 @@ function LoyaltyContent() {
             {settingsSaving
               ? <ActivityIndicator size="small" color={Colors.white} />
               : <Text style={styles.saveBtnText}>{(t as any).saveLoyaltySettings ?? 'Save Settings'}</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Tier benefits toggle */}
+      <TouchableOpacity
+        style={styles.settingsToggle}
+        onPress={() => setTierBenOpen(v => !v)}
+        activeOpacity={0.8}
+      >
+        <Crown size={16} color={Colors.gold} strokeWidth={2} />
+        <Text style={styles.settingsToggleText}>Tier Benefits</Text>
+        {tierBenOpen
+          ? <ChevronUp size={16} color={Colors.textMuted} strokeWidth={2} />
+          : <ChevronDown size={16} color={Colors.textMuted} strokeWidth={2} />
+        }
+      </TouchableOpacity>
+
+      {tierBenOpen && (
+        <View style={styles.settingsPanel}>
+          {(['bronze', 'silver', 'gold', 'platinum'] as LoyaltyTier[]).map((tier) => {
+            const b = tierBenefits[tier];
+            const tierColor = TIER_COLORS[tier];
+            return (
+              <View key={tier} style={[tierStyles.tierCard, { borderColor: tierColor + '40' }]}>
+                {/* Tier header */}
+                <View style={[tierStyles.tierHeader, { backgroundColor: tierColor + '12' }]}>
+                  <Crown size={15} color={tierColor} strokeWidth={2} />
+                  <Text style={[tierStyles.tierName, { color: tierColor }]}>
+                    {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                  </Text>
+                </View>
+
+                <View style={tierStyles.tierBody}>
+                  {/* Min points */}
+                  <View style={tierStyles.fieldRow}>
+                    <Text style={tierStyles.fieldLabel}>Min Lifetime Points</Text>
+                    <TextInput
+                      style={tierStyles.fieldInput}
+                      value={String(b.min_points)}
+                      onChangeText={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], min_points: parseInt(v, 10) || 0 } }))}
+                      keyboardType="number-pad"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+
+                  {/* Discount % */}
+                  <View style={tierStyles.fieldRow}>
+                    <View style={tierStyles.fieldLabelWrap}>
+                      <Percent size={12} color={Colors.textMuted} strokeWidth={2} />
+                      <Text style={tierStyles.fieldLabel}>Discount %</Text>
+                    </View>
+                    <TextInput
+                      style={tierStyles.fieldInput}
+                      value={String(b.discount_pct)}
+                      onChangeText={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], discount_pct: Math.min(100, parseFloat(v) || 0) } }))}
+                      keyboardType="decimal-pad"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+
+                  {/* Bonus multiplier */}
+                  <View style={tierStyles.fieldRow}>
+                    <View style={tierStyles.fieldLabelWrap}>
+                      <Zap size={12} color={Colors.textMuted} strokeWidth={2} />
+                      <Text style={tierStyles.fieldLabel}>Bonus Multiplier</Text>
+                    </View>
+                    <TextInput
+                      style={tierStyles.fieldInput}
+                      value={String(b.bonus_multiplier)}
+                      onChangeText={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], bonus_multiplier: Math.max(0.1, parseFloat(v) || 1) } }))}
+                      keyboardType="decimal-pad"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+
+                  {/* Birthday bonus */}
+                  <View style={tierStyles.fieldRow}>
+                    <View style={tierStyles.fieldLabelWrap}>
+                      <PartyPopper size={12} color={Colors.textMuted} strokeWidth={2} />
+                      <Text style={tierStyles.fieldLabel}>Birthday Bonus (pts)</Text>
+                    </View>
+                    <TextInput
+                      style={tierStyles.fieldInput}
+                      value={String(b.birthday_bonus)}
+                      onChangeText={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], birthday_bonus: parseInt(v, 10) || 0 } }))}
+                      keyboardType="number-pad"
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+
+                  {/* Toggle: Free Shipping */}
+                  <View style={tierStyles.switchRow}>
+                    <View style={tierStyles.fieldLabelWrap}>
+                      <Truck size={12} color={Colors.textMuted} strokeWidth={2} />
+                      <Text style={tierStyles.fieldLabel}>Free Shipping</Text>
+                    </View>
+                    <Switch
+                      value={b.free_shipping}
+                      onValueChange={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], free_shipping: v } }))}
+                      trackColor={{ false: Colors.border, true: Colors.neonBlueDim }}
+                      thumbColor={b.free_shipping ? Colors.neonBlue : Colors.textMuted}
+                    />
+                  </View>
+
+                  {/* Toggle: Exclusive Offers */}
+                  <View style={tierStyles.switchRow}>
+                    <View style={tierStyles.fieldLabelWrap}>
+                      <Star size={12} color={Colors.textMuted} strokeWidth={2} />
+                      <Text style={tierStyles.fieldLabel}>Exclusive Offers</Text>
+                    </View>
+                    <Switch
+                      value={b.exclusive_offers}
+                      onValueChange={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], exclusive_offers: v } }))}
+                      trackColor={{ false: Colors.border, true: Colors.neonBlueDim }}
+                      thumbColor={b.exclusive_offers ? Colors.neonBlue : Colors.textMuted}
+                    />
+                  </View>
+
+                  {/* Toggle: Early Access */}
+                  <View style={tierStyles.switchRow}>
+                    <View style={tierStyles.fieldLabelWrap}>
+                      <Zap size={12} color={Colors.textMuted} strokeWidth={2} />
+                      <Text style={tierStyles.fieldLabel}>Early Access</Text>
+                    </View>
+                    <Switch
+                      value={b.early_access}
+                      onValueChange={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], early_access: v } }))}
+                      trackColor={{ false: Colors.border, true: Colors.neonBlueDim }}
+                      thumbColor={b.early_access ? Colors.neonBlue : Colors.textMuted}
+                    />
+                  </View>
+
+                  {/* Description */}
+                  <View style={{ gap: 4 }}>
+                    <Text style={tierStyles.fieldLabel}>Customer Description</Text>
+                    <TextInput
+                      style={[tierStyles.fieldInput, { minHeight: 56, textAlignVertical: 'top' }]}
+                      value={b.description}
+                      onChangeText={(v) => setTierBenefits(prev => ({ ...prev, [tier]: { ...prev[tier], description: v } }))}
+                      multiline
+                      placeholderTextColor={Colors.textMuted}
+                      placeholder="Short description shown to customers..."
+                    />
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+
+          {tierBenMsg ? (
+            <Text style={tierBenMsg.includes('Failed') ? styles.errorMsg : styles.successMsg}>
+              {tierBenMsg}
+            </Text>
+          ) : null}
+
+          <TouchableOpacity
+            style={styles.saveBtn}
+            onPress={saveTierBenefits}
+            activeOpacity={0.8}
+            disabled={tierBenSaving}
+          >
+            {tierBenSaving
+              ? <ActivityIndicator size="small" color={Colors.white} />
+              : <Text style={styles.saveBtnText}>Save Tier Benefits</Text>
             }
           </TouchableOpacity>
         </View>
@@ -485,6 +686,68 @@ export default function LoyaltyPage() {
     </AdminGuard>
   );
 }
+
+const tierStyles = StyleSheet.create({
+  tierCard: {
+    borderWidth: 1.5,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    marginBottom: 2,
+  },
+  tierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+  },
+  tierName: {
+    fontSize: FontSize.md,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  tierBody: {
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  fieldLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+  },
+  fieldLabel: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    flex: 1,
+  },
+  fieldInput: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    minWidth: 80,
+    textAlign: 'right',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+});
 
 const styles = StyleSheet.create({
   container: {

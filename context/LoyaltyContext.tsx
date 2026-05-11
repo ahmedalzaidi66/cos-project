@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
-import { getTierFromLifetime, TIER_COLORS, type LoyaltyTier } from '@/lib/loyalty';
+import { getTierFromLifetime, TIER_COLORS, DEFAULT_TIER_BENEFITS, type LoyaltyTier, type TierBenefits } from '@/lib/loyalty';
 
 export type LoyaltyTransaction = {
   id: string;
@@ -21,6 +21,8 @@ type LoyaltyState = {
   lifetimePoints: number;
   tier: LoyaltyTier;
   tierColor: string;
+  tierBenefits: TierBenefits;
+  allTierBenefits: Record<LoyaltyTier, TierBenefits>;
   transactions: LoyaltyTransaction[];
   loading: boolean;
   refresh: () => void;
@@ -32,6 +34,8 @@ const LoyaltyContext = createContext<LoyaltyState>({
   lifetimePoints: 0,
   tier: 'bronze',
   tierColor: TIER_COLORS.bronze,
+  tierBenefits: DEFAULT_TIER_BENEFITS.bronze,
+  allTierBenefits: DEFAULT_TIER_BENEFITS,
   transactions: [],
   loading: false,
   refresh: () => {},
@@ -44,7 +48,23 @@ export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
   const [lifetimePoints, setLifetimePoints] = useState(0);
   const [transactions, setTransactions] = useState<LoyaltyTransaction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [allTierBenefits, setAllTierBenefits] = useState<Record<LoyaltyTier, TierBenefits>>(DEFAULT_TIER_BENEFITS);
   const prevTier = useRef<LoyaltyTier>('bronze');
+
+  // Fetch tier benefits once (public read, no auth required)
+  useEffect(() => {
+    supabase
+      .from('loyalty_tier_benefits')
+      .select('*')
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const map = { ...DEFAULT_TIER_BENEFITS };
+        data.forEach((row: TierBenefits) => {
+          map[row.tier] = row;
+        });
+        setAllTierBenefits(map);
+      });
+  }, []);
 
   const fetchLoyalty = useCallback(async () => {
     if (!user?.id) {
@@ -142,6 +162,8 @@ export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
         lifetimePoints,
         tier,
         tierColor: TIER_COLORS[tier],
+        tierBenefits: allTierBenefits[tier],
+        allTierBenefits,
         transactions,
         loading,
         refresh: fetchLoyalty,
