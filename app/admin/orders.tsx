@@ -69,19 +69,21 @@ type OrderItem = {
 const STATUS_FLOW = ['new', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled'];
 
 const STATUS_COLORS: Record<string, string> = {
-  new: Colors.neonBlue,
+  new:       Colors.neonBlue,
+  pending:   Colors.neonBlue,
   confirmed: '#4ADE80',
   preparing: Colors.warning,
-  shipped: '#7C83FF',
+  shipped:   '#7C83FF',
   delivered: Colors.success,
   cancelled: Colors.error,
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  new: 'جديد',
+  new:       'جديد',
+  pending:   'جديد',
   confirmed: 'مؤكد',
   preparing: 'قيد التحضير',
-  shipped: 'مشحون',
+  shipped:   'مشحون',
   delivered: 'مُسلَّم',
   cancelled: 'ملغى',
 };
@@ -139,6 +141,7 @@ function OrderDetailModal({
   const [trackingEditing, setTrackingEditing] = useState(false);
   const [savingTracking, setSavingTracking] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -147,6 +150,7 @@ function OrderDetailModal({
     setTrackingNumber(order.tracking_number ?? '');
     setTrackingEditing(false);
     setSuccessMsg('');
+    setErrorMsg('');
     setCopied(false);
     setLoadingItems(true);
     supabase
@@ -172,7 +176,11 @@ function OrderDetailModal({
       .update({ tracking_number: trackingNumber || null, updated_at: new Date().toISOString() })
       .eq('id', order.id);
     setSavingTracking(false);
-    if (!error) {
+    if (error) {
+      console.error('[AdminOrders] Tracking save failed:', error.message, error);
+      setErrorMsg(`فشل حفظ رقم التتبع: ${error.message}`);
+      setTimeout(() => setErrorMsg(''), 5000);
+    } else {
       setTrackingEditing(false);
       setSuccessMsg('تم حفظ رقم التتبع');
       setTimeout(() => setSuccessMsg(''), 2500);
@@ -182,56 +190,73 @@ function OrderDetailModal({
   const handleUpdateStatus = async (newStatus: string) => {
     if (newStatus === currentStatus) return;
     setUpdatingStatus(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
     const updateData: Record<string, unknown> = {
       status: newStatus,
       updated_at: new Date().toISOString(),
     };
-    if (newStatus === 'delivered' && !order.completed_at) {
+    // Set completed_at when marking as delivered (use currentStatus, not stale order prop)
+    if (newStatus === 'delivered') {
       updateData.completed_at = new Date().toISOString();
     }
+    // Clear completed_at if moving away from delivered (e.g. back to shipped)
+    if (newStatus !== 'delivered' && currentStatus === 'delivered') {
+      updateData.completed_at = null;
+    }
+
     const { error } = await adminSupabase()
       .from('orders')
       .update(updateData)
       .eq('id', order.id);
+
     setUpdatingStatus(false);
-    if (!error) {
-      setCurrentStatus(newStatus);
-      onStatusUpdated(order.id, newStatus);
-      setSuccessMsg('تم تحديث الحالة');
-      setTimeout(() => setSuccessMsg(''), 2500);
 
-      // Send customer notifications in background (non-blocking)
-      const emailOrder = {
-        ...order,
-        status: newStatus,
-        items: items.map((i) => ({
-          product_name: i.product_name,
-          quantity:     i.quantity,
-          unit_price:   i.unit_price,
-          shade_name:   i.shade_name,
-          shade_hex:    i.shade_hex,
-        })),
-      };
-      if (newStatus === 'shipped' || newStatus === 'delivered') {
-        sendShippingUpdate(emailOrder, newStatus);
-      } else if (newStatus !== 'new') {
-        sendOrderStatusUpdate(emailOrder, newStatus);
-      }
+    if (error) {
+      const msg = error.message ?? JSON.stringify(error);
+      console.error('[AdminOrders] Status update failed:', { orderId: order.id, newStatus, error });
+      setErrorMsg(`فشل التحديث: ${msg}`);
+      setTimeout(() => setErrorMsg(''), 5000);
+      return;
+    }
 
-      // Send push notification — look up customer's auth_user_id
-      if (newStatus !== 'new') {
-        supabase
-          .from('customers')
-          .select('auth_user_id')
-          .eq('email', order.customer_email)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (data?.auth_user_id) {
-              sendOrderPushNotification(data.auth_user_id, order.id, newStatus);
-            }
-          })
-          .catch(() => {});
-      }
+    setCurrentStatus(newStatus);
+    onStatusUpdated(order.id, newStatus);
+    setSuccessMsg('تم تحديث الحالة بنجاح');
+    setTimeout(() => setSuccessMsg(''), 3000);
+
+    // Send customer notifications in background (non-blocking)
+    const emailOrder = {
+      ...order,
+      status: newStatus,
+      items: items.map((i) => ({
+        product_name: i.product_name,
+        quantity:     i.quantity,
+        unit_price:   i.unit_price,
+        shade_name:   i.shade_name,
+        shade_hex:    i.shade_hex,
+      })),
+    };
+    if (newStatus === 'shipped' || newStatus === 'delivered') {
+      sendShippingUpdate(emailOrder, newStatus);
+    } else if (newStatus !== 'new') {
+      sendOrderStatusUpdate(emailOrder, newStatus);
+    }
+
+    // Push notification — look up customer's auth_user_id
+    if (newStatus !== 'new') {
+      supabase
+        .from('customers')
+        .select('auth_user_id')
+        .eq('email', order.customer_email)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.auth_user_id) {
+            sendOrderPushNotification(data.auth_user_id, order.id, newStatus);
+          }
+        })
+        .catch(() => {});
     }
   };
 
@@ -393,6 +418,12 @@ function OrderDetailModal({
                 <Text style={modal.successText}>{successMsg}</Text>
               </View>
             ) : null}
+            {errorMsg ? (
+              <View style={[modal.successBanner, { backgroundColor: Colors.error + '14', borderColor: Colors.error + '40' }]}>
+                <AlertCircle size={14} color={Colors.error} strokeWidth={2} />
+                <Text style={[modal.successText, { color: Colors.error, flex: 1 }]}>{errorMsg}</Text>
+              </View>
+            ) : null}
 
             {/* Cancelled banner */}
             {currentStatus === 'cancelled' && (
@@ -405,10 +436,12 @@ function OrderDetailModal({
             {/* Timeline */}
             <View style={modal.timeline}>
               {STATUS_FLOW.filter((s) => s !== 'cancelled').map((s, idx, arr) => {
-                const currentIdx = STATUS_FLOW.indexOf(currentStatus);
+                // 'pending' (DB default) and other unknown statuses map to 'new' position
+                const effectiveStatus = STATUS_FLOW.includes(currentStatus) ? currentStatus : 'new';
+                const currentIdx = STATUS_FLOW.indexOf(effectiveStatus);
                 const thisIdx   = STATUS_FLOW.indexOf(s);
-                const isDone    = currentStatus !== 'cancelled' && thisIdx < currentIdx;
-                const isActive  = s === currentStatus;
+                const isDone    = effectiveStatus !== 'cancelled' && thisIdx < currentIdx;
+                const isActive  = s === effectiveStatus || (s === 'new' && !STATUS_FLOW.includes(currentStatus));
                 const isLast    = idx === arr.length - 1;
                 const color     = isDone || isActive ? statusColor(s) : Colors.border;
                 return (
@@ -695,6 +728,8 @@ function OrdersContent() {
 
   const handleStatusUpdated = (id: string, newStatus: string) => {
     setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: newStatus } : o));
+    // Keep selectedOrder in sync so re-opening modal shows correct status
+    setSelectedOrder((prev) => prev?.id === id ? { ...prev, status: newStatus } : prev);
   };
 
   const filtered = orders.filter((o) => {

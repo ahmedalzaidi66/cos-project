@@ -59,7 +59,11 @@ export default function OrderTimeline({
   const isRTL = language === 'ar' || language === 'ckb';
 
   const isCancelled = status === 'cancelled';
-  const currentIdx = STATUS_FLOW.indexOf(status as OrderStatus);
+  // 'pending' (DB default before admin confirms) maps to 'new' visually
+  const normalizedStatus: OrderStatus = STATUS_FLOW.includes(status as OrderStatus)
+    ? (status as OrderStatus)
+    : 'new';
+  const currentIdx = STATUS_FLOW.indexOf(normalizedStatus);
 
   return (
     <View style={styles.container}>
@@ -76,7 +80,7 @@ export default function OrderTimeline({
       {/* Timeline steps */}
       {STATUS_FLOW.map((step, idx) => {
         const isDone   = !isCancelled && currentIdx > idx;
-        const isActive = !isCancelled && status === step;
+        const isActive = !isCancelled && normalizedStatus === step;
         const color    = isDone || isActive ? STATUS_COLORS[step] : (C.border);
         const isLast   = idx === STATUS_FLOW.length - 1;
         const Icon     = STATUS_ICONS[step];
