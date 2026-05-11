@@ -18,7 +18,13 @@ import {
   CircleAlert as AlertCircle,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
-import { uploadImageToSupabase, validateImageFile, readFileAsDataUrl } from '@/lib/imageUpload';
+import {
+  uploadImageToSupabase,
+  validateImageFile,
+  validateImageIntegrity,
+  readFileAsDataUrl,
+  SUPPORTED_TYPES,
+} from '@/lib/imageUpload';
 import ImageEditorModal from '@/components/admin/ImageEditorModal';
 
 type ImageItem = {
@@ -33,6 +39,7 @@ type Props = {
 };
 
 type CardStatus = 'idle' | 'uploading' | 'error';
+type CardProgress = { percent: number };
 
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -50,6 +57,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
     );
   }
   const [cardStatus, setCardStatus] = useState<Record<string, CardStatus>>({});
+  const [cardProgress, setCardProgress] = useState<Record<string, number>>({});
   const [cardError, setCardError] = useState<Record<string, string>>({});
   const [globalError, setGlobalError] = useState('');
   const [globalSuccess, setGlobalSuccess] = useState(false);
@@ -72,6 +80,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
   };
 
   const openEditorForFile = useCallback(async (file: File, replaceId?: string) => {
+    // Basic validation
     const validErr = validateImageFile(file);
     if (validErr) {
       if (replaceId) {
@@ -82,6 +91,19 @@ export default function ProductImageGallery({ images, onChange }: Props) {
       }
       return;
     }
+
+    // Integrity check (catches corrupted / non-image files)
+    const integrityErr = await validateImageIntegrity(file);
+    if (integrityErr) {
+      if (replaceId) {
+        setCardStatus(s => ({ ...s, [replaceId]: 'error' }));
+        setCardError(e => ({ ...e, [replaceId]: integrityErr }));
+      } else {
+        setGlobalError(integrityErr);
+      }
+      return;
+    }
+
     const dataUrl = await readFileAsDataUrl(file);
     setPendingFile(file);
     setPendingDataUrl(dataUrl);
@@ -98,10 +120,16 @@ export default function ProductImageGallery({ images, onChange }: Props) {
 
     const tempId = replaceId ?? generateId();
     setCardStatus(s => ({ ...s, [tempId]: 'uploading' }));
+    setCardProgress(p => ({ ...p, [tempId]: 0 }));
     setCardError(e => { const n = { ...e }; delete n[tempId]; return n; });
     setGlobalError('');
 
-    const result = await uploadImageToSupabase(editedFile, 'products');
+    const result = await uploadImageToSupabase(editedFile, {
+      folder: 'products',
+      onProgress: (p) => {
+        setCardProgress(prev => ({ ...prev, [tempId]: p.percent }));
+      },
+    });
 
     if (result.error) {
       setCardStatus(s => ({ ...s, [tempId]: 'error' }));
@@ -110,6 +138,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
     }
 
     setCardStatus(s => { const n = { ...s }; delete n[tempId]; return n; });
+    setCardProgress(p => { const n = { ...p }; delete n[tempId]; return n; });
 
     if (replaceId) {
       onChange(images.map(img => img.id === replaceId ? { ...img, url: result.url! } : img));
@@ -136,7 +165,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
     if (Platform.OS !== 'web') return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/jpeg,image/jpg,image/png,image/webp,image/svg+xml,image/gif';
+    input.accept = Object.keys(SUPPORTED_TYPES).join(',');
     input.multiple = true;
     input.onchange = async (e: Event) => {
       const files = Array.from((e.target as HTMLInputElement).files ?? []);
@@ -149,7 +178,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
     if (Platform.OS !== 'web') return;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/jpeg,image/jpg,image/png,image/webp,image/svg+xml,image/gif';
+    input.accept = Object.keys(SUPPORTED_TYPES).join(',');
     input.onchange = (e: Event) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) openEditorForFile(file, id);
@@ -245,6 +274,7 @@ export default function ProductImageGallery({ images, onChange }: Props) {
             img={img}
             index={idx}
             status={cardStatus[img.id] ?? 'idle'}
+            progress={cardProgress[img.id] ?? 0}
             error={cardError[img.id]}
             isHovered={hoveredId === img.id}
             isDraggedOver={dragOverId === img.id}
@@ -329,6 +359,7 @@ type CardProps = {
   img: ImageItem;
   index: number;
   status: CardStatus;
+  progress: number;
   error?: string;
   isHovered: boolean;
   isDraggedOver: boolean;
@@ -342,7 +373,7 @@ type CardProps = {
 };
 
 function ImageCard({
-  img, index, status, error, isHovered, isDraggedOver,
+  img, index, status, progress, error, isHovered, isDraggedOver,
   onHover, onSetMain, onReplace, onRemove, onDragStart, onDragOver, onDragEnd,
 }: CardProps) {
   const [imgErr, setImgErr] = useState(false);
@@ -383,7 +414,10 @@ function ImageCard({
       {status === 'uploading' ? (
         <View style={cs.loadingState}>
           <ActivityIndicator color={Colors.neonBlue} size="small" />
-          <Text style={cs.loadingText}>Uploading…</Text>
+          <Text style={cs.loadingText}>{progress > 0 ? `${progress}%` : 'Working…'}</Text>
+          <View style={cs.cardProgressTrack}>
+            <View style={[cs.cardProgressFill, { width: `${progress}%` as any }]} />
+          </View>
         </View>
       ) : imgErr ? (
         <View style={cs.errorState}>
@@ -485,8 +519,18 @@ function ImageCard({
 }
 
 const cs = StyleSheet.create({
-  loadingState: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4, backgroundColor: Colors.backgroundSecondary },
-  loadingText: { color: Colors.textMuted, fontSize: 9 },
+  loadingState: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 5, backgroundColor: Colors.backgroundSecondary, padding: 8 },
+  loadingText: { color: Colors.neonBlue, fontSize: 10, fontWeight: '700' },
+  cardProgressTrack: {
+    width: '80%' as any, height: 3, borderRadius: 2,
+    backgroundColor: Colors.border, overflow: 'hidden',
+  },
+  cardProgressFill: {
+    height: '100%', borderRadius: 2,
+    backgroundColor: Colors.neonBlue,
+    // @ts-ignore
+    transition: 'width 0.25s ease',
+  },
   errorState: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 4, backgroundColor: Colors.backgroundSecondary },
   errorStateText: { color: Colors.error, fontSize: 9 },
   mainBadge: {

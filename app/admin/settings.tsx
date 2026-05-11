@@ -76,6 +76,8 @@ function TryOnModelSection({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [preview, setPreview]   = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadStage, setUploadStage] = useState('');
   const [status, setStatus]     = useState<'idle' | 'ok' | 'err'>('idle');
   const [errMsg, setErrMsg]     = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
@@ -96,18 +98,26 @@ function TryOnModelSection({
       const file: File | undefined = e.target?.files?.[0];
       inp.value = '';
       if (!file) return;
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-        setErrMsg('Only JPG, PNG or WEBP accepted.'); setStatus('err'); return;
+      if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+        setErrMsg('Only JPG, PNG or WebP accepted.'); setStatus('err'); return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        setErrMsg('File exceeds 10 MB.'); setStatus('err'); return;
+      const MAX_SIZE_MB = 10;
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        setErrMsg(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is ${MAX_SIZE_MB} MB.`);
+        setStatus('err'); return;
+      }
+      if (file.size === 0) {
+        setErrMsg('File appears to be empty or corrupted.'); setStatus('err'); return;
       }
       setStatus('idle'); setErrMsg('');
       try {
+        setUploadStage('Processing image…');
         const blob = await prepareModelImage(file);
+        setUploadStage('');
         setPreview(URL.createObjectURL(blob));
       } catch {
-        setErrMsg('Could not process image.'); setStatus('err');
+        setErrMsg('Could not process image. It may be corrupted.'); setStatus('err');
+        setUploadStage('');
       }
     };
     inp.click();
@@ -116,17 +126,20 @@ function TryOnModelSection({
   const handleSave = async () => {
     if (!preview) return;
     setUploading(true); setStatus('idle'); setErrMsg('');
+    setUploadPct(5); setUploadStage('Preparing…');
     try {
-      // Fetch blob from local object URL
+      setUploadPct(15); setUploadStage('Loading image…');
       const res = await fetch(preview);
       const blob = await res.blob();
       const filename = `model-${Date.now()}.webp`;
 
+      setUploadPct(30); setUploadStage('Uploading…');
       const adminClient = adminSupabase();
 
       const { data: uploadData, error: uploadError } = await adminClient.storage
         .from(TRYON_BUCKET)
         .upload(filename, blob, { contentType: 'image/webp', upsert: true });
+      setUploadPct(80);
 
       if (uploadError) {
         console.error('[TryOn] Storage upload error:', uploadError);
@@ -148,10 +161,11 @@ function TryOnModelSection({
         throw new Error(`Save failed: ${upsertErr.message}`);
       }
 
+      setUploadPct(100); setUploadStage('Saved!');
       onSaved(publicUrl);
       setPreview(null);
       setStatus('ok');
-      setTimeout(() => setStatus('idle'), 3000);
+      setTimeout(() => { setStatus('idle'); setUploadPct(0); setUploadStage(''); }, 3000);
     } catch (err: any) {
       console.error('[TryOn] handleSave error:', err);
       setErrMsg(err?.message ?? 'Upload failed. Check console for details.');
@@ -160,6 +174,8 @@ function TryOnModelSection({
       setUploading(false);
     }
   };
+
+  const discardUploadProgress = () => { setUploadPct(0); setUploadStage(''); };
 
   const handleReset = async () => {
     setConfirmReset(false);
@@ -262,7 +278,18 @@ function TryOnModelSection({
           )}
         </View>
 
-        {status === 'ok' && <Text style={tryon.okText}>Saved successfully!</Text>}
+        {uploading && (
+          <View style={tryon.progressWrap}>
+            <View style={tryon.progressTrack}>
+              <View style={[tryon.progressFill, { width: `${uploadPct}%` as any }]} />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={tryon.progressLabel}>{uploadStage}</Text>
+              <Text style={tryon.progressPct}>{uploadPct}%</Text>
+            </View>
+          </View>
+        )}
+        {!uploading && status === 'ok' && <Text style={tryon.okText}>Saved successfully!</Text>}
         {status === 'err' && <Text style={tryon.errText}>{errMsg}</Text>}
       </View>
 
@@ -690,6 +717,22 @@ const tryon = StyleSheet.create({
   resetBtnText: { color: Colors.textMuted, fontSize: FontSize.sm, fontWeight: '600' },
   okText: { color: Colors.success, fontSize: FontSize.xs, fontWeight: '700' },
   errText: { color: Colors.error, fontSize: FontSize.xs, fontWeight: '600' },
+  progressWrap: {
+    marginTop: 6, gap: 4,
+    backgroundColor: Colors.backgroundCard,
+    borderWidth: 1, borderColor: Colors.neonBlueBorder,
+    borderRadius: Radius.sm, padding: 8,
+  },
+  progressTrack: {
+    height: 5, borderRadius: 3,
+    backgroundColor: Colors.border, overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%' as any, borderRadius: 3,
+    backgroundColor: Colors.neonBlue,
+  },
+  progressLabel: { color: Colors.textSecondary, fontSize: 10, fontWeight: '600' },
+  progressPct: { color: Colors.neonBlue, fontSize: 10, fontWeight: '800' },
   unavailableBox: {
     padding: Spacing.md, backgroundColor: Colors.backgroundSecondary,
     borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,

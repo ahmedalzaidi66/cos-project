@@ -565,11 +565,48 @@ export default function BeautyChat({ visible, onClose }: { visible: boolean; onC
     if (Platform.OS !== 'web') return;
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
-    fileInput.accept = 'image/jpeg,image/png,image/webp';
+    fileInput.accept = 'image/jpeg,image/jpg,image/png,image/webp';
 
     fileInput.onchange = async () => {
       const file = fileInput.files?.[0];
       if (!file) return;
+
+      // Validate file type and size before reading
+      const allowedTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+      if (!allowedTypes.has(file.type)) {
+        const errorLabel: Record<string, string> = {
+          en: 'Please upload a JPG, PNG, or WebP image.',
+          ar: 'يرجى رفع صورة بصيغة JPG أو PNG أو WebP.',
+          es: 'Por favor sube una imagen JPG, PNG o WebP.',
+          de: 'Bitte lade ein JPG, PNG oder WebP Bild hoch.',
+          ru: 'Пожалуйста, загрузите изображение JPG, PNG или WebP.',
+        };
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(36) + '-err',
+          role: 'assistant',
+          text: errorLabel[language] ?? errorLabel.en,
+          timestamp: Date.now(),
+        }]);
+        return;
+      }
+
+      const MAX_MB = 8;
+      if (file.size > MAX_MB * 1024 * 1024) {
+        const sizeLabel: Record<string, string> = {
+          en: `Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Please upload an image under ${MAX_MB} MB.`,
+          ar: `الصورة كبيرة جداً. الرجاء رفع صورة أقل من ${MAX_MB} ميغابايت.`,
+          es: `La imagen es demasiado grande. Sube una imagen de menos de ${MAX_MB} MB.`,
+          de: `Das Bild ist zu groß. Bitte lade ein Bild unter ${MAX_MB} MB hoch.`,
+          ru: `Изображение слишком большое. Загрузите изображение меньше ${MAX_MB} МБ.`,
+        };
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(36) + '-err',
+          role: 'assistant',
+          text: sizeLabel[language] ?? sizeLabel.en,
+          timestamp: Date.now(),
+        }]);
+        return;
+      }
 
       const reader = new FileReader();
       reader.onload = async (e) => {
