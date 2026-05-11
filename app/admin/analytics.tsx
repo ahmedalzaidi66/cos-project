@@ -8,7 +8,8 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ChartBar as BarChart3, CircleAlert as AlertCircle, Eye, MousePointerClick, Package, RefreshCw, ShoppingBag, ShoppingCart, Sparkles, TrendingDown, TrendingUp, Users } from 'lucide-react-native';
+import { ChartBar as BarChart3, CircleAlert as AlertCircle, Coins, Crown, Eye, MousePointerClick, Package, RefreshCw, Repeat2, ShoppingBag, ShoppingCart, Sparkles, TrendingDown, TrendingUp, Users, Wallet } from 'lucide-react-native';
+import { TIER_COLORS } from '@/lib/loyalty';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminGuard from '@/components/admin/AdminGuard';
@@ -68,6 +69,18 @@ type MostViewed = {
   product_name: string;
   product_id: string;
   views: number;
+};
+
+type LoyaltyAnalytics = {
+  total_points_issued: number;
+  total_points_redeemed: number;
+  total_members: number;
+  active_members_90d: number;
+  avg_balance: number;
+  redemption_rate_pct: number;
+  repeat_purchase_rate_pct: number;
+  tier_distribution: Record<string, number>;
+  top_earners: Array<{ user_id: string; email: string | null; total_points: number; lifetime_points: number; tier: string }>;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -382,7 +395,21 @@ async function fetchAnalytics(period: Period) {
     ordersChange: pctChange(totalOrders, prevOrders.length),
   };
 
-  return { stats, dayPoints, topProducts, topShades, abandonedCarts, mostViewed };
+  // Loyalty analytics via RPC
+  const loyaltyRes = await db.rpc('get_loyalty_analytics', { p_since: since ?? undefined });
+  const loyaltyData: LoyaltyAnalytics = loyaltyRes.data ?? {
+    total_points_issued: 0,
+    total_points_redeemed: 0,
+    total_members: 0,
+    active_members_90d: 0,
+    avg_balance: 0,
+    redemption_rate_pct: 0,
+    repeat_purchase_rate_pct: 0,
+    tier_distribution: {},
+    top_earners: [],
+  };
+
+  return { stats, dayPoints, topProducts, topShades, abandonedCarts, mostViewed, loyalty: loyaltyData };
 }
 
 function parseDays(p: Period): number {
@@ -409,6 +436,7 @@ function AnalyticsContent() {
   const [topShades, setTopShades] = useState<TopShade[]>([]);
   const [abandonedCarts, setAbandonedCarts] = useState<AbandonedCart[]>([]);
   const [mostViewed, setMostViewed] = useState<MostViewed[]>([]);
+  const [loyalty, setLoyalty] = useState<LoyaltyAnalytics | null>(null);
 
   const load = useCallback(async (p: Period) => {
     setLoading(true);
@@ -421,6 +449,7 @@ function AnalyticsContent() {
       setTopShades(result.topShades);
       setAbandonedCarts(result.abandonedCarts as AbandonedCart[]);
       setMostViewed(result.mostViewed);
+      setLoyalty(result.loyalty);
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load analytics');
     } finally {
@@ -701,11 +730,210 @@ function AnalyticsContent() {
               </View>
             )}
           </Section>
+
+          {/* ── Loyalty Analytics ─────────────────────────────────────── */}
+          {loyalty && <LoyaltyAnalyticsSection loyalty={loyalty} isWide={isWide} />}
         </>
       ) : null}
     </View>
   );
 }
+
+// ── Loyalty Analytics Section ─────────────────────────────────────────────────
+
+const TIER_ORDER = ['bronze', 'silver', 'gold', 'platinum'] as const;
+
+function LoyaltyAnalyticsSection({ loyalty, isWide }: { loyalty: LoyaltyAnalytics; isWide: boolean }) {
+  const { language } = useLanguage();
+
+  const tierDist = TIER_ORDER.map(tier => ({
+    tier,
+    count: loyalty.tier_distribution[tier] ?? 0,
+    color: TIER_COLORS[tier],
+  }));
+
+  const totalTierMembers = tierDist.reduce((s, t) => s + t.count, 0) || 1;
+
+  return (
+    <>
+      {/* ── Loyalty KPI cards ─────────────────────────────────────────── */}
+      <Section
+        title="Loyalty Program"
+        icon={<Coins size={16} color={Colors.gold} strokeWidth={2} />}
+      >
+        <View style={[s.cardsGrid, { flexWrap: 'wrap' }]}>
+          <View style={[s.statCardWrapper, { width: isWide ? '31%' : '48%' }]}>
+            <StatCard
+              label="Points Issued"
+              value={loyalty.total_points_issued.toLocaleString()}
+              icon={<Coins size={20} color={Colors.gold} strokeWidth={2} />}
+              color={Colors.gold}
+              hint="Confirmed earn transactions"
+            />
+          </View>
+          <View style={[s.statCardWrapper, { width: isWide ? '31%' : '48%' }]}>
+            <StatCard
+              label="Points Redeemed"
+              value={loyalty.total_points_redeemed.toLocaleString()}
+              icon={<Wallet size={20} color={Colors.neonBlue} strokeWidth={2} />}
+              color={Colors.neonBlue}
+              hint="Applied at checkout"
+            />
+          </View>
+          <View style={[s.statCardWrapper, { width: isWide ? '31%' : '48%' }]}>
+            <StatCard
+              label="Redemption Rate"
+              value={`${loyalty.redemption_rate_pct}%`}
+              icon={<TrendingUp size={20} color={Colors.success} strokeWidth={2} />}
+              color={Colors.success}
+              hint="Redeemed / issued"
+            />
+          </View>
+          <View style={[s.statCardWrapper, { width: isWide ? '31%' : '48%' }]}>
+            <StatCard
+              label="Enrolled Members"
+              value={loyalty.total_members.toLocaleString()}
+              icon={<Users size={20} color="#60CDFF" strokeWidth={2} />}
+              color="#60CDFF"
+              hint={`${loyalty.active_members_90d} active (90d)`}
+            />
+          </View>
+          <View style={[s.statCardWrapper, { width: isWide ? '31%' : '48%' }]}>
+            <StatCard
+              label="Avg. Balance"
+              value={Math.round(loyalty.avg_balance).toLocaleString() + ' pts'}
+              icon={<Wallet size={20} color={Colors.gold} strokeWidth={2} />}
+              color={Colors.gold}
+            />
+          </View>
+          <View style={[s.statCardWrapper, { width: isWide ? '31%' : '48%' }]}>
+            <StatCard
+              label="Repeat Purchase Rate"
+              value={`${loyalty.repeat_purchase_rate_pct}%`}
+              icon={<Repeat2 size={20} color={Colors.success} strokeWidth={2} />}
+              color={Colors.success}
+              hint="Customers with 2+ delivered orders"
+            />
+          </View>
+        </View>
+      </Section>
+
+      {/* ── Tier distribution ─────────────────────────────────────────── */}
+      <Section
+        title="Tier Distribution"
+        icon={<Crown size={16} color={Colors.gold} strokeWidth={2} />}
+      >
+        <View style={loyaltyStyles.tierGrid}>
+          {tierDist.map(({ tier, count, color }) => {
+            const pct = Math.round((count / totalTierMembers) * 100);
+            return (
+              <View key={tier} style={[loyaltyStyles.tierCard, { borderColor: color + '40' }]}>
+                <View style={[loyaltyStyles.tierDot, { backgroundColor: color + '25', borderColor: color + '60' }]}>
+                  <Crown size={14} color={color} strokeWidth={2} />
+                </View>
+                <Text style={[loyaltyStyles.tierName, { color }]}>
+                  {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                </Text>
+                <Text style={loyaltyStyles.tierCount}>{count.toLocaleString()}</Text>
+                <Text style={loyaltyStyles.tierPct}>{pct}%</Text>
+                <View style={loyaltyStyles.tierBarTrack}>
+                  <View style={[loyaltyStyles.tierBarFill, { width: `${pct}%` as any, backgroundColor: color }]} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </Section>
+
+      {/* ── Top loyal customers ───────────────────────────────────────── */}
+      <Section
+        title="Top Loyal Customers"
+        icon={<Crown size={16} color={Colors.gold} strokeWidth={2} />}
+      >
+        {loyalty.top_earners.length === 0 ? (
+          <EmptyState label="No loyalty members yet" />
+        ) : (
+          <View>
+            <TableHeader cols={['Customer', 'Balance', 'Lifetime', 'Tier']} />
+            {loyalty.top_earners.map((e, i) => {
+              const tierColor = TIER_COLORS[e.tier as keyof typeof TIER_COLORS] ?? Colors.gold;
+              return (
+                <View key={e.user_id} style={[s.tableRow, i % 2 === 0 && s.tableRowEven]}>
+                  <Text style={[s.tableCell, { flex: 2 }]} numberOfLines={1}>
+                    {e.email ?? e.user_id.substring(0, 12) + '…'}
+                  </Text>
+                  <Text style={[s.tableCell, { flex: 1, color: Colors.gold, fontWeight: '800' }]}>
+                    {e.total_points.toLocaleString()}
+                  </Text>
+                  <Text style={[s.tableCell, { flex: 1, color: Colors.neonBlue, fontWeight: '700' }]}>
+                    {e.lifetime_points.toLocaleString()}
+                  </Text>
+                  <Text style={[s.tableCell, { flex: 1, color: tierColor, fontWeight: '800' }]}>
+                    {e.tier.charAt(0).toUpperCase() + e.tier.slice(1)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </Section>
+    </>
+  );
+}
+
+const loyaltyStyles = StyleSheet.create({
+  tierGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  tierCard: {
+    flex: 1,
+    minWidth: 100,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+    alignItems: 'center',
+  },
+  tierDot: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  tierName: {
+    fontSize: FontSize.sm,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  tierCount: {
+    color: Colors.textPrimary,
+    fontSize: FontSize.md,
+    fontWeight: '900',
+  },
+  tierPct: {
+    color: Colors.textMuted,
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  tierBarTrack: {
+    width: '100%',
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  tierBarFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+});
 
 // ── Table helpers ─────────────────────────────────────────────────────────────
 
