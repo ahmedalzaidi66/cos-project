@@ -12,8 +12,10 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Pencil, Trash2, X, Layers, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Globe, ArrowUp, ArrowDown } from 'lucide-react-native';
+import { Plus, Pencil, Trash2, X, Layers, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Globe, ArrowUp, ArrowDown, RotateCcw } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -49,10 +51,13 @@ const EMPTY_TRANS: TranslationMap = {
 type CategoryRow = Category & { id: string; slug: string; active: boolean };
 
 function CategoriesScreen() {
-  const { isAdminAuthenticated } = useAdmin();
+  const { isAdminAuthenticated, admin } = useAdmin();
+  const { isSuperAdmin } = usePermissions();
   const { t } = useLanguage();
   const router = useRouter();
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [trashedCategories, setTrashedCategories] = useState<CategoryRow[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editing, setEditing] = useState<CategoryRow | null>(null);
@@ -65,6 +70,7 @@ function CategoriesScreen() {
   const [saving, setSaving] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [hardDeleteId, setHardDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -80,12 +86,20 @@ function CategoriesScreen() {
   }, [isAdminAuthenticated]);
 
   const fetchCategories = async () => {
-    const { data } = await supabase
-      .from('categories')
-      .select('*, translation:category_translations!left(*)')
-      .order('sort_order', { ascending: true })
-      .order('slug', { ascending: true });
-    setCategories((data ?? []) as CategoryRow[]);
+    const db = adminSupabase();
+    const [activeRes, trashedRes] = await Promise.all([
+      db.from('categories')
+        .select('*, translation:category_translations!left(*)')
+        .eq('is_deleted', false)
+        .order('sort_order', { ascending: true })
+        .order('slug', { ascending: true }),
+      db.from('categories')
+        .select('*, translation:category_translations!left(*)')
+        .eq('is_deleted', true)
+        .order('deleted_at', { ascending: false }),
+    ]);
+    setCategories((activeRes.data ?? []) as CategoryRow[]);
+    setTrashedCategories((trashedRes.data ?? []) as CategoryRow[]);
     setLoading(false);
   };
 
@@ -198,10 +212,37 @@ function CategoriesScreen() {
   };
 
   const handleDelete = async (id: string) => {
-    await adminSupabase().from('categories').delete().eq('id', id);
+    const cat = categories.find((c) => c.id === id);
+    await adminSupabase().from('categories').update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: admin?.email ?? '',
+    }).eq('id', id);
     setDeleteId(null);
     await fetchCategories();
     showToast(t.categoryDeleted);
+    logAdminAction({ action: 'delete', entityType: 'category', entityId: id, entityLabel: cat?.slug, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+  };
+
+  const handleRestore = async (id: string) => {
+    await adminSupabase().from('categories').update({
+      is_deleted: false,
+      deleted_at: null,
+      deleted_by: null,
+    }).eq('id', id);
+    await fetchCategories();
+    showToast('Category restored');
+    const cat = trashedCategories.find((c) => c.id === id);
+    logAdminAction({ action: 'update', entityType: 'category', entityId: id, entityLabel: cat?.slug, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+  };
+
+  const handleHardDelete = async (id: string) => {
+    const cat = trashedCategories.find((c) => c.id === id);
+    await adminSupabase().from('categories').delete().eq('id', id);
+    setHardDeleteId(null);
+    await fetchCategories();
+    showToast('Category permanently deleted');
+    logAdminAction({ action: 'delete', entityType: 'category', entityId: id, entityLabel: cat?.slug, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const handleAutoTranslate = async () => {
@@ -241,11 +282,29 @@ function CategoriesScreen() {
     <AdminWebDashboard title={t.categories}>
       <View style={styles.container}>
         <View style={styles.toolbar}>
-          <Text style={styles.countText}>{categories.length} {t.categoriesCount}</Text>
-          <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.8}>
-            <Plus size={16} color={Colors.background} strokeWidth={2.5} />
-            <Text style={styles.addBtnText}>{t.addCategory}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Text style={styles.countText}>
+              {showTrash ? `${trashedCategories.length} in Trash` : `${categories.length} ${t.categoriesCount}`}
+            </Text>
+            {isSuperAdmin && (
+              <TouchableOpacity
+                style={[styles.trashToggleBtn, showTrash && styles.trashToggleBtnActive]}
+                onPress={() => setShowTrash(!showTrash)}
+                activeOpacity={0.8}
+              >
+                <Trash2 size={13} color={showTrash ? Colors.error : Colors.textMuted} strokeWidth={2} />
+                <Text style={[styles.trashToggleText, showTrash && { color: Colors.error }]}>
+                  Trash {trashedCategories.length > 0 ? `(${trashedCategories.length})` : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {!showTrash && (
+            <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.8}>
+              <Plus size={16} color={Colors.background} strokeWidth={2.5} />
+              <Text style={styles.addBtnText}>{t.addCategory}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.tableHeader}>
@@ -258,12 +317,12 @@ function CategoriesScreen() {
           <Text style={[styles.th, { width: 80, textAlign: 'center' }]}>{t.colActions}</Text>
         </View>
 
-        {categories.map((cat) => {
+        {(showTrash ? trashedCategories : categories).map((cat) => {
           const transArr: any[] = Array.isArray(cat.translation) ? cat.translation : (cat.translation ? [cat.translation] : []);
           const enTrans = transArr.find((t: any) => t.language === 'en');
           const arTrans = transArr.find((t: any) => t.language === 'ar');
           return (
-            <View key={cat.id} style={styles.tableRow}>
+            <View key={cat.id} style={[styles.tableRow, showTrash && { opacity: 0.75 }]}>
               {/* Icon thumbnail */}
               <View style={{ width: 44, alignItems: 'center' }}>
                 {(cat as any).icon_url ? (
@@ -276,6 +335,9 @@ function CategoriesScreen() {
               </View>
               <View style={[styles.slugCell, { flex: 1 }]}>
                 <Text style={styles.slugText}>{cat.slug}</Text>
+                {showTrash && (cat as any).deleted_by && (
+                  <Text style={styles.deletedByText}>by {(cat as any).deleted_by}</Text>
+                )}
               </View>
               <Text style={[styles.nameText, { flex: 2 }]} numberOfLines={1}>
                 {enTrans?.name ?? '—'}
@@ -284,32 +346,58 @@ function CategoriesScreen() {
                 {arTrans?.name ?? '—'}
               </Text>
               <Text style={[styles.nameText, { width: 52, textAlign: 'center' }]}>
-                {(cat as any).sort_order ?? 0}
+                {showTrash ? '—' : ((cat as any).sort_order ?? 0)}
               </Text>
               <View style={{ width: 76 }}>
-                <View style={[styles.statusBadge, { backgroundColor: cat.active ? Colors.success + '22' : Colors.error + '22', borderColor: cat.active ? Colors.success + '44' : Colors.error + '44' }]}>
-                  <Text style={[styles.statusText, { color: cat.active ? Colors.success : Colors.error }]}>
-                    {cat.active ? t.active : t.hidden}
-                  </Text>
-                </View>
+                {showTrash ? (
+                  <View style={[styles.statusBadge, { backgroundColor: Colors.error + '22', borderColor: Colors.error + '44' }]}>
+                    <Text style={[styles.statusText, { color: Colors.error }]}>Deleted</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.statusBadge, { backgroundColor: cat.active ? Colors.success + '22' : Colors.error + '22', borderColor: cat.active ? Colors.success + '44' : Colors.error + '44' }]}>
+                    <Text style={[styles.statusText, { color: cat.active ? Colors.success : Colors.error }]}>
+                      {cat.active ? t.active : t.hidden}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={styles.actions}>
-                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(cat)} activeOpacity={0.7}>
-                  <Pencil size={14} color={Colors.neonBlue} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteId(cat.id)} activeOpacity={0.7}>
-                  <Trash2 size={14} color={Colors.error} strokeWidth={2} />
-                </TouchableOpacity>
+                {showTrash ? (
+                  <>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => handleRestore(cat.id)} activeOpacity={0.7}>
+                      <RotateCcw size={14} color={Colors.success} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => setHardDeleteId(cat.id)} activeOpacity={0.7}>
+                      <Trash2 size={14} color={Colors.error} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(cat)} activeOpacity={0.7}>
+                      <Pencil size={14} color={Colors.neonBlue} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteId(cat.id)} activeOpacity={0.7}>
+                      <Trash2 size={14} color={Colors.error} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           );
         })}
 
-        {categories.length === 0 && (
+        {!showTrash && categories.length === 0 && (
           <View style={styles.emptyState}>
             <Layers size={48} color={Colors.textMuted} strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>{t.noCategoriesYet}</Text>
             <Text style={styles.emptySubtitle}>{t.addFirstCategory}</Text>
+          </View>
+        )}
+        {showTrash && trashedCategories.length === 0 && (
+          <View style={styles.emptyState}>
+            <Trash2 size={48} color={Colors.textMuted} strokeWidth={1.5} />
+            <Text style={styles.emptyTitle}>Trash is empty</Text>
+            <Text style={styles.emptySubtitle}>Deleted categories appear here</Text>
           </View>
         )}
       </View>
@@ -477,6 +565,29 @@ function CategoriesScreen() {
         </View>
       </Modal>
 
+      {/* Hard delete confirm (permanent, super admin only) */}
+      <Modal visible={!!hardDeleteId} transparent animationType="fade" onRequestClose={() => setHardDeleteId(null)}>
+        <View style={styles.overlay}>
+          <View style={[styles.modalCard, { maxWidth: 360 }]}>
+            <Text style={[styles.modalTitle, { padding: Spacing.lg }]}>Permanently Delete?</Text>
+            <Text style={[styles.hintText, { paddingHorizontal: Spacing.lg, color: Colors.error }]}>
+              This cannot be undone. The category and all its translations will be permanently removed.
+            </Text>
+            <View style={[styles.modalFooter, { borderTopWidth: 1, borderTopColor: Colors.border }]}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setHardDeleteId(null)}>
+                <Text style={styles.cancelBtnText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: Colors.error }]}
+                onPress={() => hardDeleteId && handleHardDelete(hardDeleteId)}
+              >
+                <Text style={styles.saveBtnText}>Delete Permanently</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Toast visible={!!toast} message={toast?.message ?? ''} type={toast?.type} />
     </AdminWebDashboard>
   );
@@ -511,8 +622,12 @@ const styles = StyleSheet.create({
   tableHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, backgroundColor: Colors.backgroundSecondary, borderRadius: Radius.sm, marginBottom: 4 },
   th: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: Spacing.md, backgroundColor: Colors.backgroundCard, borderRadius: Radius.md, marginBottom: 4, borderWidth: 1, borderColor: Colors.border },
-  slugCell: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  slugCell: { flexDirection: 'column', gap: 2 },
   slugText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600', fontFamily: 'monospace' },
+  deletedByText: { color: Colors.textMuted, fontSize: FontSize.xs },
+  trashToggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  trashToggleBtnActive: { borderColor: Colors.error + '66', backgroundColor: Colors.errorDim },
+  trashToggleText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '700' },
   nameText: { color: Colors.textPrimary, fontSize: FontSize.sm, fontWeight: '500' },
   rtlText: { textAlign: 'right' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full, borderWidth: 1, alignSelf: 'flex-start' },

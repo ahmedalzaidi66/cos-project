@@ -11,8 +11,9 @@ import {
   Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Plus, Pencil, Trash2, Search, X, UserCog, Calendar, Eye, EyeOff, Lock } from 'lucide-react-native';
+import { Plus, Pencil, Trash2, Search, X, UserCog, Calendar, Eye, EyeOff, Lock, RotateCcw } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
@@ -107,10 +108,13 @@ async function callEmployeeAuthFn(
 function EmployeesScreen() {
   const { isMobile } = useAdminLayout();
   const { isAdminAuthenticated, admin } = useAdmin();
+  const { isSuperAdmin } = usePermissions();
   const { t } = useLanguage();
   const router = useRouter();
-  const { guard: guardAction, permissionError: actionPermErr, clearPermissionError } = useActionPermission('manage_employees');
+  const { guard: guardAction } = useActionPermission('manage_employees');
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [trashedEmployees, setTrashedEmployees] = useState<Employee[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -122,6 +126,7 @@ function EmployeesScreen() {
   const [error, setError] = useState('');
   const [changePassword, setChangePassword] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [hardDeleteId, setHardDeleteId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -137,8 +142,13 @@ function EmployeesScreen() {
   }, [isAdminAuthenticated]);
 
   const fetchEmployees = async () => {
-    const { data } = await adminSupabase().from('employees').select('*').order('created_at', { ascending: false });
-    setEmployees(data ?? []);
+    const db = adminSupabase();
+    const [activeRes, trashedRes] = await Promise.all([
+      db.from('employees').select('*').eq('is_deleted', false).order('created_at', { ascending: false }),
+      db.from('employees').select('*').eq('is_deleted', true).order('deleted_at', { ascending: false }),
+    ]);
+    setEmployees(activeRes.data ?? []);
+    setTrashedEmployees(trashedRes.data ?? []);
     setLoading(false);
   };
 
@@ -299,20 +309,43 @@ function EmployeesScreen() {
   const handleDelete = async (id: string) => {
     if (!guardAction()) { showToast('Permission denied: manage_employees required', 'error'); return; }
     const emp = employees.find((e) => e.id === id);
-    await adminSupabase().from('employees').delete().eq('id', id);
-
-    // Also delete the Supabase Auth account if linked
-    if (emp?.auth_user_id) {
-      await callEmployeeAuthFn('delete', { auth_user_id: emp.auth_user_id });
-    }
-
+    await adminSupabase().from('employees').update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: admin?.email ?? '',
+    }).eq('id', id);
     setDeleteId(null);
     await fetchEmployees();
-    showToast(t.deleted ?? 'Employee removed');
+    showToast('Employee moved to trash');
     logAdminAction({ action: 'delete', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
-  const filtered = employees.filter((e) =>
+  const handleRestore = async (id: string) => {
+    await adminSupabase().from('employees').update({
+      is_deleted: false,
+      deleted_at: null,
+      deleted_by: null,
+    }).eq('id', id);
+    await fetchEmployees();
+    const emp = trashedEmployees.find((e) => e.id === id);
+    showToast('Employee restored');
+    logAdminAction({ action: 'update', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+  };
+
+  const handleHardDelete = async (id: string) => {
+    const emp = trashedEmployees.find((e) => e.id === id);
+    await adminSupabase().from('employees').delete().eq('id', id);
+    if (emp?.auth_user_id) {
+      await callEmployeeAuthFn('delete', { auth_user_id: emp.auth_user_id });
+    }
+    setHardDeleteId(null);
+    await fetchEmployees();
+    showToast('Employee permanently deleted');
+    logAdminAction({ action: 'delete', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+  };
+
+  const sourceList = showTrash ? trashedEmployees : employees;
+  const filtered = sourceList.filter((e) =>
     search.trim() === '' ||
     e.full_name.toLowerCase().includes(search.toLowerCase()) ||
     e.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -349,13 +382,29 @@ function EmployeesScreen() {
               onChangeText={setSearch}
             />
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.8}>
-            <Plus size={16} color={Colors.background} strokeWidth={2.5} />
-            <Text style={styles.addBtnText}>{t.addEmployee}</Text>
-          </TouchableOpacity>
+          {isSuperAdmin && (
+            <TouchableOpacity
+              style={[styles.trashToggleBtn, showTrash && styles.trashToggleBtnActive]}
+              onPress={() => setShowTrash(!showTrash)}
+              activeOpacity={0.8}
+            >
+              <Trash2 size={13} color={showTrash ? Colors.error : Colors.textMuted} strokeWidth={2} />
+              <Text style={[styles.trashToggleText, showTrash && { color: Colors.error }]}>
+                Trash {trashedEmployees.length > 0 ? `(${trashedEmployees.length})` : ''}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {!showTrash && (
+            <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.8}>
+              <Plus size={16} color={Colors.background} strokeWidth={2.5} />
+              <Text style={styles.addBtnText}>{t.addEmployee}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        <Text style={styles.countText}>{filtered.length} {t.employeesCount}</Text>
+        <Text style={styles.countText}>
+          {showTrash ? `${filtered.length} in Trash` : `${filtered.length} ${t.employeesCount}`}
+        </Text>
 
         <View style={styles.tableHeader}>
           <Text style={[styles.th, { flex: 2 }]}>{t.employees}</Text>
@@ -403,22 +452,42 @@ function EmployeesScreen() {
                 </View>
               </View>
               <View style={[styles.actions, { width: 100 }]}>
-                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(emp)} activeOpacity={0.7}>
-                  <Pencil size={14} color={Colors.neonBlue} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteId(emp.id)} activeOpacity={0.7}>
-                  <Trash2 size={14} color={Colors.error} strokeWidth={2} />
-                </TouchableOpacity>
+                {showTrash ? (
+                  <>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => handleRestore(emp.id)} activeOpacity={0.7}>
+                      <RotateCcw size={14} color={Colors.success} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => setHardDeleteId(emp.id)} activeOpacity={0.7}>
+                      <Trash2 size={14} color={Colors.error} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(emp)} activeOpacity={0.7}>
+                      <Pencil size={14} color={Colors.neonBlue} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteId(emp.id)} activeOpacity={0.7}>
+                      <Trash2 size={14} color={Colors.error} strokeWidth={2} />
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           );
         })}
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !showTrash && (
           <View style={styles.emptyState}>
             <UserCog size={48} color={Colors.textMuted} strokeWidth={1.5} />
             <Text style={styles.emptyTitle}>{t.noEmployeesYet}</Text>
             <Text style={styles.emptySubtitle}>{t.addFirstEmployee}</Text>
+          </View>
+        )}
+        {filtered.length === 0 && showTrash && (
+          <View style={styles.emptyState}>
+            <Trash2 size={48} color={Colors.textMuted} strokeWidth={1.5} />
+            <Text style={styles.emptyTitle}>Trash is empty</Text>
+            <Text style={styles.emptySubtitle}>Deleted employees appear here</Text>
           </View>
         )}
       </View>
@@ -633,13 +702,13 @@ function EmployeesScreen() {
         </View>
       </Modal>
 
-      {/* Delete confirm modal */}
+      {/* Soft delete confirm modal */}
       <Modal visible={!!deleteId} transparent animationType="fade" onRequestClose={() => setDeleteId(null)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { maxWidth: 360 }]}>
             <Text style={[styles.modalTitle, { padding: Spacing.lg }]}>{t.deleteEmployee}</Text>
-            <Text style={[styles.errorText, { paddingHorizontal: Spacing.lg }]}>
-              {t.cannotBeUndone}{'\n'}This will also delete the employee's login account.
+            <Text style={[styles.hintText, { paddingHorizontal: Spacing.lg, color: Colors.warning }]}>
+              The employee will be moved to trash. Super admins can restore or permanently delete them.
             </Text>
             <View style={[styles.modalFooter, { borderTopWidth: 1, borderTopColor: Colors.border }]}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setDeleteId(null)}>
@@ -647,6 +716,26 @@ function EmployeesScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.error }]} onPress={() => deleteId && handleDelete(deleteId)}>
                 <Text style={styles.saveBtnText}>{t.delete}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Hard delete confirm modal (super admin only) */}
+      <Modal visible={!!hardDeleteId} transparent animationType="fade" onRequestClose={() => setHardDeleteId(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 360 }]}>
+            <Text style={[styles.modalTitle, { padding: Spacing.lg }]}>Permanently Delete?</Text>
+            <Text style={[styles.hintText, { paddingHorizontal: Spacing.lg, color: Colors.error }]}>
+              This cannot be undone. The employee record and their login account will be permanently removed.
+            </Text>
+            <View style={[styles.modalFooter, { borderTopWidth: 1, borderTopColor: Colors.border }]}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setHardDeleteId(null)}>
+                <Text style={styles.cancelBtnText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: Colors.error }]} onPress={() => hardDeleteId && handleHardDelete(hardDeleteId)}>
+                <Text style={styles.saveBtnText}>Delete Permanently</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -737,4 +826,7 @@ const styles = StyleSheet.create({
   saveBtnText: { color: Colors.background, fontSize: FontSize.md, fontWeight: '800' },
   errorText: { color: Colors.error, fontSize: FontSize.sm, marginBottom: Spacing.sm },
   white: { color: Colors.white },
+  trashToggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  trashToggleBtnActive: { borderColor: Colors.error + '66', backgroundColor: Colors.errorDim },
+  trashToggleText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '700' },
 });

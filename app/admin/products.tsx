@@ -31,8 +31,10 @@ import {
   ChevronDown,
   Palette,
   Pipette,
+  RotateCcw,
 } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { logAdminAction } from '@/lib/auditLog';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
@@ -177,7 +179,10 @@ function WebProductsScreen() {
   const router = useRouter();
   const { guard: guardAction } = useActionPermission('manage_products');
   const { admin } = useAdmin();
+  const { isSuperAdmin } = usePermissions();
   const [products, setProducts] = useState<Product[]>([]);
+  const [trashedProducts, setTrashedProducts] = useState<Product[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -194,6 +199,7 @@ function WebProductsScreen() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
+  const [confirmHardDelete, setConfirmHardDelete] = useState<Product | null>(null);
   const [langTab, setLangTab] = useState<LangCode>('en');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
@@ -427,9 +433,11 @@ function WebProductsScreen() {
 
   const loadAll = async () => {
     setLoadError(null);
+    const db = adminSupabase();
     try {
-      const [productsRes, catsRes] = await Promise.allSettled([
-        supabase.from('products').select('*').order('created_at', { ascending: false }),
+      const [productsRes, trashedRes, catsRes] = await Promise.allSettled([
+        db.from('products').select('*').eq('is_deleted', false).order('created_at', { ascending: false }),
+        db.from('products').select('*').eq('is_deleted', true).order('deleted_at', { ascending: false }),
         supabase.from('categories').select('*, translation:category_translations!left(*)').eq('active', true).order('sort_order').order('slug'),
       ]);
       if (productsRes.status === 'fulfilled') {
@@ -443,6 +451,7 @@ function WebProductsScreen() {
         console.error('[AdminProducts] loadAll products rejected:', productsRes.reason);
         setLoadError('Failed to load products. Please refresh.');
       }
+      if (trashedRes.status === 'fulfilled') setTrashedProducts(trashedRes.value.data ?? []);
       if (catsRes.status === 'fulfilled') setDbCategories(catsRes.value.data ?? []);
     } catch (err) {
       console.error('[AdminProducts] loadAll unexpected error:', err);
@@ -705,12 +714,37 @@ function WebProductsScreen() {
   const handleDelete = async (p: Product) => {
     if (!guardAction()) { showToast('Permission denied: manage_products required', 'error'); return; }
     setDeleting(p.id);
-    await adminSupabase().from('products').delete().eq('id', p.id);
+    await adminSupabase().from('products').update({
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: admin?.email ?? '',
+    }).eq('id', p.id);
     await fetchProducts();
     setDeleting(null);
     setConfirmDelete(null);
-    showToast('Product deleted');
+    showToast('Product moved to trash');
     logAdminAction({ action: 'delete', entityType: 'product', entityId: p.id, entityLabel: p.name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+  };
+
+  const handleRestore = async (p: Product) => {
+    await adminSupabase().from('products').update({
+      is_deleted: false,
+      deleted_at: null,
+      deleted_by: null,
+    }).eq('id', p.id);
+    await fetchProducts();
+    showToast('Product restored');
+    logAdminAction({ action: 'update', entityType: 'product', entityId: p.id, entityLabel: p.name, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+  };
+
+  const handleHardDelete = async (p: Product) => {
+    setDeleting(p.id);
+    await adminSupabase().from('products').delete().eq('id', p.id);
+    await fetchProducts();
+    setDeleting(null);
+    setConfirmHardDelete(null);
+    showToast('Product permanently deleted');
+    logAdminAction({ action: 'delete', entityType: 'product', entityId: p.id, entityLabel: p.name, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
   };
 
   const handleQuickStockSave = async (productId: string) => {
@@ -767,7 +801,12 @@ function WebProductsScreen() {
       }))
     : FALLBACK_CATEGORIES.map((c) => ({ slug: c, label: c }));
 
-  const filtered = products.filter((p) => {
+  const sourceProducts = showTrash ? trashedProducts : products;
+  const filtered = sourceProducts.filter((p) => {
+    if (showTrash) {
+      const q = search.trim().toLowerCase();
+      return q === '' || (p.name ?? '').toLowerCase().includes(q) || (p.name_ar ?? '').toLowerCase().includes(q);
+    }
     const q = search.trim().toLowerCase();
     const matchSearch =
       q === '' ||
@@ -789,7 +828,7 @@ function WebProductsScreen() {
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder={t.searchProducts}
+            placeholder={showTrash ? 'Search trash...' : t.searchProducts}
             placeholderTextColor={Colors.textMuted}
           />
           {search !== '' && (
@@ -798,14 +837,28 @@ function WebProductsScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.8}>
-          <Plus size={18} color={Colors.background} strokeWidth={2.5} />
-          <Text style={styles.addBtnText}>{t.addProduct}</Text>
-        </TouchableOpacity>
+        {isSuperAdmin && (
+          <TouchableOpacity
+            style={[styles.trashToggleBtn, showTrash && styles.trashToggleBtnActive]}
+            onPress={() => { setShowTrash(!showTrash); setSearch(''); setCategoryFilter('all'); }}
+            activeOpacity={0.8}
+          >
+            <Trash2 size={14} color={showTrash ? Colors.error : Colors.textMuted} strokeWidth={2} />
+            <Text style={[styles.trashToggleText, showTrash && { color: Colors.error }]}>
+              Trash {trashedProducts.length > 0 ? `(${trashedProducts.length})` : ''}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {!showTrash && (
+          <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.8}>
+            <Plus size={18} color={Colors.background} strokeWidth={2.5} />
+            <Text style={styles.addBtnText}>{t.addProduct}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Low stock alert */}
-      {lowStockCount > 0 && (
+      {/* Low stock alert — hidden in trash view */}
+      {!showTrash && lowStockCount > 0 && (
         <View style={styles.lowStockBanner}>
           <AlertCircle size={15} color={Colors.warning} strokeWidth={2} />
           <Text style={styles.lowStockBannerText}>
@@ -814,21 +867,23 @@ function WebProductsScreen() {
         </View>
       )}
 
-      {/* Category filter */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }} contentContainerStyle={{ gap: Spacing.sm, paddingRight: Spacing.sm }}>
-        {[{ slug: 'all', label: 'الكل' }, ...allCategories].map(({ slug, label }) => (
-          <TouchableOpacity
-            key={slug}
-            style={[styles.catFilterChip, categoryFilter === slug && styles.catFilterChipActive]}
-            onPress={() => setCategoryFilter(slug)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.catFilterChipText, categoryFilter === slug && styles.catFilterChipTextActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Category filter — hidden in trash view */}
+      {!showTrash && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }} contentContainerStyle={{ gap: Spacing.sm, paddingRight: Spacing.sm }}>
+          {[{ slug: 'all', label: 'الكل' }, ...allCategories].map(({ slug, label }) => (
+            <TouchableOpacity
+              key={slug}
+              style={[styles.catFilterChip, categoryFilter === slug && styles.catFilterChipActive]}
+              onPress={() => setCategoryFilter(slug)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.catFilterChipText, categoryFilter === slug && styles.catFilterChipTextActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {openEditError && (
         <View style={styles.errorBanner}>
@@ -854,11 +909,11 @@ function WebProductsScreen() {
           </TouchableOpacity>
         </View>
       ) : filtered.length === 0 ? (
-        <Text style={styles.emptyText}>{t.noProductsFound}</Text>
+        <Text style={styles.emptyText}>{showTrash ? 'Trash is empty' : t.noProductsFound}</Text>
       ) : (
         filtered.map((p) => {
-          const isLowStock = (p.stock ?? 0) <= LOW_STOCK_THRESHOLD;
-          const stockEditing = quickEditStock[p.id] !== undefined;
+          const isLowStock = !showTrash && (p.stock ?? 0) <= LOW_STOCK_THRESHOLD;
+          const stockEditing = !showTrash && quickEditStock[p.id] !== undefined;
           return (
             <View key={p.id} style={[styles.productCard, isLowStock && styles.productCardLowStock]}>
               <View style={styles.productThumb}>
@@ -930,52 +985,77 @@ function WebProductsScreen() {
                 </View>
               </View>
               <View style={styles.productActions}>
-                {/* Availability toggle */}
-                <TouchableOpacity
-                  style={[
-                    styles.availabilityBtn,
-                    p.in_stock !== false ? styles.availabilityBtnIn : styles.availabilityBtnOut,
-                  ]}
-                  onPress={() => toggleInStock(p.id, p.in_stock !== false)}
-                  activeOpacity={0.75}
-                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-                >
-                  <Text style={[
-                    styles.availabilityBtnText,
-                    p.in_stock !== false ? styles.availabilityBtnTextIn : styles.availabilityBtnTextOut,
-                  ]}>
-                    {p.in_stock !== false ? 'In Stock' : 'OOS'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, openingEdit === p.id && { opacity: 0.6 }]}
-                  onPress={() => { if (!openingEdit) openEdit(p); }}
-                  activeOpacity={0.7}
-                  disabled={!!openingEdit}
-                >
-                  {openingEdit === p.id
-                    ? <ActivityIndicator size="small" color={Colors.neonBlue} />
-                    : <Pencil size={16} color={Colors.neonBlue} strokeWidth={2} />
-                  }
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: 'rgba(255,77,141,0.08)', borderColor: 'rgba(255,77,141,0.25)' }]}
-                  onPress={() => { setReTranslateProduct(p); setReTranslateOverwrite(true); setReTranslateStatus('idle'); setReTranslateErrorMsg(''); }}
-                  activeOpacity={0.7}
-                >
-                  <RefreshCw size={15} color={Colors.neonBlue} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: Colors.error + '18' }]}
-                  onPress={() => setConfirmDelete(p)}
-                  activeOpacity={0.7}
-                >
-                  {deleting === p.id ? (
-                    <ActivityIndicator size="small" color={Colors.error} />
-                  ) : (
-                    <Trash2 size={16} color={Colors.error} strokeWidth={2} />
-                  )}
-                </TouchableOpacity>
+                {showTrash ? (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: Colors.success + '18' }]}
+                      onPress={() => handleRestore(p)}
+                      activeOpacity={0.7}
+                    >
+                      <RotateCcw size={16} color={Colors.success} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: Colors.error + '18' }]}
+                      onPress={() => setConfirmHardDelete(p)}
+                      activeOpacity={0.7}
+                    >
+                      {deleting === p.id ? (
+                        <ActivityIndicator size="small" color={Colors.error} />
+                      ) : (
+                        <Trash2 size={16} color={Colors.error} strokeWidth={2} />
+                      )}
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    {/* Availability toggle */}
+                    <TouchableOpacity
+                      style={[
+                        styles.availabilityBtn,
+                        p.in_stock !== false ? styles.availabilityBtnIn : styles.availabilityBtnOut,
+                      ]}
+                      onPress={() => toggleInStock(p.id, p.in_stock !== false)}
+                      activeOpacity={0.75}
+                      hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    >
+                      <Text style={[
+                        styles.availabilityBtnText,
+                        p.in_stock !== false ? styles.availabilityBtnTextIn : styles.availabilityBtnTextOut,
+                      ]}>
+                        {p.in_stock !== false ? 'In Stock' : 'OOS'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, openingEdit === p.id && { opacity: 0.6 }]}
+                      onPress={() => { if (!openingEdit) openEdit(p); }}
+                      activeOpacity={0.7}
+                      disabled={!!openingEdit}
+                    >
+                      {openingEdit === p.id
+                        ? <ActivityIndicator size="small" color={Colors.neonBlue} />
+                        : <Pencil size={16} color={Colors.neonBlue} strokeWidth={2} />
+                      }
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: 'rgba(255,77,141,0.08)', borderColor: 'rgba(255,77,141,0.25)' }]}
+                      onPress={() => { setReTranslateProduct(p); setReTranslateOverwrite(true); setReTranslateStatus('idle'); setReTranslateErrorMsg(''); }}
+                      activeOpacity={0.7}
+                    >
+                      <RefreshCw size={15} color={Colors.neonBlue} strokeWidth={2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: Colors.error + '18' }]}
+                      onPress={() => setConfirmDelete(p)}
+                      activeOpacity={0.7}
+                    >
+                      {deleting === p.id ? (
+                        <ActivityIndicator size="small" color={Colors.error} />
+                      ) : (
+                        <Trash2 size={16} color={Colors.error} strokeWidth={2} />
+                      )}
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             </View>
           );
@@ -1277,7 +1357,10 @@ function WebProductsScreen() {
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>{t.deleteProduct}</Text>
-            <Text style={styles.confirmMsg} numberOfLines={2}>{confirmDelete?.name}</Text>
+            <Text style={styles.confirmMsg} numberOfLines={2}>{confirmDelete?.name_ar || confirmDelete?.name}</Text>
+            <Text style={[styles.confirmMsg, { fontSize: FontSize.xs, color: Colors.warning, marginTop: 4 }]}>
+              Product will be moved to trash. Super admins can restore it.
+            </Text>
             <View style={styles.confirmBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDelete(null)} activeOpacity={0.7}>
                 <Text style={styles.cancelBtnText}>{t.cancel}</Text>
@@ -1288,6 +1371,30 @@ function WebProductsScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={styles.saveBtnText}>{t.delete}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!confirmHardDelete} animationType="fade" transparent onRequestClose={() => setConfirmHardDelete(null)}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>Permanently Delete?</Text>
+            <Text style={styles.confirmMsg} numberOfLines={2}>{confirmHardDelete?.name_ar || confirmHardDelete?.name}</Text>
+            <Text style={[styles.confirmMsg, { fontSize: FontSize.xs, color: Colors.error, marginTop: 4 }]}>
+              This cannot be undone.
+            </Text>
+            <View style={styles.confirmBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmHardDelete(null)} activeOpacity={0.7}>
+                <Text style={styles.cancelBtnText}>{t.cancel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: Colors.error }]}
+                onPress={() => confirmHardDelete && handleHardDelete(confirmHardDelete)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.saveBtnText}>Delete Permanently</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1981,6 +2088,9 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     alignItems: 'center',
   },
+  trashToggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  trashToggleBtnActive: { borderColor: Colors.error + '66', backgroundColor: Colors.errorDim },
+  trashToggleText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '700' },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
