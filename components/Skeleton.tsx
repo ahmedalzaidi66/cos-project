@@ -475,6 +475,25 @@ export const WalletSkeleton = memo(function WalletSkeleton() {
 
 // ── Chat Message Skeleton ────────────────────────────────────────────────────
 
+export const LoyaltySettingsSkeleton = memo(function LoyaltySettingsSkeleton() {
+  return (
+    <View style={{ gap: 10, paddingVertical: 4 }}>
+      <SkeletonRow gap={12}>
+        <SkeletonBox height={72} style={{ flex: 1 }} borderRadius={10} />
+        <SkeletonBox height={72} style={{ flex: 1 }} borderRadius={10} />
+        <SkeletonBox height={72} style={{ flex: 1 }} borderRadius={10} />
+      </SkeletonRow>
+      <SkeletonBox height={44} borderRadius={8} />
+      <SkeletonBox height={44} borderRadius={8} />
+      <SkeletonBox height={44} borderRadius={8} />
+      <SkeletonBox height={44} borderRadius={8} />
+      <SkeletonBox height={44} borderRadius={8} />
+      <SkeletonBox height={44} borderRadius={8} />
+      <SkeletonBox height={44} borderRadius={10} style={{ marginTop: 4 }} />
+    </View>
+  );
+});
+
 export const ChatMessageSkeleton = memo(function ChatMessageSkeleton() {
   return (
     <View style={styles.chatBubble}>

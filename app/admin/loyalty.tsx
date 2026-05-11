@@ -20,6 +20,7 @@ import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 import { TIER_COLORS, getTierFromLifetime, LoyaltyTier, TierBenefits, DEFAULT_TIER_BENEFITS } from '@/lib/loyalty';
+import { LoyaltySettingsSkeleton } from '@/components/Skeleton';
 
 type LoyaltyMember = {
   id: string;
@@ -143,15 +144,28 @@ function LoyaltyContent() {
   const saveSettings = async () => {
     setSettingsSaving(true);
     setSettingsMsg('');
+    const payload = {
+      id: 1,
+      earning_enabled:      settings.earning_enabled,
+      redeeming_enabled:    settings.redeeming_enabled,
+      points_per_iqd:       settings.points_per_iqd,
+      iqd_per_point:        settings.iqd_per_point,
+      min_order_to_earn:    settings.min_order_to_earn,
+      min_points_to_redeem: settings.min_points_to_redeem,
+      max_redeem_percent:   Math.min(100, Math.max(0, settings.max_redeem_percent)),
+      updated_at:           new Date().toISOString(),
+    };
     const { error } = await adminSupabase()
       .from('loyalty_settings')
-      .upsert({ id: 1, ...settings, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      .upsert(payload, { onConflict: 'id' });
     setSettingsSaving(false);
     if (error) {
-      setSettingsMsg((t as any).loyaltySettingsFailed ?? 'Failed to save settings');
+      const msg = error.message ?? JSON.stringify(error);
+      console.error('[saveSettings] Failed:', msg, error);
+      setSettingsMsg(`Save failed: ${msg}`);
     } else {
-      setSettingsMsg((t as any).loyaltySettingsSaved ?? 'Settings saved');
-      setTimeout(() => setSettingsMsg(''), 2000);
+      setSettingsMsg((t as any).loyaltySettingsSaved ?? 'Settings saved successfully');
+      setTimeout(() => setSettingsMsg(''), 3000);
     }
   };
 
@@ -237,8 +251,14 @@ function LoyaltyContent() {
 
   const content = (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      {/* Skeleton while loading */}
+      {loading && (
+        <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md }}>
+          <LoyaltySettingsSkeleton />
+        </View>
+      )}
       {/* Overview cards */}
-      <View style={styles.overviewRow}>
+      {!loading && <View style={styles.overviewRow}>
         <OverviewCard
           icon={<Users size={20} color={Colors.neonBlue} strokeWidth={1.8} />}
           label={(t as any).loyaltyMembers ?? 'Active Members'}
@@ -260,8 +280,9 @@ function LoyaltyContent() {
             color={TIER_COLORS[tier]}
           />
         ))}
-      </View>
+      </View>}
 
+      {!loading && <>
       {/* Settings toggle */}
       <TouchableOpacity
         style={styles.settingsToggle}
@@ -332,7 +353,7 @@ function LoyaltyContent() {
             keyboardType="number-pad"
           />
           {settingsMsg ? (
-            <Text style={settingsMsg.includes('fail') || settingsMsg.includes('fail') ? styles.errorMsg : styles.successMsg}>
+            <Text style={settingsMsg.toLowerCase().includes('fail') || settingsMsg.toLowerCase().includes('error') ? styles.errorMsg : styles.successMsg}>
               {settingsMsg}
             </Text>
           ) : null}
@@ -497,7 +518,7 @@ function LoyaltyContent() {
           })}
 
           {tierBenMsg ? (
-            <Text style={tierBenMsg.includes('Failed') ? styles.errorMsg : styles.successMsg}>
+            <Text style={tierBenMsg.toLowerCase().includes('fail') || tierBenMsg.toLowerCase().includes('error') ? styles.errorMsg : styles.successMsg}>
               {tierBenMsg}
             </Text>
           ) : null}
@@ -515,6 +536,8 @@ function LoyaltyContent() {
           </TouchableOpacity>
         </View>
       )}
+
+      </>}
 
       {/* Customer table */}
       <Text style={styles.sectionTitle}>{(t as any).loyaltyCustomerTable ?? 'Customer Balances'}</Text>
