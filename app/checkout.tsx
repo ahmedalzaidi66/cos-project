@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CreditCard, Smartphone, Globe, Banknote, CircleCheck as CheckCircle, ArrowLeft, MapPin, User, Phone, Mail, Truck, CircleAlert as AlertCircle, Coins, X } from 'lucide-react-native';
+import { CreditCard, Smartphone, Globe, Banknote, CircleCheck as CheckCircle, ArrowLeft, MapPin, User, Phone, Mail, Truck, CircleAlert as AlertCircle, Coins, X, Crown } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
@@ -644,11 +644,34 @@ export default function CheckoutScreen() {
           </View>
           {totalBonusPoints > 0 && (
             <View style={styles.checkoutBonusBanner}>
+              <Coins size={13} color="#FFD700" strokeWidth={2} />
               <Text style={styles.checkoutBonusBannerText}>
                 {((t as any).loyaltyPointsEarnedOnOrder ?? 'You will earn {{n}} bonus points').replace(
                   '{{n}}',
                   totalBonusPoints.toLocaleString()
                 )}
+              </Text>
+            </View>
+          )}
+          {/* Tier multiplier banner */}
+          {user && (tierBenefits?.bonus_multiplier ?? 1) > 1 && (
+            <View style={[styles.checkoutBonusBanner, { backgroundColor: TIER_COLORS[loyalty.tier] + '12', borderColor: TIER_COLORS[loyalty.tier] + '40' }]}>
+              <Coins size={13} color={TIER_COLORS[loyalty.tier]} strokeWidth={2} />
+              <Text style={[styles.checkoutBonusBannerText, { color: TIER_COLORS[loyalty.tier] }]}>
+                {loyalty.tier.charAt(0).toUpperCase() + loyalty.tier.slice(1)} member: {tierBenefits?.bonus_multiplier}x bonus points on this order
+              </Text>
+            </View>
+          )}
+          {/* Tier savings summary */}
+          {user && (tierDiscount > 0 || tierFreeShipping) && (
+            <View style={[styles.tierSavingsBanner, { backgroundColor: TIER_COLORS[loyalty.tier] + '10', borderColor: TIER_COLORS[loyalty.tier] + '30' }]}>
+              <Crown size={13} color={TIER_COLORS[loyalty.tier]} strokeWidth={2} />
+              <Text style={[styles.tierSavingsBannerText, { color: TIER_COLORS[loyalty.tier] }]}>
+                {'Your '}
+                {loyalty.tier.charAt(0).toUpperCase() + loyalty.tier.slice(1)}
+                {' tier saved you '}
+                {tierDiscount > 0 ? formatPrice(tierDiscount, language) : ''}
+                {tierDiscount > 0 && tierFreeShipping ? ' + free shipping' : tierFreeShipping ? 'free shipping' : ''}
               </Text>
             </View>
           )}
@@ -1282,6 +1305,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.2,
+  },
+  tierSavingsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginTop: 2,
+  },
+  tierSavingsBannerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
   },
   redeemSection: {
     marginTop: 4,

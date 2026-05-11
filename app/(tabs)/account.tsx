@@ -11,7 +11,7 @@ import {
   TextInput,
   Linking,
 } from 'react-native';
-import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake, Palette, Coins, TrendingUp, History, ChevronDown } from 'lucide-react-native';
+import { User, Mail, Lock, LogOut, Package, Eye, EyeOff, Heart, ChevronRight, CircleCheck as CheckCircle, Globe, CreditCard, MapPin, KeyRound, Pencil, X, Bell, RefreshCw, Instagram, Facebook, MessageCircle, Phone, Store, SmartphoneNfc, CalendarDays, Cake, Palette, Coins, TrendingUp, History, ChevronDown, Crown, Percent, Star, Zap } from 'lucide-react-native';
 import { Music2 } from 'lucide-react-native';
 import { useWishlist } from '@/context/WishlistContext';
 import { useRouter } from 'expo-router';
@@ -30,7 +30,7 @@ import ThemeSelector from '@/components/ThemeSelector';
 import { ListItemSkeleton, WalletSkeleton } from '@/components/Skeleton';
 import OrderTimeline from '@/components/OrderTimeline';
 import { useLoyalty } from '@/context/LoyaltyContext';
-import { TIER_COLORS, getTierBenefitLines } from '@/lib/loyalty';
+import { TIER_COLORS } from '@/lib/loyalty';
 
 export default function AccountScreen() {
   const { isAuthenticated, user } = useAuth();
@@ -1655,6 +1655,33 @@ function MenuRow({
   );
 }
 
+// ─── Tier perk icon helper ────────────────────────────────────────────────────
+
+function PerkIcon({ type, color }: { type: string; color: string }) {
+  const size = 13;
+  const sw = 2;
+  if (type === 'discount')   return <Percent size={size} color={color} strokeWidth={sw} />;
+  if (type === 'shipping')   return <Package size={size} color={color} strokeWidth={sw} />;
+  if (type === 'multiplier') return <TrendingUp size={size} color={color} strokeWidth={sw} />;
+  if (type === 'birthday')   return <Heart size={size} color={color} strokeWidth={sw} />;
+  if (type === 'exclusive')  return <Star size={size} color={color} strokeWidth={sw} />;
+  if (type === 'early')      return <Zap size={size} color={color} strokeWidth={sw} />;
+  return <CheckCircle size={size} color={color} strokeWidth={sw} />;
+}
+
+type PerkItem = { type: string; label: string };
+
+function buildPerks(b: any, _t: any): PerkItem[] {
+  const perks: PerkItem[] = [];
+  if ((b.discount_pct ?? 0) > 0)       perks.push({ type: 'discount',   label: `${b.discount_pct}% discount on all orders` });
+  if (b.free_shipping)                  perks.push({ type: 'shipping',   label: 'Free shipping on all orders' });
+  if ((b.bonus_multiplier ?? 1) > 1)    perks.push({ type: 'multiplier', label: `${b.bonus_multiplier}x bonus points on purchases` });
+  if ((b.birthday_bonus ?? 0) > 0)      perks.push({ type: 'birthday',   label: `${b.birthday_bonus} bonus pts on your birthday` });
+  if (b.exclusive_offers)               perks.push({ type: 'exclusive',  label: 'Access to exclusive member offers' });
+  if (b.early_access)                   perks.push({ type: 'early',      label: 'Early access to new launches' });
+  return perks;
+}
+
 // ─── Tier benefits card (shown inside wallet) ────────────────────────────────
 
 function TierBenefitsCard({
@@ -1665,39 +1692,79 @@ function TierBenefitsCard({
   tierColor: string;
   tierLabel: string;
 }) {
+  const { t } = useLanguage();
   const benefits = loyalty.tierBenefits;
-  const lines = getTierBenefitLines(benefits);
+  const perks = buildPerks(benefits, t);
+  const TIER_ORDER_ARR = ['bronze', 'silver', 'gold', 'platinum'] as const;
+  const nextTiers = TIER_ORDER_ARR.slice(TIER_ORDER_ARR.indexOf(loyalty.tier as any) + 1);
+  const allBenefits = loyalty.allTierBenefits;
 
   return (
-    <View style={[walletStyles.benefitsWrap, { borderColor: tierColor + '40', backgroundColor: C.backgroundCard }]}>
-      {/* Header */}
-      <View style={[walletStyles.benefitsHeader, { backgroundColor: tierColor + '12' }]}>
-        <View style={[walletStyles.benefitsBadge, { backgroundColor: tierColor + '25', borderColor: tierColor + '50' }]}>
-          <Text style={[walletStyles.benefitsBadgeText, { color: tierColor }]}>{tierLabel}</Text>
+    <View style={{ gap: 10 }}>
+      {/* Current tier benefits */}
+      <View style={[walletStyles.benefitsWrap, { borderColor: tierColor + '50', backgroundColor: C.backgroundCard }]}>
+        <View style={[walletStyles.benefitsHeader, { backgroundColor: tierColor + '15' }]}>
+          <View style={[walletStyles.benefitsBadge, { backgroundColor: tierColor + '22', borderColor: tierColor + '55' }]}>
+            <Crown size={12} color={tierColor} strokeWidth={2} />
+            <Text style={[walletStyles.benefitsBadgeText, { color: tierColor }]}>{tierLabel}</Text>
+          </View>
+          <Text style={[walletStyles.benefitsTitle, { color: C.textSecondary }]}>Your Current Benefits</Text>
         </View>
-        <Text style={[walletStyles.benefitsTitle, { color: C.textSecondary }]}>Your Benefits</Text>
+
+        {benefits.description ? (
+          <Text style={[walletStyles.benefitsDesc, { color: C.textMuted }]}>{benefits.description}</Text>
+        ) : null}
+
+        <View style={[walletStyles.perksGrid, walletStyles.benefitsBodyPad]}>
+          {perks.length === 0 ? (
+            <Text style={[walletStyles.benefitsEmpty, { color: C.textMuted }]}>
+              Earn points to unlock Silver, Gold & Platinum benefits.
+            </Text>
+          ) : (
+            perks.map((perk, i) => (
+              <View key={i} style={[walletStyles.perkChip, { backgroundColor: tierColor + '12', borderColor: tierColor + '35' }]}>
+                <PerkIcon type={perk.type} color={tierColor} />
+                <Text style={[walletStyles.perkChipText, { color: C.textPrimary }]}>{perk.label}</Text>
+              </View>
+            ))
+          )}
+        </View>
       </View>
 
-      {/* Description */}
-      {benefits.description ? (
-        <Text style={[walletStyles.benefitsDesc, { color: C.textMuted }]}>{benefits.description}</Text>
-      ) : null}
-
-      {/* Perk lines */}
-      {lines.length === 0 ? (
-        <Text style={[walletStyles.benefitsEmpty, { color: C.textMuted }]}>
-          Earn points to unlock Silver, Gold & Platinum benefits.
-        </Text>
-      ) : (
-        <View style={[{ gap: 6 }, walletStyles.benefitsBodyPad]}>
-          {lines.map((line, i) => (
-            <View key={i} style={walletStyles.benefitsRow}>
-              <View style={[walletStyles.benefitsDot, { backgroundColor: tierColor }]} />
-              <Text style={[walletStyles.benefitsLine, { color: C.textPrimary }]}>{line}</Text>
+      {/* Upcoming tier motivation cards */}
+      {nextTiers.map((upcomingTier) => {
+        const ub = allBenefits[upcomingTier];
+        const uColor = TIER_COLORS[upcomingTier];
+        const uPerks = buildPerks(ub, t);
+        const uLabel = upcomingTier.charAt(0).toUpperCase() + upcomingTier.slice(1);
+        const ptsNeeded = Math.max(0, (ub.min_points ?? 0) - loyalty.lifetimePoints);
+        return (
+          <View key={upcomingTier} style={[walletStyles.motivationCard, { borderColor: uColor + '35', backgroundColor: C.backgroundCard }]}>
+            <View style={walletStyles.motivationHeader}>
+              <View style={[walletStyles.motivationBadge, { backgroundColor: uColor + '18', borderColor: uColor + '40' }]}>
+                <Crown size={11} color={uColor} strokeWidth={2} />
+                <Text style={[walletStyles.motivationBadgeText, { color: uColor }]}>{uLabel}</Text>
+              </View>
+              <Text style={[walletStyles.motivationUnlock, { color: C.textMuted }]}>
+                {ptsNeeded > 0
+                  ? `Earn ${ptsNeeded.toLocaleString()} more pts to unlock`
+                  : 'Almost there!'}
+              </Text>
             </View>
-          ))}
-        </View>
-      )}
+            {ub.description ? (
+              <Text style={[walletStyles.motivationDesc, { color: C.textMuted }]}>{ub.description}</Text>
+            ) : null}
+            <View style={walletStyles.perksGrid}>
+              {uPerks.map((perk, i) => (
+                <View key={i} style={[walletStyles.perkChip, walletStyles.perkChipLocked, { borderColor: uColor + '25' }]}>
+                  <PerkIcon type={perk.type} color={uColor + 'AA'} />
+                  <Text style={[walletStyles.perkChipText, { color: C.textMuted }]}>{perk.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -2582,13 +2649,16 @@ const walletStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   benefitsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     borderWidth: 1,
     borderRadius: Radius.full,
     paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   benefitsBadgeText: {
     fontSize: 11,
@@ -2599,13 +2669,14 @@ const walletStyles = StyleSheet.create({
   benefitsTitle: {
     fontSize: FontSize.sm,
     fontWeight: '700',
+    flex: 1,
   },
   benefitsDesc: {
     fontSize: 11,
     fontWeight: '400',
-    lineHeight: 16,
+    lineHeight: 17,
     paddingHorizontal: Spacing.md,
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
   benefitsEmpty: {
     fontSize: 11,
@@ -2613,6 +2684,75 @@ const walletStyles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.md,
   },
+  benefitsBodyPad: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  perksGrid: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
+    gap: 6,
+  },
+  perkChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  perkChipLocked: {
+    opacity: 0.65,
+  },
+  perkChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  motivationCard: {
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    paddingBottom: 4,
+  },
+  motivationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  motivationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  motivationBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  motivationUnlock: {
+    fontSize: 10,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+  },
+  motivationDesc: {
+    fontSize: 11,
+    fontWeight: '400',
+    lineHeight: 16,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 6,
+  },
+  // Old styles kept for safety
   benefitsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2629,9 +2769,6 @@ const walletStyles = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '500',
     flex: 1,
-  },
-  benefitsBodyPad: {
-    paddingBottom: Spacing.md,
   },
 });
 

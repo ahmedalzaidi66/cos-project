@@ -158,19 +158,37 @@ function LoyaltyContent() {
   const saveTierBenefits = async () => {
     setTierBenSaving(true);
     setTierBenMsg('');
-    const rows = Object.values(tierBenefits).map(b => ({
-      ...b,
-      updated_at: new Date().toISOString(),
-    }));
-    const { error } = await adminSupabase()
-      .from('loyalty_tier_benefits')
-      .upsert(rows, { onConflict: 'tier' });
+    // Build rows — upsert one tier at a time to avoid partial failure masking errors
+    const tiers = (['bronze', 'silver', 'gold', 'platinum'] as LoyaltyTier[]);
+    let firstError: string | null = null;
+    for (const tier of tiers) {
+      const b = tierBenefits[tier];
+      const row = {
+        tier:             b.tier,
+        min_points:       b.min_points,
+        discount_pct:     b.discount_pct,
+        free_shipping:    b.free_shipping,
+        bonus_multiplier: b.bonus_multiplier,
+        birthday_bonus:   b.birthday_bonus,
+        exclusive_offers: b.exclusive_offers,
+        early_access:     b.early_access,
+        description:      b.description,
+        updated_at:       new Date().toISOString(),
+      };
+      const { error } = await adminSupabase()
+        .from('loyalty_tier_benefits')
+        .upsert(row, { onConflict: 'tier' });
+      if (error && !firstError) {
+        firstError = error.message ?? 'Unknown error';
+        console.error('[saveTierBenefits]', tier, error);
+      }
+    }
     setTierBenSaving(false);
-    if (error) {
-      setTierBenMsg('Failed to save tier benefits');
+    if (firstError) {
+      setTierBenMsg(`Save failed: ${firstError}`);
     } else {
-      setTierBenMsg('Tier benefits saved');
-      setTimeout(() => setTierBenMsg(''), 2000);
+      setTierBenMsg('Tier benefits saved successfully');
+      setTimeout(() => setTierBenMsg(''), 3000);
     }
   };
 
