@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { LayoutDashboard, Package, Layers2, ShoppingCart, Users, UserCog, File as FileEdit, Settings, LogOut, ShieldCheck, ChevronRight, MessageSquare, Tag, Layers, LayoutGrid, Maximize2, Globe, ShieldAlert, Info, Truck, Bell, LayoutList, ChartBar as BarChart3, Coins, ClipboardList } from 'lucide-react-native';
+import { LayoutDashboard, Package, Layers2, ShoppingCart, Users, UserCog, File as FileEdit, Settings, LogOut, ShieldCheck, ChevronRight, MessageSquare, Tag, Layers, LayoutGrid, Maximize2, Globe, ShieldAlert, Info, Truck, Bell, LayoutList, ChartBar as BarChart3, Coins, ClipboardList, CalendarDays } from 'lucide-react-native';
 import { useAdmin, ROLE_LABELS } from '@/context/AdminContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useLanguage } from '@/context/LanguageContext';
@@ -39,7 +39,8 @@ const NAV_ITEMS = [
   { key: 'uiSizes',       icon: Maximize2,       route: '/admin/sizes',       permission: 'manage_layout' },
   { key: 'settings',      icon: Settings,        route: '/admin/settings',    permission: 'manage_settings' },
   { key: 'permissions',   icon: ShieldAlert,     route: '/admin/permissions', permission: 'manage_permissions' },
-  { key: 'activityLogs', icon: ClipboardList,   route: '/admin/audit-logs',  permission: 'view_audit_logs' },
+  { key: 'activityLogs',     icon: ClipboardList,   route: '/admin/audit-logs',  permission: 'view_audit_logs' },
+  { key: 'seasonalCampaigns', icon: CalendarDays,   route: '/admin/campaigns',   permission: 'manage_campaigns' },
 ] as const;
 
 // Role badge colour map

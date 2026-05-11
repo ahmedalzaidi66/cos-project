@@ -525,4 +525,7 @@ export default {
   auditEntityNotification: 'ئاگادارکردنەوە',
   auditEntityCustomer: 'کڕیار',
   auditEntityShipping: 'گەیاندن',
+
+  // Admin Seasonal Campaigns
+  seasonalCampaigns: 'ئۆکازیۆن و کامپەینەکان',
 };

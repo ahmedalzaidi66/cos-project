@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { LayoutDashboard, Package, ShoppingCart, Users, UserCog, File as FileEdit, Settings, LogOut, Menu, X, ShieldCheck, ChevronLeft, MessageSquare, Tag, ShieldAlert, Truck, Bell, LayoutList, ChartBar as BarChart3, Coins, ClipboardList } from 'lucide-react-native';
+import { LayoutDashboard, Package, ShoppingCart, Users, UserCog, File as FileEdit, Settings, LogOut, Menu, X, ShieldCheck, ChevronLeft, MessageSquare, Tag, ShieldAlert, Truck, Bell, LayoutList, ChartBar as BarChart3, Coins, ClipboardList, CalendarDays } from 'lucide-react-native';
 import { useAdmin, ROLE_LABELS } from '@/context/AdminContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useLanguage } from '@/context/LanguageContext';
@@ -40,7 +40,8 @@ const MOBILE_NAV_ITEMS = [
   { key: 'content',     icon: FileEdit,        route: '/admin/content',     permission: 'manage_cms' },
   { key: 'settings',    icon: Settings,        route: '/admin/settings',    permission: 'manage_settings' },
   { key: 'permissions', icon: ShieldAlert,     route: '/admin/permissions', permission: 'manage_permissions' },
-  { key: 'activityLogs', icon: ClipboardList, route: '/admin/audit-logs',  permission: 'view_audit_logs' },
+  { key: 'activityLogs',     icon: ClipboardList, route: '/admin/audit-logs',  permission: 'view_audit_logs' },
+  { key: 'seasonalCampaigns', icon: CalendarDays,  route: '/admin/campaigns',  permission: 'manage_campaigns' },
 ] as const;
 
 const ROLE_COLORS: Record<string, string> = {

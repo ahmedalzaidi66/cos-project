@@ -1238,4 +1238,7 @@ export default {
   auditEntityNotification: 'Notification',
   auditEntityCustomer: 'Customer',
   auditEntityShipping: 'Shipping',
+
+  // Admin Seasonal Campaigns
+  seasonalCampaigns: 'Seasonal Campaigns',
 };

@@ -1238,4 +1238,7 @@ export default {
   auditEntityNotification: 'إشعار',
   auditEntityCustomer: 'عميل',
   auditEntityShipping: 'شحن',
+
+  // Admin Seasonal Campaigns
+  seasonalCampaigns: 'المناسبات والعروض',
 };
