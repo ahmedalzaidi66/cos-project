@@ -27,7 +27,7 @@ import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import ThemeSelector from '@/components/ThemeSelector';
-import { ListItemSkeleton } from '@/components/Skeleton';
+import { ListItemSkeleton, WalletSkeleton } from '@/components/Skeleton';
 import OrderTimeline from '@/components/OrderTimeline';
 import { useLoyalty } from '@/context/LoyaltyContext';
 import { TIER_COLORS } from '@/lib/loyalty';
@@ -1736,9 +1736,7 @@ function WalletSection({ loyalty }: { loyalty: ReturnType<typeof useLoyalty> }) 
           <Text style={[walletStyles.historyTitle, { color: C.textSecondary }]}>{(t as any).walletHistory ?? 'Points History'}</Text>
         </View>
         {loyalty.loading ? (
-          <View style={{ alignItems: 'center', paddingVertical: 16 }}>
-            <Text style={[walletStyles.emptyText, { color: C.textMuted }]}>{t.loading}</Text>
-          </View>
+          <WalletSkeleton />
         ) : loyalty.transactions.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 20, gap: 6 }}>
             <Coins size={28} color={C.textMuted} strokeWidth={1.5} />

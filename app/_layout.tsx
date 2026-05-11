@@ -15,6 +15,7 @@ import { ThemeProvider, useThemeMode } from '@/context/ThemeContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { LoyaltyProvider } from '@/context/LoyaltyContext';
 import BeautyChat, { ChatFloatingButton } from '@/components/BeautyChat';
+import LoyaltyToastManager from '@/components/LoyaltyToastManager';
 
 function AppShell() {
   const [chatOpen, setChatOpen] = useState(false);
@@ -31,6 +32,7 @@ function AppShell() {
         <Stack.Screen name="admin" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
+      <LoyaltyToastManager />
       <ChatFloatingButton onPress={openChat} chatOpen={chatOpen} />
       <BeautyChat visible={chatOpen} onClose={closeChat} />
       <StatusBar style={mode === 'light' ? 'dark' : 'light'} />

@@ -167,6 +167,7 @@ export type ThemeSettings = {
 
 export type Order = {
   id: string;
+  user_id?: string | null;
   customer_email: string;
   customer_first_name: string;
   customer_last_name: string;
@@ -185,6 +186,8 @@ export type Order = {
   updated_at?: string;
   tracking_number?: string | null;
   completed_at?: string | null;
+  points_earned?: number;
+  points_redeemed?: number;
 };
 
 export type OrderItem = {

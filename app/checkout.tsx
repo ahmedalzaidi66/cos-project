@@ -256,6 +256,7 @@ export default function CheckoutScreen() {
           country:             form.country.trim().slice(0, 100),
           governorate:         form.governorate.trim().slice(0, 100),
           area:                form.area.trim().slice(0, 100),
+          user_id:             user?.id ?? null,
           payment_method:      PAYMENT_METHOD_IDS.includes(form.paymentMethod as any) ? form.paymentMethod : 'cod',
           payment_status:      'pending',
           subtotal,
@@ -291,20 +292,24 @@ export default function CheckoutScreen() {
         return;
       }
 
-      // Deduct redeemed points from customer balance
+      // Deduct redeemed points from customer balance (safe, RLS-scoped to own user)
       if (pointsToRedeem > 0 && user?.id) {
         const newBalance = Math.max(0, loyalty.totalPoints - pointsToRedeem);
+        // Update balance
         await supabase.from('customer_loyalty').update({
           total_points: newBalance,
           updated_at: new Date().toISOString(),
         }).eq('user_id', user.id);
+        // Write redeem transaction (authenticated INSERT allowed by RLS for own user_id + type=redeem)
         await supabase.from('loyalty_transactions').insert({
           user_id:      user.id,
           order_id:     order.id,
           type:         'redeem',
+          status:       'confirmed',
           points:       -pointsToRedeem,
           balance_after: newBalance,
           note:         `Redeemed for order #${order.id.slice(0, 8).toUpperCase()}`,
+          description:  'Points applied as checkout discount',
         });
         loyalty.refresh();
       }

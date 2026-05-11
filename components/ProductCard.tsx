@@ -19,7 +19,8 @@ import { Colors, Radius, Spacing, FontSize, Shadow } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 import { useUISize } from '@/context/UISizeContext';
 import { useWishlistToast } from '@/context/WishlistToastContext';
-import { hasBonusPoints, getBonusBadgeLabel } from '@/lib/loyalty';
+import { hasBonusPoints, getBonusBadgeLabel, getProductBonusPoints } from '@/lib/loyalty';
+import { PointsPulse } from './LoyaltyRewardToast';
 
 type Props = {
   product: Product;
@@ -224,18 +225,21 @@ function ProductCardComponent({ product, onWishlistLoginRequired }: Props) {
               </Text>
             )}
           </View>
-          <Animated.View style={{ transform: [{ scale: cartBtnScale }] }}>
-            <TouchableOpacity
-              style={[styles.addBtn, justAdded && styles.addBtnAdded, isOutOfStock && styles.addBtnOOS, { borderRadius: btnR }]}
-              onPress={handleAddToCart}
-              activeOpacity={isOutOfStock ? 1 : 0.8}
-            >
-              {justAdded
-                ? <Check size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2.5} />
-                : <ShoppingCart size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2} />
-              }
-            </TouchableOpacity>
-          </Animated.View>
+          <View style={styles.cartBtnWrap}>
+            <Animated.View style={{ transform: [{ scale: cartBtnScale }] }}>
+              <TouchableOpacity
+                style={[styles.addBtn, justAdded && styles.addBtnAdded, isOutOfStock && styles.addBtnOOS, { borderRadius: btnR }]}
+                onPress={handleAddToCart}
+                activeOpacity={isOutOfStock ? 1 : 0.8}
+              >
+                {justAdded
+                  ? <Check size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2.5} />
+                  : <ShoppingCart size={Math.max(10, productCardSizes.addToCartBtnSize)} color={Colors.white} strokeWidth={2} />
+                }
+              </TouchableOpacity>
+            </Animated.View>
+            <PointsPulse points={getProductBonusPoints(product)} visible={justAdded} />
+          </View>
         </View>
         {hasBonusPoints(product) && (
           <View style={[styles.bonusBadge, isRTL && styles.bonusBadgeRTL]}>
@@ -338,6 +342,9 @@ const styles = StyleSheet.create({
   addBtnOOS: {
     backgroundColor: 'rgba(80,40,40,0.6)',
     opacity: 0.65,
+  },
+  cartBtnWrap: {
+    position: 'relative',
   },
 
   // Shade dots

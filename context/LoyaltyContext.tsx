@@ -1,20 +1,23 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import { getTierFromLifetime, TIER_COLORS, type LoyaltyTier } from '@/lib/loyalty';
 
-type LoyaltyTransaction = {
+export type LoyaltyTransaction = {
   id: string;
   type: 'earn' | 'redeem' | 'adjust' | 'expire';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'reversed';
   points: number;
   balance_after: number;
   note: string | null;
+  description: string | null;
   order_id: string | null;
   created_at: string;
 };
 
 type LoyaltyState = {
   totalPoints: number;
+  pendingPoints: number;
   lifetimePoints: number;
   tier: LoyaltyTier;
   tierColor: string;
@@ -25,6 +28,7 @@ type LoyaltyState = {
 
 const LoyaltyContext = createContext<LoyaltyState>({
   totalPoints: 0,
+  pendingPoints: 0,
   lifetimePoints: 0,
   tier: 'bronze',
   tierColor: TIER_COLORS.bronze,
@@ -36,13 +40,16 @@ const LoyaltyContext = createContext<LoyaltyState>({
 export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [totalPoints, setTotalPoints] = useState(0);
+  const [pendingPoints, setPendingPoints] = useState(0);
   const [lifetimePoints, setLifetimePoints] = useState(0);
   const [transactions, setTransactions] = useState<LoyaltyTransaction[]>([]);
   const [loading, setLoading] = useState(false);
+  const prevTier = useRef<LoyaltyTier>('bronze');
 
   const fetchLoyalty = useCallback(async () => {
     if (!user?.id) {
       setTotalPoints(0);
+      setPendingPoints(0);
       setLifetimePoints(0);
       setTransactions([]);
       return;
@@ -53,12 +60,12 @@ export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
       const [loyaltyRes, txnRes] = await Promise.all([
         supabase
           .from('customer_loyalty')
-          .select('total_points, lifetime_points, tier')
+          .select('total_points, pending_points, lifetime_points, tier')
           .eq('user_id', user.id)
           .maybeSingle(),
         supabase
           .from('loyalty_transactions')
-          .select('id, type, points, balance_after, note, order_id, created_at')
+          .select('id, type, status, points, balance_after, note, description, order_id, created_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(50),
@@ -66,9 +73,11 @@ export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
 
       if (loyaltyRes.data) {
         setTotalPoints(loyaltyRes.data.total_points ?? 0);
+        setPendingPoints(loyaltyRes.data.pending_points ?? 0);
         setLifetimePoints(loyaltyRes.data.lifetime_points ?? 0);
       } else {
         setTotalPoints(0);
+        setPendingPoints(0);
         setLifetimePoints(0);
       }
 
@@ -84,7 +93,7 @@ export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
     fetchLoyalty();
   }, [fetchLoyalty]);
 
-  // Realtime: re-fetch when loyalty row changes
+  // Realtime: re-fetch when loyalty row changes, also listen for new transactions
   useEffect(() => {
     if (!user?.id) return;
 
@@ -100,6 +109,19 @@ export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
         },
         () => { fetchLoyalty(); }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'loyalty_transactions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newTx = payload.new as LoyaltyTransaction;
+          setTransactions((prev) => [newTx, ...prev.slice(0, 49)]);
+        }
+      )
       .subscribe();
 
     return () => { channel.unsubscribe(); };
@@ -107,10 +129,16 @@ export function LoyaltyProvider({ children }: { children: React.ReactNode }) {
 
   const tier = getTierFromLifetime(lifetimePoints);
 
+  // Track previous tier for tier-up detection
+  useEffect(() => {
+    prevTier.current = tier;
+  }, [tier]);
+
   return (
     <LoyaltyContext.Provider
       value={{
         totalPoints,
+        pendingPoints,
         lifetimePoints,
         tier,
         tierColor: TIER_COLORS[tier],

@@ -429,6 +429,50 @@ export const SearchResultsSkeleton = memo(function SearchResultsSkeleton() {
   );
 });
 
+// ── Wallet / Loyalty Skeleton ────────────────────────────────────────────────
+
+export const WalletSkeleton = memo(function WalletSkeleton() {
+  return (
+    <View style={{ gap: 12, paddingVertical: 4 }}>
+      {/* Stats row */}
+      <SkeletonRow gap={8}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={{ flex: 1, gap: 6, padding: 12, borderRadius: 10, backgroundColor: 'transparent' }}>
+            <SkeletonBox height={22} width="70%" borderRadius={4} />
+            <SkeletonBox height={10} width="55%" borderRadius={4} />
+          </View>
+        ))}
+      </SkeletonRow>
+      {/* Progress bar */}
+      <View style={{ gap: 8, paddingHorizontal: 2 }}>
+        <SkeletonRow style={{ justifyContent: 'space-between' }}>
+          <SkeletonBox height={11} width={120} borderRadius={4} />
+          <SkeletonBox height={11} width={36} borderRadius={4} />
+        </SkeletonRow>
+        <SkeletonBox height={8} width="100%" borderRadius={4} />
+        <SkeletonBox height={10} width={180} borderRadius={4} />
+      </View>
+      {/* Transaction rows */}
+      <View style={{ gap: 0 }}>
+        <SkeletonBox height={12} width={120} borderRadius={4} style={{ marginBottom: 10 }} />
+        {[0, 1, 2, 3].map((i) => (
+          <SkeletonRow key={i} style={{ justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: 'rgba(255,255,255,0.05)' }}>
+            <View style={{ gap: 5 }}>
+              <SkeletonBox height={12} width={90} borderRadius={4} />
+              <SkeletonBox height={9} width={140} borderRadius={4} />
+              <SkeletonBox height={9} width={70} borderRadius={4} />
+            </View>
+            <View style={{ gap: 5, alignItems: 'flex-end' }}>
+              <SkeletonBox height={12} width={56} borderRadius={4} />
+              <SkeletonBox height={9} width={72} borderRadius={4} />
+            </View>
+          </SkeletonRow>
+        ))}
+      </View>
+    </View>
+  );
+});
+
 // ── Chat Message Skeleton ────────────────────────────────────────────────────
 
 export const ChatMessageSkeleton = memo(function ChatMessageSkeleton() {
