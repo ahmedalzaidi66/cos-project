@@ -41,6 +41,7 @@ import Toast from '@/components/admin/Toast';
 import ImageUploader from '@/components/admin/ImageUploader';
 import ProductImageGallery from '@/components/admin/ProductImageGallery';
 import { supabase, adminSupabase, getAdminToken, Product, Category, getProductName } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { adminSendNotification } from '@/context/NotificationContext';
 import { extractDominantColor } from '@/lib/colorExtract';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
@@ -173,6 +174,7 @@ const LOW_STOCK_THRESHOLD = 5;
 function WebProductsScreen() {
   const { t, language } = useLanguage();
   const router = useRouter();
+  const { guard: guardAction } = useActionPermission('manage_products');
   const [products, setProducts] = useState<Product[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -558,6 +560,7 @@ function WebProductsScreen() {
   };
 
   const handleSave = async () => {
+    if (!guardAction()) { showToast('Permission denied: manage_products required', 'error'); return; }
     if (!form.name_ar.trim()) { showToast('يرجى إدخال اسم المنتج بالعربية', 'error'); return; }
     if (!form.price || isNaN(Number(form.price))) { showToast('Valid price required', 'error'); return; }
     setSaving(true);
@@ -697,6 +700,7 @@ function WebProductsScreen() {
   };
 
   const handleDelete = async (p: Product) => {
+    if (!guardAction()) { showToast('Permission denied: manage_products required', 'error'); return; }
     setDeleting(p.id);
     await adminSupabase().from('products').delete().eq('id', p.id);
     await fetchProducts();
@@ -706,6 +710,7 @@ function WebProductsScreen() {
   };
 
   const handleQuickStockSave = async (productId: string) => {
+    if (!guardAction()) { showToast('Permission denied: manage_products required', 'error'); return; }
     const rawVal = quickEditStock[productId];
     const newStock = parseInt(rawVal ?? '', 10);
     if (isNaN(newStock) || newStock < 0) {
@@ -725,6 +730,7 @@ function WebProductsScreen() {
   };
 
   const toggleInStock = async (productId: string, current: boolean) => {
+    if (!guardAction()) { showToast('Permission denied: manage_products required', 'error'); return; }
     const next = !current;
     const token = getAdminToken();
     console.log('[toggleInStock] admin token present:', !!token, '| productId:', productId, '| setting in_stock →', next);
@@ -1400,6 +1406,7 @@ function WebProductsScreen() {
 
 function MobileProductsScreen() {
   const { t, language } = useLanguage();
+  const { guard: guardAction } = useActionPermission('manage_products');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -1438,6 +1445,7 @@ function MobileProductsScreen() {
   };
 
   const handleSave = async () => {
+    if (!guardAction()) { showToast('Permission denied: manage_products required', 'error'); return; }
     if (!editProduct) return;
     if (!editForm.name.trim()) { showToast('Product name is required', 'error'); return; }
     const price = parseFloat(editForm.price);

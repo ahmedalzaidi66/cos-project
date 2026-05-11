@@ -19,6 +19,7 @@ import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
 import Toast from '@/components/admin/Toast';
 import { supabase, adminSupabase, Review } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
@@ -34,6 +35,7 @@ function ReviewsScreen() {
   const { t } = useLanguage();
   const router = useRouter();
   const { isMobile } = useAdminLayout();
+  const { guard: guardAction } = useActionPermission('manage_reviews');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -64,6 +66,7 @@ function ReviewsScreen() {
   };
 
   const updateStatus = async (id: string, status: Review['status']) => {
+    if (!guardAction()) { showToast('Permission denied: manage_reviews required', 'error'); return; }
     const { error: err } = await adminSupabase().from('reviews').update({ status }).eq('id', id);
     setReviews((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
     if (selectedReview?.id === id) {
@@ -77,6 +80,7 @@ function ReviewsScreen() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!guardAction()) { showToast('Permission denied: manage_reviews required', 'error'); return; }
     await adminSupabase().from('reviews').delete().eq('id', id);
     setDeleteId(null);
     setSelectedReview(null);

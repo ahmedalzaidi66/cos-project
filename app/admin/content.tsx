@@ -45,6 +45,7 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import MobileUnsupported from '@/components/admin/MobileUnsupported';
 import ImageUploader from '@/components/admin/ImageUploader';
 import { supabase, adminSupabase } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { autoTranslate } from '@/lib/translate';
 import { useCMS, CMSContent, DEFAULT_BRANDING } from '@/context/CMSContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -193,6 +194,7 @@ const EMPTY_SLIDE = (): SlideFields => ({
 });
 
 function HeroSlidesEditor() {
+  const { guard: guardAction } = useActionPermission('manage_cms');
   const [slides, setSlides] = useState<SlideFields[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -245,6 +247,7 @@ function HeroSlidesEditor() {
   }
 
   async function handleSave() {
+    if (!guardAction()) { setSaveError('Permission denied: manage_cms required'); return; }
     setSaving(true);
     setSaveError(null);
     const db = adminSupabase();
@@ -560,6 +563,7 @@ function HeroEditorSection({
   language: string;
   onSaved: () => void;
 }) {
+  const { guard: guardAction } = useActionPermission('manage_cms');
   const { refresh: refreshCMS } = useCMS();
 
   // ── Local hero state ──────────────────────────────────────────────────────
@@ -640,6 +644,7 @@ function HeroEditorSection({
 
   // ── Save directly to homepage_content ────────────────────────────────────
   async function handleSave() {
+    if (!guardAction()) { setSaveError('Permission denied: manage_cms required'); return; }
     setSaving(true);
     setSaveError(null);
 
@@ -719,6 +724,7 @@ function HeroEditorSection({
   }
 
   async function handleAutoTranslate() {
+    if (!guardAction()) { setTranslateMsg('Permission denied: manage_cms required'); return; }
     if (!fields.title?.trim()) { setTranslateMsg('Enter a title first'); return; }
     setTranslating(true);
     setTranslateMsg(null);
@@ -971,6 +977,7 @@ function ContentScreen() {
   const { isMobile } = useAdminLayout();
   const { isAdminAuthenticated } = useAdmin();
   const router = useRouter();
+  const { guard: guardAction } = useActionPermission('manage_cms');
   const { refresh: refreshCMS } = useCMS();
   const { t } = useLanguage();
   const TABS = [
@@ -1029,6 +1036,7 @@ function ContentScreen() {
   }, []);
 
   const handleSave = async () => {
+    if (!guardAction()) { setSaveError('Permission denied: manage_cms required'); return; }
     setSaving(true);
 
     const contentRows: { section: string; key: string; value: string; language: string }[] = [];

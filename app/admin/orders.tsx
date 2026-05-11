@@ -19,6 +19,7 @@ import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { supabase, adminSupabase } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 import { printOrder, downloadOrderPdf, type PrintOrder, type PrintOrderItem } from '@/components/admin/OrderPrintView';
@@ -139,6 +140,7 @@ function OrderDetailModal({
   onStatusUpdated: (id: string, status: string) => void;
 }) {
   const { language } = useLanguage();
+  const { guard: guardAction } = useActionPermission('manage_orders');
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -184,6 +186,7 @@ function OrderDetailModal({
   }, [visible, order.id, order.status]);
 
   const handleSaveTracking = async () => {
+    if (!guardAction()) { setErrorMsg('Permission denied: manage_orders required'); setTimeout(() => setErrorMsg(''), 4000); return; }
     setSavingTracking(true);
     const { error } = await adminSupabase()
       .from('orders')
@@ -223,6 +226,7 @@ function OrderDetailModal({
   };
 
   const commitStatusUpdate = async (newStatus: string, reason?: string) => {
+    if (!guardAction()) { setErrorMsg('Permission denied: manage_orders required'); setTimeout(() => setErrorMsg(''), 4000); return; }
     setUpdatingStatus(true);
     setErrorMsg('');
     setSuccessMsg('');

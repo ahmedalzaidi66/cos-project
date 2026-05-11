@@ -20,6 +20,7 @@ import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
 import Toast from '@/components/admin/Toast';
 import { supabase, adminSupabase, Coupon } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
 
@@ -38,6 +39,7 @@ function CouponsScreen() {
   const { isMobile } = useAdminLayout();
   const { t, language } = useLanguage();
   const router = useRouter();
+  const { guard: guardAction } = useActionPermission('manage_coupons');
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -90,6 +92,7 @@ function CouponsScreen() {
   };
 
   const handleSave = async () => {
+    if (!guardAction()) { setError('Permission denied: manage_coupons required'); return; }
     if (!form.code.trim()) { setError('Coupon code is required.'); return; }
     const val = parseFloat(form.discount_value);
     if (isNaN(val) || val <= 0) { setError('Discount value must be a positive number.'); return; }
@@ -122,6 +125,7 @@ function CouponsScreen() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!guardAction()) { showToast('Permission denied: manage_coupons required', 'error'); return; }
     await adminSupabase().from('coupons').delete().eq('id', id);
     setDeleteId(null);
     setCoupons((prev) => prev.filter((c) => c.id !== id));

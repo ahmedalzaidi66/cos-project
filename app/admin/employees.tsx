@@ -21,6 +21,7 @@ import MobileUnsupported from '@/components/admin/MobileUnsupported';
 import Toast from '@/components/admin/Toast';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { supabase, adminSupabase, getAdminToken, Employee, EMPLOYEE_ROLES, EMPLOYEE_PERMISSIONS } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
@@ -107,6 +108,7 @@ function EmployeesScreen() {
   const { isAdminAuthenticated } = useAdmin();
   const { t } = useLanguage();
   const router = useRouter();
+  const { guard: guardAction, permissionError: actionPermErr, clearPermissionError } = useActionPermission('manage_employees');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -195,6 +197,7 @@ function EmployeesScreen() {
   };
 
   const handleSave = async () => {
+    if (!guardAction()) { showToast('Permission denied: manage_employees required', 'error'); return; }
     const validationError = validate();
     if (validationError) { setError(validationError); return; }
     setError('');
@@ -291,6 +294,7 @@ function EmployeesScreen() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!guardAction()) { showToast('Permission denied: manage_employees required', 'error'); return; }
     const emp = employees.find((e) => e.id === id);
     await adminSupabase().from('employees').delete().eq('id', id);
 

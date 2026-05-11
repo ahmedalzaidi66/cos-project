@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ShieldOff, ArrowLeft } from 'lucide-react-native';
 import { useAdmin, EMPLOYEE_DEFAULT_ROUTES } from '@/context/AdminContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
 
 type Props = {
   /** Permission key required to view this section. Omit for auth-only (no specific permission needed). */
@@ -12,19 +13,92 @@ type Props = {
   children: React.ReactNode;
 };
 
+/**
+ * Wraps admin pages with two layers of protection:
+ *
+ * 1. Client-side: checks isAdminAuthenticated and the required permission.
+ * 2. Server-side: on every mount re-verifies the Supabase Auth session.
+ *    This catches stale localStorage sessions (e.g. after a tab is left open).
+ *    For employee accounts it also re-fetches the employee row to confirm
+ *    the account is still active. If the check fails the guard redirects to login.
+ */
 export default function AdminGuard({ permission, children }: Props) {
   const router = useRouter();
-  const { isAdminAuthenticated, hydrated } = useAdmin();
+  const { isAdminAuthenticated, hydrated, admin, adminLogout } = useAdmin();
   const { hasPermission } = usePermissions();
+  const [serverVerified, setServerVerified] = useState(false);
+  const [serverChecking, setServerChecking] = useState(true);
 
+  // ── Server-side session re-verification on every mount ──────────────────────
+  useEffect(() => {
+    if (!hydrated) return;
+
+    if (!isAdminAuthenticated) {
+      setServerChecking(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const verify = async () => {
+      try {
+        // Super-admin (hardcoded) has no Supabase Auth session — skip server check.
+        if (admin?.id === 'admin-fixed') {
+          if (!cancelled) { setServerVerified(true); setServerChecking(false); }
+          return;
+        }
+
+        // For employee accounts: confirm the Supabase Auth session is still valid.
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError || !session) {
+          if (!cancelled) {
+            await adminLogout();
+            router.replace('/admin/login');
+          }
+          return;
+        }
+
+        // Confirm the employee row is still active (e.g. admin hasn't deactivated it).
+        const { data: empRow, error: empError } = await supabase
+          .from('employees')
+          .select('id, is_active')
+          .eq('auth_user_id', session.user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (!cancelled) {
+          if (empError || !empRow) {
+            await adminLogout();
+            router.replace('/admin/login');
+          } else {
+            setServerVerified(true);
+            setServerChecking(false);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setServerChecking(false);
+          setServerVerified(false);
+        }
+      }
+    };
+
+    verify();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, isAdminAuthenticated]);
+
+  // ── Redirect unauthenticated users ──────────────────────────────────────────
   useEffect(() => {
     if (!hydrated) return;
     if (!isAdminAuthenticated) {
       router.replace('/admin/login');
     }
-  }, [isAdminAuthenticated, hydrated]);
+  }, [isAdminAuthenticated, hydrated, router]);
 
-  if (!hydrated) {
+  // ── Show spinner while hydrating from localStorage ───────────────────────────
+  if (!hydrated || serverChecking) {
     return (
       <View style={styles.container}>
         <ActivityIndicator color={Colors.neonBlue} size="large" />
@@ -34,6 +108,10 @@ export default function AdminGuard({ permission, children }: Props) {
 
   if (!isAdminAuthenticated) return null;
 
+  // ── Show spinner while server verification is running ───────────────────────
+  // (serverVerified=false + serverChecking=false only when verification failed → already redirected)
+
+  // ── Permission check ─────────────────────────────────────────────────────────
   if (permission && !hasPermission(permission)) {
     return <AccessDenied />;
   }
@@ -46,12 +124,10 @@ function AccessDenied() {
   const { hasPermission } = usePermissions();
 
   const goToSafeRoute = () => {
-    // Find the first route this user is allowed to access
     const safeRoute = EMPLOYEE_DEFAULT_ROUTES.find((r) => hasPermission(r.permission))?.route;
     if (safeRoute) {
       router.replace(safeRoute as any);
     } else {
-      // No permitted routes at all — log out to login
       router.replace('/admin/login');
     }
   };

@@ -19,6 +19,7 @@ import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import AdminGuard from '@/components/admin/AdminGuard';
 import { supabase, adminSupabase } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -73,6 +74,7 @@ function TryOnModelSection({
   currentUrl: string;
   onSaved: (url: string) => void;
 }) {
+  const { guard: guardAction } = useActionPermission('manage_settings');
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [preview, setPreview]   = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -124,6 +126,7 @@ function TryOnModelSection({
   };
 
   const handleSave = async () => {
+    if (!guardAction()) { setStatus('err'); setErrMsg('Permission denied: manage_settings required'); return; }
     if (!preview) return;
     setUploading(true); setStatus('idle'); setErrMsg('');
     setUploadPct(5); setUploadStage('Preparing…');
@@ -178,6 +181,7 @@ function TryOnModelSection({
   const discardUploadProgress = () => { setUploadPct(0); setUploadStage(''); };
 
   const handleReset = async () => {
+    if (!guardAction()) { setStatus('err'); setErrMsg('Permission denied: manage_settings required'); return; }
     setConfirmReset(false);
     setUploading(true); setStatus('idle'); setErrMsg('');
     try {
@@ -468,6 +472,7 @@ function SettingsScreen() {
   const router = useRouter();
   const { isMobile } = useAdminLayout();
   const { t } = useLanguage();
+  const { guard: guardAction } = useActionPermission('manage_settings');
 
   const groupTitleMap: Record<string, string> = {
     'Store Identity': t.storeIdentityGroup,
@@ -504,6 +509,7 @@ function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [permDenied, setPermDenied] = useState(false);
   const [tryonModelUrl, setTryonModelUrl] = useState('');
 
   useEffect(() => {
@@ -525,6 +531,7 @@ function SettingsScreen() {
   };
 
   const handleSave = async () => {
+    if (!guardAction()) { setPermDenied(true); setTimeout(() => setPermDenied(false), 4000); return; }
     setSaving(true);
     const db = adminSupabase();
     for (const [key, value] of Object.entries(settings)) {
@@ -562,6 +569,8 @@ function SettingsScreen() {
               <ActivityIndicator color={Colors.background} size="small" />
             ) : saved ? (
               <Text style={styles.saveBtnText}>{t.savedBang}</Text>
+            ) : permDenied ? (
+              <Text style={[styles.saveBtnText, { color: Colors.error }]}>Permission Denied</Text>
             ) : (
               <>
                 <Save size={15} color={Colors.background} strokeWidth={2.5} />

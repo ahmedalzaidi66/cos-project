@@ -25,6 +25,7 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import MobileUnsupported from '@/components/admin/MobileUnsupported';
 import Toast from '@/components/admin/Toast';
 import { supabase, adminSupabase } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,6 +69,7 @@ const SECTION_COLORS: Record<string, string> = {
 function PermissionsScreen() {
   const { isMobile } = useAdminLayout();
   const { t } = useLanguage();
+  const { guard: guardAction } = useActionPermission('manage_permissions');
   const [tab, setTab] = useState<Tab>('roles');
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -122,6 +124,7 @@ function PermissionsScreen() {
   };
 
   const saveRolePerms = useCallback(async (roleKey: string) => {
+    if (!guardAction()) { showToast('Permission denied: manage_permissions required', 'error'); return; }
     setSaving(roleKey);
     const perms = Array.from(rolePermMap[roleKey] ?? []);
     const { error } = await adminSupabase().rpc('update_role_permissions', {
@@ -132,7 +135,7 @@ function PermissionsScreen() {
     if (error) showToast('Failed to save: ' + error.message, 'error');
     else showToast('Permissions saved for ' + roleKey.replace(/_/g, ' '));
     setSaving(null);
-  }, [rolePermMap]);
+  }, [rolePermMap, guardAction]);
 
   const toggleEmployeeCustom = (emp: Employee, permKey: string) => {
     setEmployees((prev) =>
@@ -148,6 +151,7 @@ function PermissionsScreen() {
   };
 
   const saveEmployeePerms = useCallback(async (emp: Employee) => {
+    if (!guardAction()) { showToast('Permission denied: manage_permissions required', 'error'); return; }
     setSaving(emp.id);
     const perms = emp.custom_permissions ?? Array.from(rolePermMap[emp.role] ?? []);
     const { error } = await adminSupabase().rpc('update_employee_permissions', {
@@ -158,7 +162,7 @@ function PermissionsScreen() {
     if (error) showToast('Failed to save: ' + error.message, 'error');
     else showToast('Permissions saved for ' + emp.full_name);
     setSaving(null);
-  }, [rolePermMap]);
+  }, [rolePermMap, guardAction]);
 
   const resetEmployeeToRole = (emp: Employee) => {
     setEmployees((prev) =>

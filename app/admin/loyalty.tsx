@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Coins, TrendingUp, Users, Gift, ChevronDown, ChevronUp, Plus, Minus, X, Check, Settings2, Crown, Truck, Star, Zap, Percent, PartyPopper } from 'lucide-react-native';
 import { adminSupabase } from '@/lib/supabase';
+import { useActionPermission } from '@/hooks/useActionPermission';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminGuard from '@/components/admin/AdminGuard';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
@@ -45,6 +46,7 @@ type LoyaltySettings = {
 function LoyaltyContent() {
   const { t, language } = useLanguage();
   const { isDesktop } = useAdminLayout();
+  const { guard: guardAction } = useActionPermission('manage_settings');
   const DashboardShell = isDesktop ? AdminWebDashboard : AdminMobileDashboard;
   const shellTitle = (t as any).loyaltyAdmin ?? 'Loyalty & Rewards';
 
@@ -142,6 +144,7 @@ function LoyaltyContent() {
   });
 
   const saveSettings = async () => {
+    if (!guardAction()) { setSettingsMsg('Permission denied: manage_settings required'); setTimeout(() => setSettingsMsg(''), 4000); return; }
     setSettingsSaving(true);
     setSettingsMsg('');
     const payload = {
@@ -170,6 +173,7 @@ function LoyaltyContent() {
   };
 
   const saveTierBenefits = async () => {
+    if (!guardAction()) { setTierBenMsg('Permission denied: manage_settings required'); setTimeout(() => setTierBenMsg(''), 4000); return; }
     setTierBenSaving(true);
     setTierBenMsg('');
     // Build rows — upsert one tier at a time to avoid partial failure masking errors
@@ -207,6 +211,7 @@ function LoyaltyContent() {
   };
 
   const handleAdjust = async () => {
+    if (!guardAction()) { setAdjustMsg('Permission denied: manage_settings required'); setTimeout(() => setAdjustMsg(''), 4000); return; }
     if (!adjustMember) return;
     const pts = parseInt(adjustAmount, 10);
     if (!pts || pts <= 0) return;
@@ -722,7 +727,7 @@ function SettingInput({
 
 export default function LoyaltyPage() {
   return (
-    <AdminGuard>
+    <AdminGuard permission="manage_settings">
       <LoyaltyContent />
     </AdminGuard>
   );
