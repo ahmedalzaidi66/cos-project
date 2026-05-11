@@ -44,6 +44,7 @@ interface ProductRow {
   image_url: string;
   main_image: string | null;
   category: string;
+  makeup_subcategory: string | null;
   rating: number;
   review_count: number;
   badge: string | null;
@@ -54,11 +55,13 @@ interface ProductRow {
   skin_types: string[] | null;
   suitable_undertone: string[] | null;
   is_featured: boolean;
+  in_stock: boolean;
+  stock: number;
 }
 
 interface RoutineStep {
   step: number;
-  label: string;       // e.g. "Cleanser", "Serum"
+  label: string;
   product: RecommendedProduct;
   why: string;
 }
@@ -92,13 +95,13 @@ const SKINCARE_STEPS: { label: string; categories: string[]; required: boolean }
 ];
 
 const MAKEUP_STEPS: { label: string; categories: string[]; required: boolean }[] = [
-  { label: "Primer",      categories: ["primer"],                     required: false },
-  { label: "Foundation",  categories: ["foundation"],                 required: true  },
-  { label: "Concealer",   categories: ["concealer"],                  required: true  },
-  { label: "Blush",       categories: ["blush", "bronzer"],           required: false },
-  { label: "Eyes",        categories: ["eyeshadow", "eyeliner", "mascara"], required: false },
-  { label: "Lips",        categories: ["lipstick"],                   required: false },
-  { label: "Set",         categories: ["powder", "highlighter"],      required: false },
+  { label: "Primer",      categories: ["primer"],                          required: false },
+  { label: "Foundation",  categories: ["foundation"],                      required: true  },
+  { label: "Concealer",   categories: ["concealer"],                       required: true  },
+  { label: "Blush",       categories: ["blush", "bronzer"],                required: false },
+  { label: "Eyes",        categories: ["eyeshadow", "eyeliner", "mascara"],required: false },
+  { label: "Lips",        categories: ["lipstick"],                        required: false },
+  { label: "Set",         categories: ["powder", "highlighter"],           required: false },
 ];
 
 // ─── Dialect detection ────────────────────────────────────────────────────────
@@ -159,64 +162,86 @@ function detectIntent(msg: string): Intent {
   if (/^(hi|hello|hey|hola|buenos|good\s*(morning|evening|afternoon)|salam|مرحبا|السلام|هلا|اهلا|هلو|الو|هاي|hallo|guten|привет|здравствуй)/i.test(m)) return "greeting";
   if (/shade|لون|ظل|درجة|color\s*(match|recommend|find)|which\s*(shade|color)|right\s*shade|تناسب لوني|يناسب بشرتي|اي لون|tono|оттенок/i.test(m)) return "shade_help";
   if (/skin\s*concern|dryness|oily|oiliness|redness|acne|dark\s*circle|uneven\s*tone|pore|wrinkle|pigment|جفاف|دهني|احمرار|حب شباب|هالات|تصبغ|تجاعيد|акне|круги/i.test(m)) return "skin_concern_analysis";
-  if (/skin\s*tone|skin\s*type|analyz|detect|upload.*(face|photo|selfie)|نوع بشرت|تحليل|صورة وجه|سيلفي|лون بشرت|тип кожи|анализ/i.test(m)) return "skin_tone_analysis";
+  if (/skin\s*tone|skin\s*type|analyz|detect|upload.*(face|photo|selfie)|نوع بشرت|تحليل|صورة وجه|سيلفي|لون بشرت|тип кожи|анализ/i.test(m)) return "skin_tone_analysis";
   if (/routine|روتين|خطوات|steps?\s*(for|to)|how\s*(to|do)\s*(apply|use)|tutorial|daily|يومي|كيف اسوي|شلون اسوي|طريقة|rutina|рутин/i.test(m)) return "routine";
   if (/skincare|skin\s*care|moisturiz|sunscreen|cleanser|serum|عناية|ترطيب|واقي شمس|منظف|سيروم|cuidado|pflege|уход/i.test(m)) return "skincare_advice";
+  if (/hair|شعر|شامبو|shampoo|scalp|فروة/i.test(m)) return "product_search";
   if (/recommend|suggest|best|looking\s*for|show\s*me|lipstick|foundation|blush|concealer|mascara|primer|powder|eyeshadow|eyeliner|bronzer|highlighter|lip|رو[جژ]|فاونديشن|بلاشر|كونسيلر|ماسكرا|برايمر|بودر|ايشادو|آيلاينر|هايلايتر|احمر شفاه|كريم اساس|منتج|ابي شي|ابغى شي|اريد شي|دلني|رشحي|نصحني|labial|помада|тушь/i.test(m)) return "product_search";
   if (/beauty|makeup|cosmetic|look|glam|natural|مكياج|ميكاب|تجميل|لوك|جمال|حلو|مناسب|belleza|maquillaje|красота|макияж/i.test(m)) return "general_beauty";
   return "unknown";
 }
 
-// ─── Concern/category extraction ──────────────────────────────────────────────
+// ─── Semantic category mapping ────────────────────────────────────────────────
+// Maps user keywords → actual product category values in the DB
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  lipstick:    ["lipstick","lip","lips","روج","احمر شفاه","حمرة","شفايف","ليب","labial","помада"],
-  foundation:  ["foundation","base","complexion","فاونديشن","كريم اساس","اساس","тональный"],
-  blush:       ["blush","cheek","بلاشر","خدود","rouge","румяна"],
-  concealer:   ["concealer","under eye","كونسيلر","خافي","هالات","консилер"],
-  mascara:     ["mascara","lash","ماسكرا","رموش","тушь"],
-  primer:      ["primer","prep","برايمر"],
-  powder:      ["powder","setting","بودر","بودرة","пудра"],
-  eyeshadow:   ["eyeshadow","eye shadow","ايشادو","ظلال","тени"],
-  eyeliner:    ["eyeliner","liner","kohl","آيلاينر","كحل","подводка"],
-  bronzer:     ["bronzer","contour","برونزر","кронтор","бронзер"],
-  highlighter: ["highlighter","glow","shimmer","هايلايتر","اضاءة","хайлайтер"],
-  cleanser:    ["cleanser","wash","غسول","منظف","очищающее"],
-  moisturizer: ["moisturizer","cream","مرطب","كريم","увлажняющий"],
-  serum:       ["serum","سيروم","серум"],
-  sunscreen:   ["sunscreen","spf","sun","واقي شمس","солнцезащитный"],
+  // Makeup
+  lipstick:    ["lipstick","lip ","lips ","lip gloss","lip liner","روج","احمر شفاه","حمرة","شفايف","ليب","labial","помада","lipcolor"],
+  foundation:  ["foundation","base coat","complexion","فاونديشن","كريم اساس","اساس","تاسيس","تональный","bb cream","cc cream"],
+  blush:       ["blush","cheek color","بلاشر","خدود","rouge","румяна","احمر خدود"],
+  concealer:   ["concealer","under eye","كونسيلر","خافي عيوب","هالات","консилер","مخفي"],
+  mascara:     ["mascara","lash","ماسكرا","رموش","тушь","mascara"],
+  primer:      ["primer","prep skin","برايمر","اساس تحضيري"],
+  powder:      ["powder","setting powder","بودر","بودرة","пудра","compact"],
+  eyeshadow:   ["eyeshadow","eye shadow","ايشادو","ظلال عيون","тени","pallete","palette"],
+  eyeliner:    ["eyeliner","liner","kohl","آيلاينر","كحل عيون","подводка","kajal"],
+  bronzer:     ["bronzer","contour","برونزر","كونتور","бронзер","sculpt"],
+  highlighter: ["highlighter","glow","shimmer","هايلايتر","اضاءة وجه","хайлайтер","illuminat"],
+  // Skincare
+  cleanser:    ["cleanser","face wash","غسول وجه","منظف بشرة","очищающее","cleanse","wash"],
+  moisturizer: ["moisturizer","face cream","مرطب","كريم وجه","увлажняющий","hydrate","cream"],
+  serum:       ["serum","essence","سيروم","مصل","серум","ampoule"],
+  sunscreen:   ["sunscreen","spf","sun protection","واقي شمس","солнцезащитный","sun cream","uva","uvb"],
+  // Haircare
+  haircare:    [
+    "hair","shampoo","conditioner","scalp","شامبو","شعر","فروة الرأس","كوندشنر","مرطب شعر",
+    "hair care","haircare","hair loss","تساقط شعر","hair oil","زيت شعر","hair mask","ماسك شعر",
+    "oily hair","dry hair","شعر دهني","شعر جاف","damaged hair","شعر تالف",
+  ],
+  // General body
+  makeup:      ["makeup","maquillage","مكياج","ميكاب","تجميل"],
 };
 
 function extractCategories(msg: string): string[] {
   const lower = msg.toLowerCase();
-  return Object.entries(CATEGORY_KEYWORDS)
-    .filter(([, kws]) => kws.some((kw) => lower.includes(kw)))
-    .map(([cat]) => cat);
+  const found = new Set<string>();
+  for (const [cat, kws] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (kws.some((kw) => lower.includes(kw.toLowerCase()))) {
+      found.add(cat);
+    }
+  }
+  return [...found];
 }
+
+// ─── Concern extraction ────────────────────────────────────────────────────────
 
 function extractConcernKeys(msg: string): string[] {
   const lower = msg.toLowerCase();
   const map: [RegExp, string][] = [
-    [/oil|دهني|greasy/i, "oily"],
-    [/acne|حب شباب|pimple|breakout/i, "acne"],
+    [/oil|دهني|greasy|oily\s*(hair|skin|scalp)|شعر\s*دهني|فروة\s*دهنية/i, "oily"],
+    [/acne|حب شباب|pimple|breakout|blemish/i, "acne"],
     [/redne|احمرار|rosacea/i, "redness"],
-    [/dry|جفاف|flak/i, "dryness"],
+    [/dry|جفاف|flak|dry\s*(hair|skin)|شعر\s*جاف/i, "dryness"],
     [/dark\s*circle|هالات/i, "dark_circles"],
     [/uneven|pigment|تصبغ|discolor|dark\s*spot/i, "uneven_tone"],
     [/wrinkle|aging|تجاعيد|fine\s*line/i, "wrinkle"],
     [/spf|sun\s*screen|واقي/i, "spf"],
     [/bright|glow|نضارة/i, "brightening"],
     [/hydrat|moistur|رطوبة/i, "hydration"],
+    [/hair\s*loss|thinning|تساقط/i, "hair_loss"],
+    [/dandruff|قشرة/i, "dandruff"],
+    [/frizz|كيرلي|curly/i, "frizz"],
+    [/damage|تالف|brittle/i, "damaged_hair"],
   ];
   return map.filter(([rx]) => rx.test(lower)).map(([, k]) => k);
 }
 
 // Maps concern keys → ingredient terms for scoring
 const CONCERN_TO_INGREDIENTS: Record<string, string[]> = {
-  oily:         ["niacinamide", "salicylic acid", "zinc", "kaolin"],
+  oily:         ["niacinamide", "salicylic acid", "zinc", "kaolin", "clay", "tea tree"],
   acne:         ["salicylic acid", "benzoyl peroxide", "niacinamide", "tea tree"],
   redness:      ["centella asiatica", "allantoin", "niacinamide", "aloe vera", "bisabolol"],
-  dryness:      ["hyaluronic acid", "ceramide", "shea butter", "glycerin", "squalane"],
+  dryness:      ["hyaluronic acid", "ceramide", "shea butter", "glycerin", "squalane", "argan", "coconut"],
   dark_circles: ["vitamin k", "caffeine", "retinol", "vitamin c", "peptide"],
   uneven_tone:  ["vitamin c", "niacinamide", "azelaic acid", "kojic acid"],
   pigmentation: ["vitamin c", "azelaic acid", "kojic acid", "niacinamide"],
@@ -224,16 +249,24 @@ const CONCERN_TO_INGREDIENTS: Record<string, string[]> = {
   spf:          ["zinc oxide", "titanium dioxide", "spf"],
   hydration:    ["hyaluronic acid", "ceramide", "glycerin", "squalane"],
   brightening:  ["vitamin c", "niacinamide", "kojic acid"],
+  hair_loss:    ["biotin", "caffeine", "keratin", "zinc", "minoxidil"],
+  dandruff:     ["zinc pyrithione", "selenium", "salicylic acid", "tea tree", "ketoconazole"],
+  frizz:        ["argan oil", "keratin", "coconut oil", "shea butter"],
+  damaged_hair: ["keratin", "protein", "argan oil", "coconut oil", "biotin"],
 };
 
 const CONCERN_TO_DB_CONCERNS: Record<string, string[]> = {
-  oily:         ["oiliness", "acne", "shine", "sebum", "enlarged pores"],
+  oily:         ["oiliness", "acne", "shine", "sebum", "enlarged pores", "oily hair", "oil control"],
   acne:         ["acne", "breakout", "blemish", "pores"],
   redness:      ["redness", "inflammation", "sensitive", "irritation"],
-  dryness:      ["dryness", "dehydration", "flakiness", "barrier damage"],
+  dryness:      ["dryness", "dehydration", "flakiness", "barrier damage", "dry hair"],
   dark_circles: ["dark circles", "puffiness", "hyperpigmentation"],
   uneven_tone:  ["uneven tone", "discoloration", "hyperpigmentation", "dark spots"],
   wrinkle:      ["wrinkles", "fine lines", "aging"],
+  hair_loss:    ["hair loss", "thinning", "shedding"],
+  dandruff:     ["dandruff", "flaking scalp", "seborrheic"],
+  frizz:        ["frizz", "humidity", "curly"],
+  damaged_hair: ["damaged", "brittle", "split ends", "bleached"],
 };
 
 // ─── Skin color analysis ──────────────────────────────────────────────────────
@@ -278,8 +311,173 @@ function analyzeSkinFromColors(r: number, g: number, b: number): {
   return { toneKey, undertoneKey, concerns };
 }
 
-// ─── DB fetching ──────────────────────────────────────────────────────────────
+// ─── DB fetching — live catalog search ────────────────────────────────────────
 
+/**
+ * Score a product against the user's intent.
+ * Returns a numeric score — higher = better match.
+ */
+function scoreProduct(
+  p: ProductRow,
+  targetCategories: string[],
+  concernKeys: string[],
+  undertone: string | null,
+  toneKey: string | null,
+  queryLower: string,
+): number {
+  let score = 0;
+
+  const ingredientTerms = concernKeys.flatMap((k) => CONCERN_TO_INGREDIENTS[k] ?? []);
+  const concernTerms    = concernKeys.flatMap((k) => CONCERN_TO_DB_CONCERNS[k] ?? []);
+
+  // Category exact match — strongest signal
+  if (targetCategories.includes(p.category)) score += 20;
+  // makeup_subcategory match
+  if (p.makeup_subcategory && targetCategories.includes(p.makeup_subcategory)) score += 15;
+
+  // Text relevance — search name, description, purpose
+  const searchableText = [p.name, p.description, p.purpose, p.category, p.makeup_subcategory]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  // Direct keyword hits in product text
+  const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2);
+  for (const word of queryWords) {
+    if (searchableText.includes(word)) score += 5;
+  }
+
+  // Ingredient match
+  const pIngr = (p.ingredients ?? []).map((i) => i.toLowerCase());
+  for (const t of ingredientTerms) {
+    if (pIngr.some((i) => i.includes(t))) score += 3;
+  }
+
+  // Concern match from product's own concerns array
+  const pConc = (p.concerns ?? []).map((c) => c.toLowerCase());
+  for (const t of concernTerms) {
+    if (pConc.some((c) => c.includes(t))) score += 2;
+  }
+
+  // Skin type match
+  if (concernKeys.includes("oily") && p.skin_types?.some((s) => /oil/.test(s.toLowerCase()))) score += 3;
+  if (concernKeys.includes("dryness") && p.skin_types?.some((s) => /dry/.test(s.toLowerCase()))) score += 3;
+
+  // Undertone match for makeup
+  const makeupCats = ["foundation", "blush", "bronzer", "concealer", "lipstick"];
+  if (undertone && p.suitable_undertone && makeupCats.includes(p.category)) {
+    if (p.suitable_undertone.includes(undertone)) score += 4;
+    else score -= 2;
+  }
+
+  // Foundation tone matching
+  if (p.category === "foundation" && toneKey) {
+    const nameLower = p.name.toLowerCase();
+    if (["fair","light"].includes(toneKey) && nameLower.includes("fair")) score += 5;
+    else if (["medium","tan"].includes(toneKey) && nameLower.includes("medium")) score += 5;
+    else if (["deep","very_deep"].includes(toneKey) && nameLower.includes("tan")) score += 5;
+  }
+
+  // Quality signals
+  if (p.is_featured) score += 2;
+  if (p.rating >= 4.7) score += 2;
+  else if (p.rating >= 4.5) score += 1;
+
+  // In-stock preference
+  if (p.in_stock && p.stock > 0) score += 3;
+  else if (!p.in_stock || p.stock === 0) score -= 10;
+
+  return score;
+}
+
+/**
+ * Fetch products from the live catalog matching the user's query.
+ * Uses a two-stage approach:
+ * 1) Exact category match
+ * 2) Full-text search fallback if category match yields too few results
+ */
+async function fetchRelevantProducts(
+  db: ReturnType<typeof createClient>,
+  targetCategories: string[],
+  concernKeys: string[],
+  undertone: string | null,
+  toneKey: string | null,
+  queryLower: string,
+  limit: number = 6,
+): Promise<ProductRow[]> {
+  const selectCols = "id,name,price,image_url,main_image,category,makeup_subcategory,rating,review_count,badge,description,purpose,ingredients,concerns,skin_types,suitable_undertone,is_featured,in_stock,stock";
+
+  let candidates: ProductRow[] = [];
+
+  // Stage 1: category-filtered query (most relevant)
+  if (targetCategories.length > 0) {
+    const { data } = await db.from("products")
+      .select(selectCols)
+      .eq("status", "active")
+      .in("category", targetCategories)
+      .order("rating", { ascending: false })
+      .limit(40);
+    if (data) candidates = data as ProductRow[];
+  }
+
+  // Stage 2: if category query returned < 3 results, add full-text search across name/description/purpose
+  if (candidates.length < 3 && queryLower.trim().length > 2) {
+    // Build ilike terms from meaningful query words
+    const words = queryLower
+      .split(/\s+/)
+      .filter((w) => w.length > 2)
+      .slice(0, 5); // limit to avoid too many OR conditions
+
+    // Search across name, description, purpose with OR between words
+    let query = db.from("products")
+      .select(selectCols)
+      .eq("status", "active")
+      .order("rating", { ascending: false })
+      .limit(40);
+
+    if (words.length > 0) {
+      // Use Postgres ilike with OR pattern — search name OR description OR purpose
+      const namePattern = words.map((w) => `name.ilike.%${w}%`).join(",");
+      const descPattern = words.map((w) => `description.ilike.%${w}%`).join(",");
+      const purpPattern = words.map((w) => `purpose.ilike.%${w}%`).join(",");
+      query = query.or(`${namePattern},${descPattern},${purpPattern}`);
+    }
+
+    const { data } = await query;
+    if (data) {
+      // Merge, dedup by id
+      const seen = new Set(candidates.map((p) => p.id));
+      for (const p of data as ProductRow[]) {
+        if (!seen.has(p.id)) {
+          seen.add(p.id);
+          candidates.push(p);
+        }
+      }
+    }
+  }
+
+  if (candidates.length === 0) return [];
+
+  // Score and rank
+  const scored = candidates.map((p) => ({
+    product: p,
+    score: scoreProduct(p, targetCategories, concernKeys, undertone, toneKey, queryLower),
+  }));
+  scored.sort((a, b) => b.score - a.score || b.product.rating - a.product.rating);
+
+  // Return top results — only in-stock unless no in-stock products exist
+  const inStockTop = scored.filter((s) => s.product.in_stock && s.product.stock > 0).slice(0, limit);
+  if (inStockTop.length >= 2) {
+    return inStockTop.map((s) => s.product);
+  }
+  // Fallback: include out-of-stock if in-stock results are scarce
+  return scored.slice(0, limit).map((s) => s.product);
+}
+
+/**
+ * Fetch the single best product for a routine step category.
+ * Uses the same scoring logic as fetchRelevantProducts.
+ */
 async function fetchBestProductForCategory(
   db: ReturnType<typeof createClient>,
   categories: string[],
@@ -287,54 +485,8 @@ async function fetchBestProductForCategory(
   undertone: string | null,
   toneKey: string | null
 ): Promise<ProductRow | null> {
-  const ingredientTerms = concernKeys.flatMap((k) => CONCERN_TO_INGREDIENTS[k] ?? []);
-  const concernTerms = concernKeys.flatMap((k) => CONCERN_TO_DB_CONCERNS[k] ?? []);
-
-  const { data, error } = await db.from("products")
-    .select("id,name,price,image_url,main_image,category,rating,review_count,badge,description,purpose,ingredients,concerns,skin_types,suitable_undertone,is_featured")
-    .eq("status", "active")
-    .in("category", categories)
-    .order("rating", { ascending: false })
-    .limit(20);
-
-  if (error || !data || data.length === 0) return null;
-
-  const scored = (data as ProductRow[]).map((p) => {
-    let score = 0;
-
-    const pIngr = (p.ingredients ?? []).map((i) => i.toLowerCase());
-    for (const t of ingredientTerms) {
-      if (pIngr.some((i) => i.includes(t))) score += 3;
-    }
-
-    const pConc = (p.concerns ?? []).map((c) => c.toLowerCase());
-    for (const t of concernTerms) {
-      if (pConc.some((c) => c.includes(t))) score += 2;
-    }
-
-    // Undertone match for makeup categories
-    const makeupCats = ["foundation", "blush", "bronzer", "concealer", "lipstick"];
-    if (undertone && p.suitable_undertone && makeupCats.includes(p.category)) {
-      if (p.suitable_undertone.includes(undertone)) score += 4;
-      else score -= 2;
-    }
-
-    // Foundation tone matching
-    if (p.category === "foundation" && toneKey) {
-      const nameLower = p.name.toLowerCase();
-      if (["fair","light"].includes(toneKey) && nameLower.includes("fair")) score += 5;
-      else if (["medium","tan"].includes(toneKey) && nameLower.includes("medium")) score += 5;
-      else if (["deep","very_deep"].includes(toneKey) && nameLower.includes("tan")) score += 5;
-    }
-
-    if (p.is_featured) score += 1;
-    if (p.rating >= 4.7) score += 1;
-
-    return { product: p, score };
-  });
-
-  scored.sort((a, b) => b.score - a.score || b.product.rating - a.product.rating);
-  return scored[0]?.product ?? null;
+  const results = await fetchRelevantProducts(db, categories, concernKeys, undertone, toneKey, categories.join(" "), 5);
+  return results[0] ?? null;
 }
 
 // ─── OpenAI ───────────────────────────────────────────────────────────────────
@@ -378,7 +530,6 @@ async function buildRoutine(
     recType === "makeup"   ? MAKEUP_STEPS   :
     [...SKINCARE_STEPS, ...MAKEUP_STEPS];
 
-  // Fetch the best product per step in parallel
   const resolved = await Promise.all(
     stepsToFill.map(async (step) => {
       const product = await fetchBestProductForCategory(
@@ -388,11 +539,9 @@ async function buildRoutine(
     })
   );
 
-  // Keep steps that have a product (required ones fallback to null = skip)
   const filledSteps = resolved.filter((r) => r.product !== null);
   if (filledSteps.length === 0) return null;
 
-  // Ask GPT-4o to generate routine title + one "why" sentence per step
   const langNote =
     dialect === "iraqi" ? "Iraqi Arabic dialect (informal, friendly, use words like شلون، هواية، خوش، هسه)" :
     dialect === "gulf"  ? "Gulf Arabic dialect (informal, friendly, use words like وايد، ابغى، يجنن، تراه)" :
@@ -425,7 +574,7 @@ Return ONLY valid JSON in this exact shape:
   "steps": [
     { "why": "one sentence max 12 words — why THIS product for THIS skin" }
   ],
-  "closing": "one short motivating closing line (e.g. Use in this order every morning for visible results in 2 weeks)"
+  "closing": "one short motivating closing line"
 }
 
 Rules:
@@ -436,7 +585,6 @@ Rules:
 - NO bullet points, NO markdown inside JSON strings`;
 
   let aiJson: { title: string; steps: { why: string }[]; closing: string };
-
   const raw = await callOpenAI([{ role: "user", content: prompt }], 500);
   const cleaned = raw.replace(/```json|```/g, "").trim();
   aiJson = JSON.parse(cleaned);
@@ -505,7 +653,6 @@ Deno.serve(async (req: Request) => {
     const dialect = resolveDialect(message, prevDialect, lang);
     const intent  = detectIntent(message);
 
-    // Skin analysis
     let skinData: ReturnType<typeof analyzeSkinFromColors> | null = null;
     if (skinColors) skinData = analyzeSkinFromColors(skinColors.r, skinColors.g, skinColors.b);
 
@@ -515,11 +662,11 @@ Deno.serve(async (req: Request) => {
     const categories         = extractCategories(message);
     const undertone          = skinData?.undertoneKey ?? null;
     const toneKey            = skinData?.toneKey ?? null;
+    const queryLower         = message.toLowerCase();
 
     const suggestUpload   = ["shade_help","skin_tone_analysis","skin_concern_analysis","skincare_advice"].includes(intent) && !skinColors;
     const showRecTypePicker = intent === "skin_concern_analysis" && !skinColors;
 
-    // ── Decide whether to build a routine ──
     const isRoutineRequest =
       intent === "routine" ||
       (skinColors && recType !== "both") ||
@@ -529,7 +676,6 @@ Deno.serve(async (req: Request) => {
     let products: RecommendedProduct[] = [];
 
     if (isRoutineRequest) {
-      // Build full step-by-step routine
       routine = await buildRoutine(db, {
         recType,
         concernKeys: allConcernKeys,
@@ -540,63 +686,70 @@ Deno.serve(async (req: Request) => {
         skinConcerns: skinData?.concerns ?? [],
       });
     } else if (intent !== "greeting") {
-      // Single-product recommendations (non-routine queries)
+      // Determine candidate categories for this query
       const SKINCARE_CATS = ["cleanser","moisturizer","serum","sunscreen"];
       const MAKEUP_CATS   = ["lipstick","foundation","blush","concealer","mascara","primer","powder","eyeshadow","eyeliner","bronzer","highlighter"];
-      const allCats = recType === "skincare" ? SKINCARE_CATS : recType === "makeup" ? MAKEUP_CATS : [...SKINCARE_CATS, ...MAKEUP_CATS];
+      const HAIRCARE_CATS = ["haircare"];
+      const allCats = recType === "skincare" ? SKINCARE_CATS :
+                      recType === "makeup"   ? MAKEUP_CATS   :
+                      [...SKINCARE_CATS, ...MAKEUP_CATS, ...HAIRCARE_CATS, "makeup"];
+
+      // Use extracted categories if found; otherwise use all relevant for recType
       const finalCats = categories.length > 0 ? categories : allCats;
 
-      const ingredientTerms = allConcernKeys.flatMap((k) => CONCERN_TO_INGREDIENTS[k] ?? []);
-      const concernTerms    = allConcernKeys.flatMap((k) => CONCERN_TO_DB_CONCERNS[k] ?? []);
+      const top = await fetchRelevantProducts(
+        db, finalCats, allConcernKeys, undertone, toneKey, queryLower, 6
+      );
 
-      const { data } = await db.from("products")
-        .select("id,name,price,image_url,main_image,category,rating,review_count,badge,description,purpose,ingredients,concerns,skin_types,suitable_undertone,is_featured")
-        .eq("status", "active")
-        .in("category", finalCats.length > 0 ? finalCats : allCats)
-        .order("rating", { ascending: false })
-        .limit(50);
+      if (top.length > 0) {
+        const langNote =
+          dialect === "iraqi" ? "Iraqi Arabic dialect" :
+          dialect === "gulf"  ? "Gulf Arabic dialect"  :
+          dialect === "msa"   ? "Modern Standard Arabic" :
+          lang === "es" ? "Spanish" : lang === "de" ? "German" : lang === "ru" ? "Russian" : "English";
 
-      if (data) {
-        const scored = (data as ProductRow[]).map((p) => {
-          let score = 0;
-          const pIngr = (p.ingredients ?? []).map((i) => i.toLowerCase());
-          for (const t of ingredientTerms) if (pIngr.some((i) => i.includes(t))) score += 3;
-          const pConc = (p.concerns ?? []).map((c) => c.toLowerCase());
-          for (const t of concernTerms) if (pConc.some((c) => c.includes(t))) score += 2;
-          if (undertone && p.suitable_undertone?.includes(undertone)) score += 2;
-          if (p.is_featured) score += 1;
-          if (p.rating >= 4.7) score += 1;
-          return { product: p, score };
-        });
-        scored.sort((a, b) => b.score - a.score || b.product.rating - a.product.rating);
+        const skinCtx = [
+          toneKey    ? `Tone: ${toneKey}`              : "",
+          undertone  ? `Undertone: ${undertone}`       : "",
+          allConcernKeys.length ? `Concerns: ${allConcernKeys.join(", ")}` : "",
+        ].filter(Boolean).join(", ");
 
-        const top = scored.slice(0, 4).map((s) => s.product);
+        const productList = top.map((p, i) =>
+          `${i + 1}. ${p.name} (${p.category}${p.makeup_subcategory ? "/" + p.makeup_subcategory : ""}): ${p.purpose ?? p.description?.slice(0, 80)}`
+        ).join("\n");
 
-        // Generate reasons
-        if (top.length > 0) {
-          const langNote =
-            dialect === "iraqi" ? "Iraqi Arabic dialect" :
-            dialect === "gulf"  ? "Gulf Arabic dialect"  :
-            dialect === "msa"   ? "Modern Standard Arabic" :
-            lang === "es" ? "Spanish" : lang === "de" ? "German" : lang === "ru" ? "Russian" : "English";
+        const userQuestion = `Customer asked: "${message}"`;
 
-          const skinCtx = [toneKey ? `Tone: ${toneKey}` : "", undertone ? `Undertone: ${undertone}` : "", allConcernKeys.length ? `Concerns: ${allConcernKeys.join(", ")}` : ""].filter(Boolean).join(", ");
-          const productList = top.map((p, i) => `${i + 1}. ${p.name} (${p.category}): ${p.purpose ?? p.description?.slice(0,60)}`).join("\n");
-
+        let reasons: string[] = top.map(() => "");
+        try {
           const reasonRaw = await callOpenAI([{
             role: "user",
-            content: `Beauty expert. For each product write ONE sentence (max 12 words) explaining why it suits this customer. Use ${langNote}. Be specific — name the key ingredient or benefit. Output ONLY a JSON array of strings.\n\nCustomer: ${skinCtx || "general"}\n\nProducts:\n${productList}`,
-          }], 200);
-          const reasons: string[] = JSON.parse(reasonRaw.replace(/```json|```/g, "").trim());
-          products = top.map((p, i) => ({
-            id: p.id, name: p.name,
-            image: p.main_image || p.image_url,
-            price: p.price, category: p.category,
-            rating: p.rating, review_count: p.review_count,
-            badge: p.badge,
-            reason: reasons[i] ?? (p.purpose ?? ""),
-          }));
+            content: `Beauty expert. ${userQuestion}
+Customer profile: ${skinCtx || "general customer"}
+Language: ${langNote}
+
+For each product below, write ONE sentence (max 12 words) explaining why it matches what the customer asked for. Be specific — mention the key benefit or ingredient. Output ONLY a JSON array of strings.
+
+Products:
+${productList}`,
+          }], 300);
+          reasons = JSON.parse(reasonRaw.replace(/```json|```/g, "").trim());
+        } catch {
+          // fallback: use purpose/description
+          reasons = top.map((p) => p.purpose ?? p.description?.slice(0, 80) ?? "");
         }
+
+        products = top.slice(0, 5).map((p, i) => ({
+          id: p.id,
+          name: p.name,
+          image: p.main_image || p.image_url,
+          price: p.price,
+          category: p.category,
+          rating: p.rating,
+          review_count: p.review_count,
+          badge: p.badge,
+          reason: reasons[i] ?? (p.purpose ?? ""),
+        }));
       }
     }
 
@@ -609,7 +762,7 @@ Your personality: warm, direct, expert. Precise clinical advice without platitud
 
 ${routine ? `A complete personalized routine has been built for the customer (shown as step cards). Your reply should:
 1. ${skinData ? "Briefly state what the skin analysis revealed." : "Acknowledge the routine type requested."}
-2. In 1-2 sentences, explain the overall strategy behind this routine (e.g. why this cleanser + serum combo works for their concern).
+2. In 1-2 sentences, explain the overall strategy behind this routine.
 3. End with one encouraging line. Total: max 3 sentences.` :
 `${skinData ? "1. Briefly state what the skin analysis revealed (tone, undertone, top concern)." : ""}
 2. Explain the root cause of the main issue with named ingredients.
@@ -632,7 +785,7 @@ Rules:
     if (routine) {
       contextParts.push(`ROUTINE BUILT: ${routine.title} — ${routine.steps.length} steps (${routine.steps.map(s => s.label).join(" → ")})`);
     } else if (products.length > 0) {
-      contextParts.push(`MATCHED PRODUCTS: ${products.length} products shown as cards`);
+      contextParts.push(`MATCHED PRODUCTS: ${products.length} products shown as cards (categories: ${[...new Set(products.map(p => p.category))].join(", ")})`);
     }
     if (intent !== "unknown") contextParts.push(`Intent: ${intent}`);
 
@@ -646,8 +799,8 @@ Rules:
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ]);
-    } catch (err) {
-      console.error("OpenAI FAILED:", err);
+    } catch (e) {
+      console.error("OpenAI FAILED:", e);
       reply = "⚠️ AI not responding. Check OPENAI_API_KEY or OpenAI billing.";
     }
 
