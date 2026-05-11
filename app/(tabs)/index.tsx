@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from '
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
