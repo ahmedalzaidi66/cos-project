@@ -13,6 +13,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { BRAND_CONFIG } from '@/config/brand';
 
 const WEB_ONLY_ROUTES = new Set(['/admin/builder', '/admin/layout', '/admin/sizes']);
 
@@ -90,7 +91,7 @@ export default function AdminWebLayout({ children, title, noScroll = false }: Pr
             <ShieldCheck size={22} color={Colors.neonBlue} strokeWidth={2} />
             <Text style={styles.logoText}>Admin</Text>
           </View>
-          <Text style={styles.storeName}>Lazurde Makeup</Text>
+          <Text style={styles.storeName}>{BRAND_CONFIG.brandFullName}</Text>
         </View>
 
         <ScrollView style={styles.navList} showsVerticalScrollIndicator={false}>

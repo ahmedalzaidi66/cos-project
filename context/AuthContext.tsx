@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { BRAND_CONFIG } from '@/config/brand';
 
 export type UserProfile = {
   id: string;
@@ -40,7 +41,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const PHONE_OTP_EMAIL_SUFFIX = '@otp.lazurde.internal';
+const PHONE_OTP_EMAIL_SUFFIX = BRAND_CONFIG.phoneOtpEmailSuffix;
 
 function isPhoneOtpEmail(email: string): boolean {
   return email.endsWith(PHONE_OTP_EMAIL_SUFFIX);

@@ -51,6 +51,7 @@ import { autoTranslate } from '@/lib/translate';
 import { useCMS, CMSContent, DEFAULT_BRANDING } from '@/context/CMSContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { BRAND_CONFIG } from '@/config/brand';
 import HeroLivePreview, { HeroPreviewState } from '@/components/admin/HeroLivePreview';
 
 type BrandingMap = Record<string, string>;
@@ -86,13 +87,13 @@ const DEFAULT_CONTENT_EN: CMSContent = {
   testimonials: { title: 'Loved by Makeup Enthusiasts', subtitle: 'Hear from our community', enabled: 'true' },
   footer: {
     tagline: 'Premium makeup for every skin tone.',
-    copyright: '© 2026 Lazurde Makeup. All rights reserved.',
+    copyright: BRAND_CONFIG.copyrightText,
     logo_url: '',
     col1_title: 'Shop',
     col2_title: 'Company',
     col3_title: 'Support',
-    contact_email: 'support@lazurdemakeup.com',
-    contact_phone: '+1 (800) 555-0199',
+    contact_email: BRAND_CONFIG.supportEmail,
+    contact_phone: BRAND_CONFIG.supportPhone,
   },
 };
 
@@ -1203,7 +1204,7 @@ function ContentScreen() {
 
           <Divider />
           <SectionHeader icon={<Type size={18} color={Colors.neonBlue} strokeWidth={2} />} title={t.appIdentity} />
-          <ContentField label={t.appName} value={branding.app_name} onChange={(v) => updateBranding('app_name', v)} placeholder="LAZURDE" />
+          <ContentField label={t.appName} value={branding.app_name} onChange={(v) => updateBranding('app_name', v)} placeholder={BRAND_CONFIG.brandShortName} />
           <ContentField label={t.appTagline} value={branding.app_tagline} onChange={(v) => updateBranding('app_tagline', v)} placeholder="MAKEUP" hint={t.appTaglineHint} />
           <ToggleField
             label={t.showHeaderIcons}
@@ -1268,7 +1269,7 @@ function ContentScreen() {
         <View style={styles.section}>
           <SectionHeader icon={<Type size={18} color={Colors.neonBlue} strokeWidth={2} />} title={t.footerContent} />
           <ContentField label={t.tagline} value={footer.tagline ?? ''} onChange={(v) => updateField('footer', 'tagline', v)} placeholder="Premium beauty products for every skin type." multiline rtl={language === 'ar'} />
-          <ContentField label={t.copyrightText} value={footer.copyright ?? ''} onChange={(v) => updateField('footer', 'copyright', v)} placeholder="© 2026 Lazurde Makeup." rtl={language === 'ar'} />
+          <ContentField label={t.copyrightText} value={footer.copyright ?? ''} onChange={(v) => updateField('footer', 'copyright', v)} placeholder={BRAND_CONFIG.copyrightText} rtl={language === 'ar'} />
           <ContentField label={t.contactEmail} value={footer.contact_email ?? ''} onChange={(v) => updateField('footer', 'contact_email', v)} placeholder="support@example.com" />
           <ContentField label={t.contactPhone} value={footer.contact_phone ?? ''} onChange={(v) => updateField('footer', 'contact_phone', v)} placeholder="+1 (800) 555-0199" />
           <ImageUploader
@@ -1353,8 +1354,8 @@ function BrandingPreview({ branding }: { branding: BrandingMap }) {
             <Image source={{ uri: branding.logo_url }} style={pv.logoImg} resizeMode="contain" />
           ) : (
             <View style={{ flexDirection: 'row' }}>
-              <Text style={pv.logoText}>{branding.app_name || 'LAZURDE'}</Text>
-              <Text style={pv.logoAccent}> {branding.app_tagline || 'MAKEUP'}</Text>
+              <Text style={pv.logoText}>{branding.app_name || BRAND_CONFIG.brandShortName}</Text>
+              <Text style={pv.logoAccent}> {branding.app_tagline || BRAND_CONFIG.tagline}</Text>
             </View>
           )}
         </View>

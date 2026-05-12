@@ -27,6 +27,7 @@ import { useCMS } from '@/context/CMSContext';
 import { supabase } from '@/lib/supabase';
 import AppHeader from '@/components/AppHeader';
 import { Colors, Radius, Spacing, FontSize } from '@/constants/theme';
+import { BRAND_CONFIG } from '@/config/brand';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ export default function AboutScreen() {
   const ret = data.return ?? {};
   const footer = data.footer ?? {};
 
-  const brandName = brand.name || branding.app_name || 'LAZURDE MAKEUP';
+  const brandName = brand.name || branding.app_name || `${BRAND_CONFIG.brandShortName} ${BRAND_CONFIG.tagline}`;
   const brandTagline = brand.tagline || t.aboutTagline;
   const brandDesc = brand.description || '';
   const brandMission = brand.mission || '';
@@ -163,7 +164,7 @@ export default function AboutScreen() {
             {branding.logo_url ? (
               <Image source={{ uri: branding.logo_url }} style={styles.logo} resizeMode="contain" />
             ) : (
-              <Text style={styles.logoFallbackText}>{branding.app_name || 'Lazurde Makeup'}</Text>
+              <Text style={styles.logoFallbackText}>{branding.app_name || BRAND_CONFIG.brandFullName}</Text>
             )}
           </View>
           <Text style={styles.heroTitle}>{t.aboutUs.toUpperCase()}</Text>
@@ -297,7 +298,7 @@ export default function AboutScreen() {
               {branding.logo_url ? (
                 <Image source={{ uri: branding.logo_url }} style={styles.footerLogo} resizeMode="contain" />
               ) : (
-                <Text style={styles.footerLogoText}>{branding.app_name || 'Lazurde Makeup'}</Text>
+                <Text style={styles.footerLogoText}>{branding.app_name || BRAND_CONFIG.brandFullName}</Text>
               )}
               <Text style={styles.footerCopyright}>{copyright}</Text>
             </View>

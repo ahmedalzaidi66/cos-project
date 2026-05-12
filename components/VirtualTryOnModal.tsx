@@ -29,6 +29,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
 import { ProductShade, supabase } from '@/lib/supabase';
+import { BRAND_CONFIG } from '@/config/brand';
 import {
   smartRenderLayers, initFaceLandmarker, isFaceLandmarkerReady,
   getTryOnCategory, getDefaultFinish, TRYON_PRODUCTS,
@@ -557,7 +558,7 @@ function TryOnModalWeb({
     try {
       const url = canvasRef.current.toDataURL('image/png');
       const a = document.createElement('a');
-      a.href = url; a.download = 'lazurde-look.png';
+      a.href = url; a.download = `${BRAND_CONFIG.brandName.en.toLowerCase()}-look.png`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setSaveState('ok'); setTimeout(() => setSaveState('idle'), 2500);
     } catch { setSaveState('err'); setTimeout(() => setSaveState('idle'), 3000); }

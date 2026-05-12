@@ -17,6 +17,7 @@ import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
 import { supabase, adminSupabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { BRAND_CONFIG } from '@/config/brand';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ type FieldDef = {
 };
 
 const BRAND_FIELDS: FieldDef[] = [
-  { key: 'name',        label: 'Brand Name',        placeholder: 'LAZURDE MAKEUP' },
+  { key: 'name',        label: 'Brand Name',        placeholder: `${BRAND_CONFIG.brandShortName} ${BRAND_CONFIG.tagline}` },
   { key: 'tagline',     label: 'Tagline',            placeholder: 'Professional gear trusted worldwide' },
   { key: 'description', label: 'Brand Description',  placeholder: 'Describe your brand...', multiline: true },
   { key: 'mission',     label: 'Mission Statement',  placeholder: 'Our mission is...', multiline: true },

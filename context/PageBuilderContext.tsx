@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { supabase, adminSupabase } from '@/lib/supabase';
+import { BRAND_CONFIG } from '@/config/brand';
 
 export type BlockType =
   | 'header'
@@ -41,9 +42,9 @@ export const DEFAULT_BLOCK_CONTENT: Record<BlockType, Record<string, any>> = {
   banner: { text: 'Free shipping on orders over $50', link_text: 'Shop Now', link_url: '', bg_color: '#FF4D8D', text_color: '#FFFFFF' },
   footer: {
     tagline: 'Premium makeup for every skin tone.',
-    copyright: '© 2026 Lazurde Makeup. All rights reserved.',
+    copyright: BRAND_CONFIG.copyrightText,
     col1_title: 'Shop', col2_title: 'Company', col3_title: 'Support',
-    contact_email: 'support@lazurdemakeup.com', contact_phone: '+1 (800) 555-0199',
+    contact_email: BRAND_CONFIG.supportEmail, contact_phone: BRAND_CONFIG.supportPhone,
   },
   section_row: { section_id: '', title_en: '', title_ar: '', is_active: true },
 };

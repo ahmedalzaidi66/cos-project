@@ -25,6 +25,7 @@ import AppHeader from '@/components/AppHeader';
 import GlossyButton from '@/components/GlossyButton';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { Colors, Spacing, FontSize, Radius, Shadow } from '@/constants/theme';
+import { BRAND_CONFIG } from '@/config/brand';
 import { useAppColors } from '@/context/ThemeContext';
 import { formatPrice } from '@/lib/currency';
 import ThemeSelector from '@/components/ThemeSelector';
@@ -80,7 +81,7 @@ function AuthView() {
               <Text style={authViewStyles.logoLetter}>L</Text>
             </View>
           </View>
-          <Text style={[authViewStyles.brandName, { color: C.textPrimary }]}>LAZURDE</Text>
+          <Text style={[authViewStyles.brandName, { color: C.textPrimary }]}>{BRAND_CONFIG.brandShortName}</Text>
           <Text style={[authViewStyles.brandTagline, { color: C.textMuted }]}>{t.authBrandTagline}</Text>
         </View>
 
@@ -1081,7 +1082,7 @@ function PhoneSignupGate() {
               <Text style={gateStyles.logoLetter}>L</Text>
             </View>
           </View>
-          <Text style={[gateStyles.brandName, { color: C.textPrimary }]}>LAZURDE</Text>
+          <Text style={[gateStyles.brandName, { color: C.textPrimary }]}>{BRAND_CONFIG.brandShortName}</Text>
         </View>
 
         {/* Card */}

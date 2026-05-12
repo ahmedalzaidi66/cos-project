@@ -1,5 +1,5 @@
 /**
- * Brand protection for Lazurde Beauty translations.
+ * Brand protection for translations.
  *
  * Rules:
  * - "لازوردي" (Arabic) must stay as-is in Arabic and Kurdish (ckb).
@@ -9,6 +9,8 @@
  * - AI or Google Translate must not rename the brand.
  */
 
+import { BRAND_CONFIG } from '@/config/brand';
+
 /** Languages where the Arabic script spelling is correct and should be preserved. */
 const ARABIC_SCRIPT_LANGS = new Set(['ar', 'ckb']);
 
@@ -17,8 +19,8 @@ const ARABIC_SCRIPT_LANGS = new Set(['ar', 'ckb']);
  * Arabic/Kurdish: Arabic script.
  * All other languages: Latin script.
  */
-const BRAND_LATIN = 'Lazurde';
-const BRAND_ARABIC = 'لازوردي';
+const BRAND_LATIN = BRAND_CONFIG.brandName.en;
+const BRAND_ARABIC = BRAND_CONFIG.brandName.ar;
 
 /**
  * Known incorrect AI/Google transliterations and translations of "Lazurde"
@@ -134,7 +136,7 @@ export function normalizeBrandTranslationResult(
  * Inject this into the OpenAI prompt.
  */
 export const BRAND_PROTECTION_PROMPT = `IMPORTANT RULES:
-- "Lazurde" and "Lazurde Beauty" are brand names. NEVER translate, transliterate, or modify them.
-- In Arabic and Kurdish: keep "لازوردي" exactly as written.
-- In all other languages: always write "Lazurde" (Latin script, exact spelling).
-- Do not convert "Lazurde" to any other script or spelling.`;
+- "${BRAND_CONFIG.brandName.en}" and "${BRAND_CONFIG.brandFullName}" are brand names. NEVER translate, transliterate, or modify them.
+- In Arabic and Kurdish: keep "${BRAND_CONFIG.brandName.ar}" exactly as written.
+- In all other languages: always write "${BRAND_CONFIG.brandName.en}" (Latin script, exact spelling).
+- Do not convert "${BRAND_CONFIG.brandName.en}" to any other script or spelling.`;

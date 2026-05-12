@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { Platform } from 'react-native';
 import { setAdminSessionToken, supabase } from '@/lib/supabase';
 import { logAdminAction } from '@/lib/auditLog';
+import { BRAND_CONFIG } from '@/config/brand';
 
 export type AdminRole = 'super_admin' | 'admin' | 'employee' | 'product_manager' | 'order_manager' | 'customer_support' | 'content_editor';
 
@@ -13,7 +14,7 @@ export type AdminUser = {
   permissions: string[];
 };
 
-const ADMIN_EMAIL = 'admin@lazurdemakeup.com';
+const ADMIN_EMAIL = BRAND_CONFIG.adminEmail;
 const ADMIN_PASSWORD = '123456';
 const STORAGE_KEY = 'isAdminLoggedIn';
 const STORAGE_USER_KEY = 'adminUser';

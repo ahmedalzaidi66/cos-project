@@ -23,6 +23,7 @@ import { supabase, adminSupabase } from '@/lib/supabase';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 import { useLanguage } from '@/context/LanguageContext';
+import { BRAND_CONFIG } from '@/config/brand';
 
 const TRYON_BUCKET = 'tryon-models';
 const TRYON_SETTING_KEY = 'tryon_model_image_url';
@@ -419,7 +420,7 @@ const SETTING_GROUPS = [
     title: 'Store Identity',
     icon: Store,
     fields: [
-      { key: 'store_name', label: 'Store Name', placeholder: 'Lazurde Makeup' },
+      { key: 'store_name', label: 'Store Name', placeholder: BRAND_CONFIG.brandFullName },
       { key: 'store_tagline', label: 'Store Tagline', placeholder: 'Premium Makeup Products' },
       { key: 'logo_url', label: 'Logo URL', placeholder: 'https://...', hint: 'Direct link to your logo image' },
     ],

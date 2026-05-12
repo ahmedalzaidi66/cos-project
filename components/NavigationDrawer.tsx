@@ -37,6 +37,7 @@ import { useCart } from '@/context/CartContext';
 import { useCMS } from '@/context/CMSContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { BRAND_CONFIG } from '@/config/brand';
 import { useAppColors } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { fetchCategories, getCategoryName, Category } from '@/lib/supabase';
@@ -226,8 +227,8 @@ export default function NavigationDrawer({ visible, onClose }: Props) {
                 />
               ) : (
                 <View>
-                  <Text style={[styles.brandName, { color: C.textPrimary }]}>{branding.app_name || 'LAZURDE'}</Text>
-                  <Text style={styles.brandTagline}>{branding.app_tagline || 'MAKEUP'}</Text>
+                  <Text style={[styles.brandName, { color: C.textPrimary }]}>{branding.app_name || BRAND_CONFIG.brandShortName}</Text>
+                  <Text style={styles.brandTagline}>{branding.app_tagline || BRAND_CONFIG.tagline}</Text>
                 </View>
               )}
               <TouchableOpacity style={[styles.closeBtn, { backgroundColor: C.backgroundCard }]} onPress={onClose} activeOpacity={0.7}>

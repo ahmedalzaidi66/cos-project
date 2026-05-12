@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { fetchCMSContent, fetchThemeSettings, CMSContent as CMSRow, ThemeSettings } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
+import { BRAND_CONFIG } from '@/config/brand';
 
 export type SectionMap = Record<string, string>;
 export type CMSContent = Record<string, SectionMap>;
@@ -14,9 +15,9 @@ export type Branding = {
 };
 
 const DEFAULT_BRANDING: Branding = {
-  logo_url: '',
-  app_name: 'LAZURDE',
-  app_tagline: 'MAKEUP',
+  logo_url: BRAND_CONFIG.logo,
+  app_name: BRAND_CONFIG.brandShortName,
+  app_tagline: BRAND_CONFIG.tagline,
   header_icons: 'true',
 };
 

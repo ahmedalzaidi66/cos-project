@@ -28,6 +28,7 @@ import {
   BlockType,
 } from '@/context/PageBuilderContext';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import { BRAND_CONFIG } from '@/config/brand';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const IS_WIDE = SCREEN_WIDTH > 900;
@@ -318,8 +319,8 @@ function PreviewBlock({ block }: { block: PageBlock }) {
             {[0,1,2].map(i => <View key={i} style={[pb.menuLine, i === 1 && { width: '60%' }]} />)}
           </View>
           <Text style={pb.headerLogo}>
-            <Text style={{ color: Colors.textPrimary }}>LAZURDE</Text>
-            <Text style={{ color: Colors.neonBlue }}> MAKEUP</Text>
+            <Text style={{ color: Colors.textPrimary }}>{BRAND_CONFIG.brandShortName}</Text>
+            <Text style={{ color: Colors.neonBlue }}> {BRAND_CONFIG.tagline}</Text>
           </Text>
           <View style={pb.headerIcons}>
             {c.show_account !== false && <User size={11} color={Colors.textMuted} strokeWidth={2} />}

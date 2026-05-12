@@ -18,6 +18,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import NavigationDrawer from '@/components/NavigationDrawer';
 import { Colors, Spacing, FontSize } from '@/constants/theme';
 import { useAppColors } from '@/context/ThemeContext';
+import { BRAND_CONFIG } from '@/config/brand';
 import { useUISize } from '@/context/UISizeContext';
 
 type Props = {
@@ -140,7 +141,7 @@ export default function AppHeader({ showBack = false, title, onSearchPress }: Pr
             />
           ) : (
             <Text style={[styles.logoText, { color: C.textPrimary }]}>
-              {branding.app_name || 'LAZURDE'}
+              {branding.app_name || BRAND_CONFIG.brandShortName}
               {(branding.app_tagline) ? (
                 <Text style={styles.logoAccent}> {branding.app_tagline}</Text>
               ) : (

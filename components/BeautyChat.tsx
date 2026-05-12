@@ -36,6 +36,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, FontSize, Radius } from '@/constants/theme';
 import { formatPrice } from '@/lib/currency';
+import { BRAND_CONFIG, getBrandName } from '@/config/brand';
 import { useCart } from '@/context/CartContext';
 import { supabase, Product, fetchProductById, fetchProductGallery, fetchProductShades, ProductShade, getProductName, getProductDescription } from '@/lib/supabase';
 import { extractSkinTone, SkinToneRGB } from '@/lib/colorExtract';
@@ -87,7 +88,7 @@ type ChatMessage = {
   timestamp: number;
 };
 
-const CHAT_STORAGE_KEY = 'lazurde_beauty_chat_history';
+const CHAT_STORAGE_KEY = `${BRAND_CONFIG.brandName.en.toLowerCase()}_beauty_chat_history`;
 const API_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/beauty-chat`;
 
 function loadHistory(): ChatMessage[] {
@@ -447,11 +448,11 @@ export default function BeautyChat({ visible, onClose }: { visible: boolean; onC
         setMessages(history);
       } else {
         const welcomeTexts: Record<string, string> = {
-          en: "Welcome to Lazurde Beauty! I'm your AI beauty assistant. Ask me about products, shades, routines, or upload a face photo for personalized skin analysis and recommendations.",
-          ar: 'مرحباً بك في لازوردي! أنا مساعدتك الذكية للجمال. اسألي عن المنتجات، الألوان، الروتين، أو ارسلي صورة وجهك لتحليل البشرة.',
-          es: 'Bienvenida a Lazurde Beauty! Soy tu asistente de belleza con IA. Pregunta sobre productos, tonos, rutinas, o sube una foto para analizar tu piel.',
-          de: 'Willkommen bei Lazurde Beauty! Ich bin deine KI-Beauty-Assistentin. Frag nach Produkten, Farbtönen, Routinen oder lade ein Foto zur Hautanalyse hoch.',
-          ru: 'Добро пожаловать в Lazurde Beauty! Я ваш ИИ-ассистент по красоте. Спросите о продуктах, оттенках, рутине или загрузите фото для анализа кожи.',
+          en: `Welcome to ${BRAND_CONFIG.brandFullName}! I'm your AI beauty assistant. Ask me about products, shades, routines, or upload a face photo for personalized skin analysis and recommendations.`,
+          ar: `مرحباً بك في ${getBrandName('ar')}! أنا مساعدتك الذكية للجمال. اسألي عن المنتجات، الألوان، الروتين، أو ارسلي صورة وجهك لتحليل البشرة.`,
+          es: `Bienvenida a ${BRAND_CONFIG.brandFullName}! Soy tu asistente de belleza con IA. Pregunta sobre productos, tonos, rutinas, o sube una foto para analizar tu piel.`,
+          de: `Willkommen bei ${BRAND_CONFIG.brandFullName}! Ich bin deine KI-Beauty-Assistentin. Frag nach Produkten, Farbtönen, Routinen oder lade ein Foto zur Hautanalyse hoch.`,
+          ru: `Добро пожаловать в ${BRAND_CONFIG.brandFullName}! Я ваш ИИ-ассистент по красоте. Спросите о продуктах, оттенках, рутине или загрузите фото для анализа кожи.`,
         };
         setMessages([{
           id: 'welcome',

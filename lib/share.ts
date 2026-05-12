@@ -13,6 +13,7 @@
  */
 
 import { Platform, Share, Clipboard } from 'react-native';
+import { BRAND_CONFIG, getBrandName } from '@/config/brand';
 
 export type ShareResult = 'shared' | 'copied' | 'cancelled' | 'error';
 
@@ -100,14 +101,14 @@ export function buildProductSharePayload(
   const url =
     typeof window !== 'undefined'
       ? window.location.href
-      : `https://lazurdebeauty.com/product/${productId}`;
+      : `${BRAND_CONFIG.websiteUrl}/product/${productId}`;
 
   const title = name;
 
   const text =
     language === 'ar'
-      ? `${name} — ${price}\nاكتشف المنتج على لازوردي`
-      : `${name} — ${price}\nDiscover it on Lazurde`;
+      ? `${name} — ${price}\nاكتشف المنتج على ${getBrandName('ar')}`
+      : `${name} — ${price}\nDiscover it on ${getBrandName('en')}`;
 
   return { title, text, url };
 }

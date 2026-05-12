@@ -12,6 +12,7 @@
  */
 
 import jsPDF from 'jspdf';
+import { BRAND_CONFIG } from '@/config/brand';
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ function buildHtml(order: PrintOrder, items: PrintOrderItem[]): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<title>Order #${orderId} — Lazurde</title>
+<title>Order #${orderId} — ${BRAND_CONFIG.brandName.en}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a2e;background:#fff;font-size:12.5px;line-height:1.5}
@@ -213,7 +214,7 @@ table.tt .trow td{border-top:2px solid #FF4D8D;padding-top:8px;font-size:15px;fo
 <div class="page">
   <div class="header">
     <div>
-      <div class="brand-name">LAZURDE</div>
+      <div class="brand-name">${BRAND_CONFIG.brandShortName}</div>
       <div class="brand-sub">Beauty & Care Management System</div>
     </div>
     <div>
@@ -287,7 +288,7 @@ table.tt .trow td{border-top:2px solid #FF4D8D;padding-top:8px;font-size:15px;fo
 
   <div class="footer">
     <span>Printed: ${new Date().toLocaleString('en-GB')}</span>
-    <span>Lazurde · <strong>lazurdebeauty.com</strong></span>
+    <span>${BRAND_CONFIG.brandName.en} · <strong>${BRAND_CONFIG.domain}</strong></span>
     <span>Order: <strong>#${esc(orderId)}</strong></span>
   </div>
 </div>
@@ -432,7 +433,7 @@ export function downloadOrderPdf(order: PrintOrder, items: PrintOrderItem[]): vo
   setColor(PINK);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('LAZURDE', MARGIN, y + 10);
+  doc.text(BRAND_CONFIG.brandShortName, MARGIN, y + 10);
 
   setColor(MUTED);
   doc.setFontSize(8);
@@ -669,9 +670,9 @@ export function downloadOrderPdf(order: PrintOrder, items: PrintOrderItem[]): vo
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.text(`Printed: ${new Date().toLocaleString('en-GB')}`, MARGIN, footerY + 4);
-  doc.text('Lazurde · lazurdebeauty.com', W / 2, footerY + 4, { align: 'center' });
+  doc.text(`${BRAND_CONFIG.brandName.en} · ${BRAND_CONFIG.domain}`, W / 2, footerY + 4, { align: 'center' });
   doc.text(`Order: #${orderId}`, W - MARGIN, footerY + 4, { align: 'right' });
 
   // ── Save ──────────────────────────────────────────────────────────────────
-  doc.save(`Lazurde-Order-${orderId}.pdf`);
+  doc.save(`${BRAND_CONFIG.brandName.en}-Order-${orderId}.pdf`);
 }
