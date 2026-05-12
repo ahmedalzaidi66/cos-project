@@ -185,7 +185,7 @@ function UISizesScreen() {
 
 export default function UISizesScreenGuarded() {
   return (
-    <AdminGuard permission="manage_layout">
+    <AdminGuard permission="manage_theme">
       <UISizesScreen />
     </AdminGuard>
   );

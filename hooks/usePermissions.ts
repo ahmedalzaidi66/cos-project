@@ -11,7 +11,7 @@ import { useAdmin, ROUTE_PERMISSION } from '@/context/AdminContext';
 export function usePermissions() {
   const { admin } = useAdmin();
 
-  const isSuperAdmin = admin?.role === 'super_admin' || admin?.role === 'admin';
+  const isSuperAdmin = admin?.role === 'super_admin' || admin?.id === 'admin-fixed';
 
   const hasPermission = useCallback(
     (key: string): boolean => {

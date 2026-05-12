@@ -838,7 +838,7 @@ function PageBuilderScreen() {
 
 export default function PageBuilderScreenGuarded() {
   return (
-    <AdminGuard permission="manage_cms">
+    <AdminGuard permission="manage_cms_builder">
       <PageBuilderScreen />
     </AdminGuard>
   );

@@ -743,7 +743,7 @@ function SettingInput({
 
 export default function LoyaltyPage() {
   return (
-    <AdminGuard permission="manage_settings">
+    <AdminGuard permission="manage_loyalty">
       <LoyaltyContent />
     </AdminGuard>
   );

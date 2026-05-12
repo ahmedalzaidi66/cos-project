@@ -526,7 +526,7 @@ function NotificationsScreen() {
 
 export default function NotificationsScreenGuarded() {
   return (
-    <AdminGuard permission="manage_customers">
+    <AdminGuard permission="manage_notifications">
       <NotificationsScreen />
     </AdminGuard>
   );

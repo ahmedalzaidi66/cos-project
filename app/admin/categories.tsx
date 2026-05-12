@@ -606,7 +606,7 @@ export default function CategoriesScreenGuarded() {
   const { isMobile } = useAdminLayout();
   if (isMobile) return <MobileCategoriesScreen />;
   return (
-    <AdminGuard permission="manage_products">
+    <AdminGuard permission="manage_categories">
       <CategoriesScreen />
     </AdminGuard>
   );

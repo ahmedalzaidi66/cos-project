@@ -140,7 +140,7 @@ export default function AdminAboutScreen() {
   const { t } = useLanguage();
 
   const content = (
-    <AdminGuard permission="manage_cms">
+    <AdminGuard permission="manage_about">
       <AboutEditor />
     </AdminGuard>
   );

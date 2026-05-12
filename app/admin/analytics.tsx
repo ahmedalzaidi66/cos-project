@@ -998,7 +998,7 @@ function AnalyticsScreen() {
 
 export default function AnalyticsScreenGuarded() {
   return (
-    <AdminGuard permission="view_dashboard">
+    <AdminGuard permission="manage_analytics">
       <AnalyticsScreen />
     </AdminGuard>
   );
