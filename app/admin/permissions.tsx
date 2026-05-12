@@ -27,6 +27,7 @@ import Toast from '@/components/admin/Toast';
 import { supabase, adminSupabase } from '@/lib/supabase';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
+import type { Translations } from '@/constants/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,22 +54,119 @@ type Employee = {
 
 type Tab = 'roles' | 'employees';
 
-// Roles that cannot be edited
+// Roles that cannot have their permissions edited
 const LOCKED_ROLES = new Set(['super_admin', 'admin', 'user']);
 
 const SECTION_COLORS: Record<string, string> = {
-  general: Colors.neonBlue,
-  catalog: Colors.warning,
-  sales:   Colors.success,
-  content: '#60CDFF',
-  admin:   Colors.error,
+  general:   Colors.neonBlue,
+  catalog:   Colors.warning,
+  sales:     Colors.success,
+  content:   '#60CDFF',
+  admin:     Colors.error,
+  marketing: '#F472B6',
 };
+
+// ─── i18n helpers ─────────────────────────────────────────────────────────────
+
+// Map permission key → translation key suffix for label
+const PERM_LABEL_KEYS: Record<string, keyof Translations> = {
+  view_dashboard:       'permLabelViewDashboard',
+  manage_analytics:     'permLabelManageAnalytics',
+  manage_products:      'permLabelManageProducts',
+  manage_categories:    'permLabelManageCategories',
+  manage_orders:        'permLabelManageOrders',
+  manage_customers:     'permLabelManageCustomers',
+  manage_loyalty:       'permLabelManageLoyalty',
+  manage_notifications: 'permLabelManageNotifications',
+  manage_employees:     'permLabelManageEmployees',
+  manage_reviews:       'permLabelManageReviews',
+  manage_coupons:       'permLabelManageCoupons',
+  manage_shipping:      'permLabelManageShipping',
+  manage_sections:      'permLabelManageSections',
+  manage_cms:           'permLabelManageCms',
+  manage_about:         'permLabelManageAbout',
+  manage_cms_builder:   'permLabelManageCmsBuilder',
+  manage_layout:        'permLabelManageLayout',
+  manage_theme:         'permLabelManageTheme',
+  manage_settings:      'permLabelManageSettings',
+  manage_permissions:   'permLabelManagePermissions',
+  view_audit_logs:      'permLabelViewAuditLogs',
+  manage_campaigns:     'permLabelManageCampaigns',
+};
+
+const PERM_DESC_KEYS: Record<string, keyof Translations> = {
+  view_dashboard:       'permDescViewDashboard',
+  manage_analytics:     'permDescManageAnalytics',
+  manage_products:      'permDescManageProducts',
+  manage_categories:    'permDescManageCategories',
+  manage_orders:        'permDescManageOrders',
+  manage_customers:     'permDescManageCustomers',
+  manage_loyalty:       'permDescManageLoyalty',
+  manage_notifications: 'permDescManageNotifications',
+  manage_employees:     'permDescManageEmployees',
+  manage_reviews:       'permDescManageReviews',
+  manage_coupons:       'permDescManageCoupons',
+  manage_shipping:      'permDescManageShipping',
+  manage_sections:      'permDescManageSections',
+  manage_cms:           'permDescManageCms',
+  manage_about:         'permDescManageAbout',
+  manage_cms_builder:   'permDescManageCmsBuilder',
+  manage_layout:        'permDescManageLayout',
+  manage_theme:         'permDescManageTheme',
+  manage_settings:      'permDescManageSettings',
+  manage_permissions:   'permDescManagePermissions',
+  view_audit_logs:      'permDescViewAuditLogs',
+  manage_campaigns:     'permDescManageCampaigns',
+};
+
+const ROLE_LABEL_KEYS: Record<string, keyof Translations> = {
+  super_admin:      'roleSuperAdmin',
+  admin:            'roleAdmin',
+  employee:         'roleEmployee',
+  product_manager:  'roleProductManager',
+  order_manager:    'roleOrderManager',
+  customer_support: 'roleCustomerSupport',
+  content_editor:   'roleContentEditor',
+};
+
+const SECTION_LABEL_KEYS: Record<string, keyof Translations> = {
+  general:   'permGeneral',
+  catalog:   'permCatalog',
+  sales:     'permSales',
+  content:   'permContent',
+  admin:     'permAdmin',
+  marketing: 'permMarketing',
+};
+
+function getPermLabel(t: Translations, key: string, fallback: string): string {
+  const tKey = PERM_LABEL_KEYS[key];
+  if (tKey && t[tKey]) return t[tKey] as string;
+  return fallback;
+}
+
+function getPermDesc(t: Translations, key: string, fallback: string): string {
+  const tKey = PERM_DESC_KEYS[key];
+  if (tKey && t[tKey]) return t[tKey] as string;
+  return fallback;
+}
+
+function getRoleLabel(t: Translations, key: string): string {
+  const tKey = ROLE_LABEL_KEYS[key];
+  if (tKey && t[tKey]) return t[tKey] as string;
+  return key.replace(/_/g, ' ');
+}
+
+function getSectionLabel(t: Translations, section: string): string {
+  const tKey = SECTION_LABEL_KEYS[section];
+  if (tKey && t[tKey]) return t[tKey] as string;
+  return section.charAt(0).toUpperCase() + section.slice(1);
+}
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 function PermissionsScreen() {
   const { isMobile } = useAdminLayout();
-  const { t } = useLanguage();
+  const { t, isRTL } = useLanguage();
   const { guard: guardAction } = useActionPermission('manage_permissions');
   const [tab, setTab] = useState<Tab>('roles');
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -132,10 +230,10 @@ function PermissionsScreen() {
       p_permissions: perms,
     });
 
-    if (error) showToast('Failed to save: ' + error.message, 'error');
-    else showToast('Permissions saved for ' + roleKey.replace(/_/g, ' '));
+    if (error) showToast((t.saveFailed ?? 'Failed to save') + ': ' + error.message, 'error');
+    else showToast((t.saveRolePermissions ?? 'Saved') + ' — ' + getRoleLabel(t, roleKey));
     setSaving(null);
-  }, [rolePermMap, guardAction]);
+  }, [rolePermMap, guardAction, t]);
 
   const toggleEmployeeCustom = (emp: Employee, permKey: string) => {
     setEmployees((prev) =>
@@ -159,10 +257,10 @@ function PermissionsScreen() {
       p_permissions: perms,
     });
 
-    if (error) showToast('Failed to save: ' + error.message, 'error');
-    else showToast('Permissions saved for ' + emp.full_name);
+    if (error) showToast((t.saveFailed ?? 'Failed to save') + ': ' + error.message, 'error');
+    else showToast((t.savePermissions ?? 'Saved') + ' — ' + emp.full_name);
     setSaving(null);
-  }, [rolePermMap, guardAction]);
+  }, [rolePermMap, guardAction, t]);
 
   const resetEmployeeToRole = (emp: Employee) => {
     setEmployees((prev) =>
@@ -179,16 +277,16 @@ function PermissionsScreen() {
   if (isMobile) {
     return (
       <AdminMobileDashboard title={t.permissions} showBack>
-        <MobileUnsupported featureName="Permissions Manager" />
+        <MobileUnsupported featureName={t.permissions} />
       </AdminMobileDashboard>
     );
   }
 
   return (
     <AdminWebDashboard title={t.permissions}>
-      <View style={styles.container}>
+      <View style={[styles.container, isRTL && styles.containerRtl]}>
         {/* Tab bar */}
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, isRTL && styles.tabBarRtl]}>
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'roles' && styles.tabBtnActive]}
             onPress={() => setTab('roles')}
@@ -221,6 +319,7 @@ function PermissionsScreen() {
             toggleRolePerm={toggleRolePerm}
             saveRolePerms={saveRolePerms}
             saving={saving}
+            isRTL={isRTL}
           />
         ) : (
           <EmployeesTab
@@ -233,6 +332,7 @@ function PermissionsScreen() {
             saveEmployeePerms={saveEmployeePerms}
             resetEmployeeToRole={resetEmployeeToRole}
             saving={saving}
+            isRTL={isRTL}
           />
         )}
       </View>
@@ -253,17 +353,16 @@ type RolesTabProps = {
   toggleRolePerm: (roleKey: string, permKey: string) => void;
   saveRolePerms: (roleKey: string) => void;
   saving: string | null;
+  isRTL: boolean;
 };
 
-function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpandedRole, toggleRolePerm, saveRolePerms, saving }: RolesTabProps) {
+function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpandedRole, toggleRolePerm, saveRolePerms, saving, isRTL }: RolesTabProps) {
   const { t } = useLanguage();
   return (
     <View style={styles.tabContent}>
-      <View style={styles.infoBox}>
+      <View style={[styles.infoBox, isRTL && styles.infoBoxRtl]}>
         <AlertCircle size={14} color={Colors.warning} strokeWidth={2} />
-        <Text style={styles.infoText}>
-          {t.roleDefaultsInfo}
-        </Text>
+        <Text style={[styles.infoText, isRTL && styles.textRtl]}>{t.roleDefaultsInfo}</Text>
       </View>
 
       {roles.map((role) => {
@@ -271,22 +370,23 @@ function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpande
         const totalPerms = Object.values(sectionedPerms).flat().length;
         const isExpanded = expandedRole === role.key;
         const isSaving = saving === role.key;
+        const localLabel = getRoleLabel(t, role.key);
 
         return (
           <View key={role.key} style={styles.card}>
             <TouchableOpacity
-              style={styles.cardHeader}
+              style={[styles.cardHeader, isRTL && styles.rowRtl]}
               onPress={() => setExpandedRole(isExpanded ? null : role.key)}
               activeOpacity={0.7}
             >
-              <View style={styles.cardHeaderLeft}>
+              <View style={[styles.cardHeaderLeft, isRTL && styles.rowRtl]}>
                 <UserCog size={18} color={Colors.neonBlue} strokeWidth={2} />
                 <View>
-                  <Text style={styles.cardTitle}>{role.label}</Text>
-                  <Text style={styles.cardSubtitle}>{perms.size} / {totalPerms} permissions</Text>
+                  <Text style={[styles.cardTitle, isRTL && styles.textRtl]}>{localLabel}</Text>
+                  <Text style={[styles.cardSubtitle, isRTL && styles.textRtl]}>{perms.size} / {totalPerms}</Text>
                 </View>
               </View>
-              <View style={styles.cardHeaderRight}>
+              <View style={[styles.cardHeaderRight, isRTL && styles.rowRtl]}>
                 <View style={styles.permCountBadge}>
                   <Text style={styles.permCountText}>{perms.size}</Text>
                 </View>
@@ -301,23 +401,33 @@ function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpande
               <View style={styles.cardBody}>
                 {Object.entries(sectionedPerms).map(([section, sectionPerms]) => (
                   <View key={section} style={styles.section}>
-                    <View style={[styles.sectionHeader, { borderLeftColor: SECTION_COLORS[section] ?? Colors.textMuted }]}>
-                      <Text style={styles.sectionTitle}>{({general:t.permGeneral,catalog:t.permCatalog,sales:t.permSales,content:t.permContent,admin:t.permAdmin} as Record<string,string>)[section] ?? (section.charAt(0).toUpperCase()+section.slice(1))}</Text>
+                    <View style={[
+                      styles.sectionHeader,
+                      isRTL ? { borderRightWidth: 3, borderRightColor: SECTION_COLORS[section] ?? Colors.textMuted, borderLeftWidth: 0, paddingRight: Spacing.sm, paddingLeft: 0 }
+                             : { borderLeftColor: SECTION_COLORS[section] ?? Colors.textMuted }
+                    ]}>
+                      <Text style={[styles.sectionTitle, isRTL && styles.textRtl]}>
+                        {getSectionLabel(t, section)}
+                      </Text>
                     </View>
-                    {sectionPerms.map((perm) => (
-                      <View key={perm.key} style={styles.permRow}>
-                        <View style={styles.permInfo}>
-                          <Text style={styles.permLabel}>{perm.label}</Text>
-                          <Text style={styles.permDesc}>{perm.description}</Text>
+                    {sectionPerms.map((perm) => {
+                      const label = getPermLabel(t, perm.key, perm.label);
+                      const desc = getPermDesc(t, perm.key, perm.description);
+                      return (
+                        <View key={perm.key} style={[styles.permRow, isRTL && styles.rowRtl]}>
+                          <View style={styles.permInfo}>
+                            <Text style={[styles.permLabel, isRTL && styles.textRtl]}>{label}</Text>
+                            <Text style={[styles.permDesc, isRTL && styles.textRtl]}>{desc}</Text>
+                          </View>
+                          <Switch
+                            value={perms.has(perm.key)}
+                            onValueChange={() => toggleRolePerm(role.key, perm.key)}
+                            trackColor={{ false: Colors.backgroundCard, true: Colors.neonBlueGlow }}
+                            thumbColor={perms.has(perm.key) ? Colors.neonBlue : Colors.textMuted}
+                          />
                         </View>
-                        <Switch
-                          value={perms.has(perm.key)}
-                          onValueChange={() => toggleRolePerm(role.key, perm.key)}
-                          trackColor={{ false: Colors.backgroundCard, true: Colors.neonBlueGlow }}
-                          thumbColor={perms.has(perm.key) ? Colors.neonBlue : Colors.textMuted}
-                        />
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 ))}
 
@@ -354,19 +464,18 @@ type EmployeesTabProps = {
   saveEmployeePerms: (emp: Employee) => void;
   resetEmployeeToRole: (emp: Employee) => void;
   saving: string | null;
+  isRTL: boolean;
 };
 
-function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee, setExpandedEmployee, toggleEmployeeCustom, saveEmployeePerms, resetEmployeeToRole, saving }: EmployeesTabProps) {
+function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee, setExpandedEmployee, toggleEmployeeCustom, saveEmployeePerms, resetEmployeeToRole, saving, isRTL }: EmployeesTabProps) {
   const { t } = useLanguage();
   const editableEmployees = employees.filter((e) => !LOCKED_ROLES.has(e.role));
 
   return (
     <View style={styles.tabContent}>
-      <View style={styles.infoBox}>
+      <View style={[styles.infoBox, isRTL && styles.infoBoxRtl]}>
         <AlertCircle size={14} color={Colors.warning} strokeWidth={2} />
-        <Text style={styles.infoText}>
-          {t.employeeOverridesInfo}
-        </Text>
+        <Text style={[styles.infoText, isRTL && styles.textRtl]}>{t.employeeOverridesInfo}</Text>
       </View>
 
       {editableEmployees.length === 0 && (
@@ -382,33 +491,34 @@ function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee
         const isExpanded = expandedEmployee === emp.id;
         const isSaving = saving === emp.id;
         const totalPerms = Object.values(sectionedPerms).flat().length;
+        const roleLocalLabel = getRoleLabel(t, emp.role);
 
         return (
           <View key={emp.id} style={styles.card}>
             <TouchableOpacity
-              style={styles.cardHeader}
+              style={[styles.cardHeader, isRTL && styles.rowRtl]}
               onPress={() => setExpandedEmployee(isExpanded ? null : emp.id)}
               activeOpacity={0.7}
             >
-              <View style={styles.cardHeaderLeft}>
+              <View style={[styles.cardHeaderLeft, isRTL && styles.rowRtl]}>
                 <View style={styles.empAvatar}>
                   <Text style={styles.empAvatarText}>{emp.full_name[0].toUpperCase()}</Text>
                 </View>
                 <View>
-                  <View style={styles.empNameRow}>
-                    <Text style={styles.cardTitle}>{emp.full_name}</Text>
+                  <View style={[styles.empNameRow, isRTL && styles.rowRtl]}>
+                    <Text style={[styles.cardTitle, isRTL && styles.textRtl]}>{emp.full_name}</Text>
                     {hasCustom && (
                       <View style={styles.customBadge}>
                         <Text style={styles.customBadgeText}>{t.customBadge}</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={styles.cardSubtitle}>
-                    {emp.role.replace(/_/g, ' ')} · {effectivePerms.size}/{totalPerms} perms
+                  <Text style={[styles.cardSubtitle, isRTL && styles.textRtl]}>
+                    {roleLocalLabel} · {effectivePerms.size}/{totalPerms}
                   </Text>
                 </View>
               </View>
-              <View style={styles.cardHeaderRight}>
+              <View style={[styles.cardHeaderRight, isRTL && styles.rowRtl]}>
                 <View style={styles.permCountBadge}>
                   <Text style={styles.permCountText}>{effectivePerms.size}</Text>
                 </View>
@@ -422,8 +532,8 @@ function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee
             {isExpanded && (
               <View style={styles.cardBody}>
                 {!hasCustom && (
-                  <View style={styles.roleDefaultNotice}>
-                    <Text style={styles.roleDefaultText}>
+                  <View style={[styles.roleDefaultNotice, isRTL && styles.infoBoxRtl]}>
+                    <Text style={[styles.roleDefaultText, isRTL && styles.textRtl]}>
                       {t.roleDefaultNotice}
                     </Text>
                   </View>
@@ -431,27 +541,37 @@ function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee
 
                 {Object.entries(sectionedPerms).map(([section, sectionPerms]) => (
                   <View key={section} style={styles.section}>
-                    <View style={[styles.sectionHeader, { borderLeftColor: SECTION_COLORS[section] ?? Colors.textMuted }]}>
-                      <Text style={styles.sectionTitle}>{({general:t.permGeneral,catalog:t.permCatalog,sales:t.permSales,content:t.permContent,admin:t.permAdmin} as Record<string,string>)[section] ?? (section.charAt(0).toUpperCase()+section.slice(1))}</Text>
+                    <View style={[
+                      styles.sectionHeader,
+                      isRTL ? { borderRightWidth: 3, borderRightColor: SECTION_COLORS[section] ?? Colors.textMuted, borderLeftWidth: 0, paddingRight: Spacing.sm, paddingLeft: 0 }
+                             : { borderLeftColor: SECTION_COLORS[section] ?? Colors.textMuted }
+                    ]}>
+                      <Text style={[styles.sectionTitle, isRTL && styles.textRtl]}>
+                        {getSectionLabel(t, section)}
+                      </Text>
                     </View>
-                    {sectionPerms.map((perm) => (
-                      <View key={perm.key} style={styles.permRow}>
-                        <View style={styles.permInfo}>
-                          <Text style={styles.permLabel}>{perm.label}</Text>
-                          <Text style={styles.permDesc}>{perm.description}</Text>
+                    {sectionPerms.map((perm) => {
+                      const label = getPermLabel(t, perm.key, perm.label);
+                      const desc = getPermDesc(t, perm.key, perm.description);
+                      return (
+                        <View key={perm.key} style={[styles.permRow, isRTL && styles.rowRtl]}>
+                          <View style={styles.permInfo}>
+                            <Text style={[styles.permLabel, isRTL && styles.textRtl]}>{label}</Text>
+                            <Text style={[styles.permDesc, isRTL && styles.textRtl]}>{desc}</Text>
+                          </View>
+                          <Switch
+                            value={effectivePerms.has(perm.key)}
+                            onValueChange={() => toggleEmployeeCustom(emp, perm.key)}
+                            trackColor={{ false: Colors.backgroundCard, true: Colors.neonBlueGlow }}
+                            thumbColor={effectivePerms.has(perm.key) ? Colors.neonBlue : Colors.textMuted}
+                          />
                         </View>
-                        <Switch
-                          value={effectivePerms.has(perm.key)}
-                          onValueChange={() => toggleEmployeeCustom(emp, perm.key)}
-                          trackColor={{ false: Colors.backgroundCard, true: Colors.neonBlueGlow }}
-                          thumbColor={effectivePerms.has(perm.key) ? Colors.neonBlue : Colors.textMuted}
-                        />
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 ))}
 
-                <View style={styles.actionRow}>
+                <View style={[styles.actionRow, isRTL && styles.rowRtl]}>
                   {hasCustom && (
                     <TouchableOpacity
                       style={styles.resetBtn}
@@ -499,6 +619,9 @@ const styles = StyleSheet.create({
   container: {
     paddingBottom: 48,
   },
+  containerRtl: {
+    direction: 'rtl' as any,
+  },
   tabBar: {
     flexDirection: 'row',
     gap: Spacing.sm,
@@ -509,6 +632,16 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  tabBarRtl: {
+    flexDirection: 'row-reverse',
+    alignSelf: 'flex-end',
+  },
+  rowRtl: {
+    flexDirection: 'row-reverse',
+  },
+  textRtl: {
+    textAlign: 'right',
   },
   tabBtn: {
     flexDirection: 'row',
@@ -546,6 +679,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     marginBottom: Spacing.xs,
+  },
+  infoBoxRtl: {
+    flexDirection: 'row-reverse',
   },
   infoText: {
     flex: 1,
