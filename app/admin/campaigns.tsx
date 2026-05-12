@@ -2629,7 +2629,7 @@ function CampaignsContent() {
   const handleDismiss = async (key: string) => {
     await upsertOverride(key, 'dismissed');
     showToast(language === 'ar' ? 'تم رفض التذكير' : language === 'ckb' ? 'بیرخستنەوە ڕەتکرایەوە' : 'Reminder dismissed');
-    logAdminAction({ action: 'update', entityType: 'settings', entityLabel: `Campaign dismiss: ${key}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'update', entityType: 'settings', entityLabel: `Campaign dismiss: ${key}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleSnooze = async (key: string, opt: SnoozeOption) => {
@@ -2643,7 +2643,7 @@ function CampaignsContent() {
   const handleComplete = async (key: string) => {
     await upsertOverride(key, 'completed');
     showToast(language === 'ar' ? 'تم تحديده كمكتمل' : language === 'ckb' ? 'وەکو تەواوکراو نیشانەکرا' : 'Marked as completed');
-    logAdminAction({ action: 'update', entityType: 'settings', entityLabel: `Campaign complete: ${key}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'update', entityType: 'settings', entityLabel: `Campaign complete: ${key}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleAction = async (key: string, type: ActionType) => {
@@ -2653,7 +2653,7 @@ function CampaignsContent() {
         action_type: type,
         admin_email: admin?.email ?? '',
       });
-      logAdminAction({ action: 'create', entityType: 'settings', entityLabel: `Campaign action: ${key} / ${type}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'create', entityType: 'settings', entityLabel: `Campaign action: ${key} / ${type}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
 
       if (type === 'notification') {
         showToast(language === 'ar' ? 'تم تسجيل التذكير' : language === 'ckb' ? 'بیرخستنەوە تۆمارکرا' : 'Reminder logged');

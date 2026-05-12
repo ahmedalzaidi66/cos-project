@@ -271,7 +271,7 @@ function EmployeesScreen() {
       await fetchEmployees();
       const pwMsg = changePassword && form.password ? ' and password changed' : '';
       showToast('Employee updated' + pwMsg);
-      logAdminAction({ action: 'update', entityType: 'employee', entityId: editingEmployee.id, entityLabel: form.full_name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'update', entityType: 'employee', entityId: editingEmployee.id, entityLabel: form.full_name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     } else {
       // Create Supabase Auth account first
       const { data: authData, error: authErr } = await callEmployeeAuthFn('create', {
@@ -302,7 +302,7 @@ function EmployeesScreen() {
       setModalVisible(false);
       await fetchEmployees();
       showToast('Employee created — they can now log in with their email and password');
-      logAdminAction({ action: 'create', entityType: 'employee', entityLabel: form.full_name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'create', entityType: 'employee', entityLabel: form.full_name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     }
   };
 
@@ -317,7 +317,7 @@ function EmployeesScreen() {
     setDeleteId(null);
     await fetchEmployees();
     showToast('Employee moved to trash');
-    logAdminAction({ action: 'delete', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleRestore = async (id: string) => {
@@ -329,7 +329,7 @@ function EmployeesScreen() {
     await fetchEmployees();
     const emp = trashedEmployees.find((e) => e.id === id);
     showToast('Employee restored');
-    logAdminAction({ action: 'update', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'update', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleHardDelete = async (id: string) => {
@@ -341,7 +341,7 @@ function EmployeesScreen() {
     setHardDeleteId(null);
     await fetchEmployees();
     showToast('Employee permanently deleted');
-    logAdminAction({ action: 'delete', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'employee', entityId: id, entityLabel: emp?.full_name, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const sourceList = showTrash ? trashedEmployees : employees;

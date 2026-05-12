@@ -78,7 +78,7 @@ function ReviewsScreen() {
       showToast(t.reviewUpdateFailed, 'error');
     } else {
       showToast(status === 'approved' ? t.reviewApprovedMsg : t.reviewRejectedMsg);
-      logAdminAction({ action: 'status_change', entityType: 'review', entityId: id, entityLabel: review?.customer_name, afterData: { status }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'status_change', entityType: 'review', entityId: id, entityLabel: review?.customer_name, afterData: { status }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     }
   };
 
@@ -90,7 +90,7 @@ function ReviewsScreen() {
     setSelectedReview(null);
     setReviews((prev) => prev.filter((r) => r.id !== id));
     showToast(t.reviewDeletedMsg);
-    logAdminAction({ action: 'delete', entityType: 'review', entityId: id, entityLabel: review?.customer_name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'review', entityId: id, entityLabel: review?.customer_name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const filtered = reviews.filter((r) => {

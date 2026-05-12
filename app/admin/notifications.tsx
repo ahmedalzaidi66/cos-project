@@ -155,7 +155,7 @@ function NotificationsContent() {
     setHistory(prev => prev.filter(n => n.id !== id));
     setConfirmDeleteId(null);
     showToast('Notification deleted');
-    logAdminAction({ action: 'delete', entityType: 'notification', entityId: id, entityLabel: notif?.title, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'notification', entityId: id, entityLabel: notif?.title, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const filteredCustomers = customers.filter(c => {

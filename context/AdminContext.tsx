@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { setAdminSessionToken, supabase } from '@/lib/supabase';
+import { logAdminAction } from '@/lib/auditLog';
 
 export type AdminRole = 'super_admin' | 'admin' | 'employee' | 'product_manager' | 'order_manager' | 'customer_support' | 'content_editor';
 
@@ -162,6 +163,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       setAdminSessionToken('fixed-admin-token');
       storageSet(STORAGE_KEY, 'true');
       storageSet(STORAGE_USER_KEY, JSON.stringify(user));
+      logAdminAction({ action: 'login', entityType: 'employee', entityLabel: 'Super Admin login', adminUserId: user.id, adminEmail: user.email, adminName: user.name, adminRole: user.role });
       return '/admin/dashboard';
     }
 
@@ -216,6 +218,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     storageSet(STORAGE_KEY, 'true');
     storageSet(STORAGE_USER_KEY, JSON.stringify(user));
 
+    logAdminAction({ action: 'login', entityType: 'employee', entityId: user.id, entityLabel: `${user.name} login`, adminUserId: user.id, adminEmail: user.email, adminName: user.name, adminRole: user.role });
+
     // Pick the first route the employee is permitted to access.
     // Returns '' (empty string) if authenticated but no permitted route exists.
     const destination =
@@ -226,13 +230,18 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   const adminLogout = useCallback(async () => {
     console.log('[AdminContext] Logging out...');
+    // Capture admin before clearing state so log has context
+    const currentAdmin = admin;
+    if (currentAdmin) {
+      logAdminAction({ action: 'logout', entityType: 'employee', entityId: currentAdmin.id, entityLabel: `${currentAdmin.name} logout`, adminUserId: currentAdmin.id, adminEmail: currentAdmin.email, adminName: currentAdmin.name, adminRole: currentAdmin.role });
+    }
     setAdmin(null);
     setAdminSessionToken(null);
     storageRemove(STORAGE_KEY);
     storageRemove(STORAGE_USER_KEY);
     await supabase.auth.signOut();
     console.log('[AdminContext] Logged out');
-  }, []);
+  }, [admin]);
 
   return (
     <AdminContext.Provider value={{ admin, isAdminAuthenticated: !!admin, adminLogin, adminLogout, hydrated }}>

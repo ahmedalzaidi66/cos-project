@@ -197,7 +197,7 @@ function TryOnModelSection({
       onSaved('');
       setPreview(null);
       setStatus('ok');
-      logAdminAction({ action: 'delete', entityType: 'settings', entityLabel: 'Virtual Try-On Model Image', metadata: { setting: TRYON_SETTING_KEY }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'delete', entityType: 'settings', entityLabel: 'Virtual Try-On Model Image', metadata: { setting: TRYON_SETTING_KEY }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
       setTimeout(() => setStatus('idle'), 2500);
     } catch (err: any) {
       console.error('[TryOn] handleReset error:', err);
@@ -545,7 +545,7 @@ function SettingsScreen() {
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
-    logAdminAction({ action: 'update', entityType: 'settings', entityLabel: 'Site Settings', adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'update', entityType: 'settings', entityLabel: 'Site Settings', adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const Shell = isMobile ? AdminMobileDashboard : AdminWebDashboard;

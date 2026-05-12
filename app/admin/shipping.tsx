@@ -170,7 +170,7 @@ function ShippingScreen() {
 
     setModalVisible(false);
     showToast(editingRule ? 'تم تحديث قاعدة الشحن' : 'تمت إضافة قاعدة الشحن');
-    logAdminAction({ action: editingRule ? 'update' : 'create', entityType: 'shipping', entityId: editingRule?.id, entityLabel: [payload.country, payload.governorate, payload.area].filter(Boolean).join(' / '), afterData: payload as any, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: editingRule ? 'update' : 'create', entityType: 'shipping', entityId: editingRule?.id, entityLabel: [payload.country, payload.governorate, payload.area].filter(Boolean).join(' / '), afterData: payload as any, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     fetchRules();
   };
 
@@ -181,7 +181,7 @@ function ShippingScreen() {
     setDeleteId(null);
     if (error) { showToast('فشل الحذف: ' + error.message, 'error'); return; }
     showToast('تم حذف القاعدة');
-    logAdminAction({ action: 'delete', entityType: 'shipping', entityId: deleteId, entityLabel: rule ? [rule.country, rule.governorate, rule.area].filter(Boolean).join(' / ') : deleteId, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'shipping', entityId: deleteId, entityLabel: rule ? [rule.country, rule.governorate, rule.area].filter(Boolean).join(' / ') : deleteId, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     fetchRules();
   };
 

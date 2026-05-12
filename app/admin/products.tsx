@@ -708,7 +708,7 @@ function WebProductsScreen() {
     setSaving(false);
     setShowForm(false);
     showToast(editProduct ? 'Product updated' : 'Product created');
-    logAdminAction({ action: editProduct ? 'update' : 'create', entityType: 'product', entityId: editProduct?.id, entityLabel: form.name_ar || form.name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: editProduct ? 'update' : 'create', entityType: 'product', entityId: editProduct?.id, entityLabel: form.name_ar || form.name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleDelete = async (p: Product) => {
@@ -723,7 +723,7 @@ function WebProductsScreen() {
     setDeleting(null);
     setConfirmDelete(null);
     showToast('Product moved to trash');
-    logAdminAction({ action: 'delete', entityType: 'product', entityId: p.id, entityLabel: p.name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'product', entityId: p.id, entityLabel: p.name, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleRestore = async (p: Product) => {
@@ -734,7 +734,7 @@ function WebProductsScreen() {
     }).eq('id', p.id);
     await fetchProducts();
     showToast('Product restored');
-    logAdminAction({ action: 'update', entityType: 'product', entityId: p.id, entityLabel: p.name, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'update', entityType: 'product', entityId: p.id, entityLabel: p.name, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleHardDelete = async (p: Product) => {
@@ -744,7 +744,7 @@ function WebProductsScreen() {
     setDeleting(null);
     setConfirmHardDelete(null);
     showToast('Product permanently deleted');
-    logAdminAction({ action: 'delete', entityType: 'product', entityId: p.id, entityLabel: p.name, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'product', entityId: p.id, entityLabel: p.name, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleQuickStockSave = async (productId: string) => {
@@ -1580,7 +1580,7 @@ function MobileProductsScreen() {
     await fetchProducts();
     showToast('Product saved');
     setTimeout(() => setEditProduct(null), 400);
-    logAdminAction({ action: 'update', entityType: 'product', entityId: editProduct.id, entityLabel: editForm.name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'update', entityType: 'product', entityId: editProduct.id, entityLabel: editForm.name.trim(), adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const filtered = products.filter(

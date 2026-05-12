@@ -123,7 +123,7 @@ function CouponsScreen() {
     setSaving(false);
     setModalVisible(false);
     showToast(editingCoupon ? 'Coupon updated' : 'Coupon created');
-    logAdminAction({ action: editingCoupon ? 'update' : 'create', entityType: 'coupon', entityId: editingCoupon?.id, entityLabel: payload.code, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: editingCoupon ? 'update' : 'create', entityType: 'coupon', entityId: editingCoupon?.id, entityLabel: payload.code, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleDelete = async (id: string) => {
@@ -133,7 +133,7 @@ function CouponsScreen() {
     setDeleteId(null);
     setCoupons((prev) => prev.filter((c) => c.id !== id));
     showToast('Coupon deleted');
-    logAdminAction({ action: 'delete', entityType: 'coupon', entityId: id, entityLabel: coupon?.code, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'coupon', entityId: id, entityLabel: coupon?.code, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const isExpired = (coupon: Coupon) => {

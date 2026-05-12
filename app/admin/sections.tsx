@@ -180,7 +180,7 @@ function SectionsContent() {
         .eq('type', 'section_row')
         .filter('content->>section_id', 'eq', editingSection.id);
       showToast('تم حفظ التعديلات');
-      logAdminAction({ action: 'update', entityType: 'content', entityId: editingSection.id, entityLabel: form.title_en || form.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'update', entityType: 'content', entityId: editingSection.id, entityLabel: form.title_en || form.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     } else {
       const nextOrder = sections.length > 0 ? Math.max(...sections.map(s => s.sort_order)) + 1 : 1;
       const { data: newSection, error } = await db
@@ -211,7 +211,7 @@ function SectionsContent() {
         });
       }
       showToast('تم إنشاء القسم');
-    logAdminAction({ action: 'create', entityType: 'content', entityLabel: form.title_en || form.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'create', entityType: 'content', entityLabel: form.title_en || form.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     }
 
     setModalVisible(false);
@@ -232,7 +232,7 @@ function SectionsContent() {
     setDeleteId(null);
     if (error) { showToast('فشل الحذف: ' + error.message, 'error'); return; }
     showToast('تم حذف القسم');
-    logAdminAction({ action: 'delete', entityType: 'content', entityId: deleteId, entityLabel: section?.title_en || section?.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'content', entityId: deleteId, entityLabel: section?.title_en || section?.title_ar, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     fetchSections();
   };
 

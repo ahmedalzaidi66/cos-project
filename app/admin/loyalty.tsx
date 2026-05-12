@@ -172,7 +172,7 @@ function LoyaltyContent() {
     } else {
       setSettingsMsg((t as any).loyaltySettingsSaved ?? 'Settings saved successfully');
       setTimeout(() => setSettingsMsg(''), 3000);
-      logAdminAction({ action: 'update', entityType: 'loyalty', entityLabel: 'Loyalty Settings', afterData: payload as any, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'update', entityType: 'loyalty', entityLabel: 'Loyalty Settings', afterData: payload as any, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     }
   };
 
@@ -257,6 +257,8 @@ function LoyaltyContent() {
         afterData: { total_points: newTotal, tier: newTier, delta, note: adjustNote.trim() || 'Admin adjustment' } as any,
         adminUserId: admin?.id ?? '',
         adminEmail: admin?.email ?? '',
+        adminName: admin?.name ?? '',
+        adminRole: admin?.role ?? '',
       });
       fetchData();
       setTimeout(() => {

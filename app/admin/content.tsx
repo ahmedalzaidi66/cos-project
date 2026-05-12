@@ -1070,7 +1070,7 @@ function ContentScreen() {
       await refreshCMS(language);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-      logAdminAction({ action: 'update', entityType: 'content', entityLabel: `CMS Content (${language})`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+      logAdminAction({ action: 'update', entityType: 'content', entityLabel: `CMS Content (${language})`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
     } catch (err: any) {
       console.error('[Content] handleSave error:', err?.message ?? err);
     } finally {

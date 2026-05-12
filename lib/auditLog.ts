@@ -7,7 +7,9 @@ export type AuditAction =
   | 'login'
   | 'logout'
   | 'status_change'
-  | 'send';
+  | 'send'
+  | 'restore'
+  | 'soft_delete';
 
 export type AuditEntityType =
   | 'product'
@@ -21,12 +23,17 @@ export type AuditEntityType =
   | 'content'
   | 'notification'
   | 'customer'
-  | 'shipping';
+  | 'shipping'
+  | 'campaign'
+  | 'banner'
+  | 'permission';
 
 export type AuditLogEntry = {
   id: string;
   admin_user_id: string;
   admin_email: string;
+  admin_name: string;
+  admin_role: string;
   action: AuditAction;
   entity_type: AuditEntityType;
   entity_id: string | null;
@@ -49,6 +56,8 @@ export type LogAuditParams = {
   metadata?: Record<string, unknown> | null;
   adminUserId: string;
   adminEmail: string;
+  adminName?: string;
+  adminRole?: string;
 };
 
 /**
@@ -61,6 +70,8 @@ export async function logAdminAction(params: LogAuditParams): Promise<void> {
     await db.from('admin_audit_logs').insert({
       admin_user_id: params.adminUserId,
       admin_email: params.adminEmail,
+      admin_name: params.adminName ?? '',
+      admin_role: params.adminRole ?? '',
       action: params.action,
       entity_type: params.entityType,
       entity_id: params.entityId ?? null,
@@ -72,7 +83,7 @@ export async function logAdminAction(params: LogAuditParams): Promise<void> {
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
     });
   } catch {
-    // Audit log failures must never break the primary action
+    // Audit log failures must never block the primary action
   }
 }
 
@@ -128,7 +139,7 @@ export async function fetchAuditLogs(params: FetchAuditLogsParams): Promise<Fetc
 
   if (params.search) {
     query = query.or(
-      `entity_label.ilike.%${params.search}%,admin_email.ilike.%${params.search}%,entity_id.ilike.%${params.search}%`
+      `entity_label.ilike.%${params.search}%,admin_email.ilike.%${params.search}%,admin_name.ilike.%${params.search}%,entity_id.ilike.%${params.search}%`
     );
   }
 
@@ -137,7 +148,6 @@ export async function fetchAuditLogs(params: FetchAuditLogsParams): Promise<Fetc
   }
 
   if (params.dateTo) {
-    // Include the full end day
     const end = new Date(params.dateTo);
     end.setDate(end.getDate() + 1);
     query = query.lt('created_at', end.toISOString().split('T')[0]);

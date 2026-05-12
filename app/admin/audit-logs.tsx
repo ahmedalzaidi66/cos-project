@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Platform,
   ScrollView,
@@ -12,6 +11,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { ClipboardList, ListFilter as Filter, RefreshCw, Search, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react-native';
+import { adminSupabase } from '@/lib/supabase';
 import AdminGuard from '@/components/admin/AdminGuard';
 import AdminWebLayout from '@/components/admin/AdminWebLayout';
 import AdminMobileLayout from '@/components/admin/AdminMobileLayout';
@@ -34,6 +34,8 @@ const ACTION_OPTIONS: { value: string; label: string }[] = [
   { value: 'create', label: 'Created' },
   { value: 'update', label: 'Updated' },
   { value: 'delete', label: 'Deleted' },
+  { value: 'soft_delete', label: 'Soft Deleted' },
+  { value: 'restore', label: 'Restored' },
   { value: 'login', label: 'Logged In' },
   { value: 'logout', label: 'Logged Out' },
   { value: 'status_change', label: 'Status Changed' },
@@ -54,12 +56,17 @@ const ENTITY_OPTIONS: { value: string; label: string }[] = [
   { value: 'notification', label: 'Notification' },
   { value: 'customer', label: 'Customer' },
   { value: 'shipping', label: 'Shipping' },
+  { value: 'campaign', label: 'Campaign' },
+  { value: 'banner', label: 'Banner' },
+  { value: 'permission', label: 'Permission' },
 ];
 
 const ACTION_COLORS: Record<string, string> = {
   create: Colors.success,
   update: Colors.neonBlue,
   delete: Colors.error,
+  soft_delete: '#FF7043',
+  restore: '#26C6DA',
   login: '#60CDFF',
   logout: Colors.textMuted,
   status_change: Colors.warning,
@@ -79,6 +86,9 @@ const ENTITY_COLORS: Record<string, string> = {
   notification: '#FF6B6B',
   customer: Colors.success,
   shipping: '#00BCD4',
+  campaign: '#F06292',
+  banner: '#4DB6AC',
+  permission: '#CE93D8',
 };
 
 function formatDate(iso: string): string {
@@ -152,10 +162,22 @@ function DetailsModal({ log, onClose }: DetailsModalProps) {
                 <Text style={[dm.metaValue, { fontFamily: Platform.OS === 'web' ? 'monospace' : undefined, fontSize: FontSize.xs }]}>{log.entity_id}</Text>
               </View>
             )}
+            {(log.admin_name) && (
+              <View style={dm.row}>
+                <Text style={dm.metaLabel}>Name</Text>
+                <Text style={dm.metaValue}>{log.admin_name}</Text>
+              </View>
+            )}
             <View style={dm.row}>
               <Text style={dm.metaLabel}>Admin</Text>
               <Text style={dm.metaValue}>{log.admin_email}</Text>
             </View>
+            {log.admin_role && (
+              <View style={dm.row}>
+                <Text style={dm.metaLabel}>Role</Text>
+                <Text style={dm.metaValue}>{log.admin_role.replace('_', ' ')}</Text>
+              </View>
+            )}
             <View style={dm.row}>
               <Text style={dm.metaLabel}>Date</Text>
               <Text style={dm.metaValue}>{formatDate(log.created_at)}</Text>
@@ -233,6 +255,8 @@ function AuditLogsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [liveConnected, setLiveConnected] = useState(false);
+  const [newCount, setNewCount] = useState(0);
 
   const [search, setSearch] = useState('');
   const [filterAction, setFilterAction] = useState('all');
@@ -244,6 +268,8 @@ function AuditLogsContent() {
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageRef = useRef(0);
+  const searchRef = useRef('');
 
   const load = useCallback(async (pg: number, q: string) => {
     setLoading(true);
@@ -284,6 +310,38 @@ function AuditLogsContent() {
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [search]);
 
+  // Keep refs in sync so the realtime handler can use current values
+  useEffect(() => { pageRef.current = page; }, [page]);
+  useEffect(() => { searchRef.current = search; }, [search]);
+
+  // Realtime: subscribe to new audit log inserts
+  useEffect(() => {
+    const channel = adminSupabase()
+      .channel('audit_logs_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_audit_logs' }, (payload) => {
+        // Only prepend the new row if we're on page 0 with no active filters
+        if (pageRef.current === 0 && !searchRef.current) {
+          setLogs(prev => {
+            const newEntry = payload.new as AuditLogEntry;
+            const alreadyExists = prev.some(l => l.id === newEntry.id);
+            if (alreadyExists) return prev;
+            setTotal(t => t + 1);
+            setNewCount(c => c + 1);
+            return [newEntry, ...prev.slice(0, PAGE_SIZE - 1)];
+          });
+        } else {
+          setNewCount(c => c + 1);
+        }
+      })
+      .subscribe((status) => {
+        setLiveConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      adminSupabase().removeChannel(channel);
+    };
+  }, []);
+
   const goPage = (newPage: number) => {
     setPage(newPage);
     load(newPage, search);
@@ -321,6 +379,11 @@ function AuditLogsContent() {
             </TouchableOpacity>
           ) : null}
         </View>
+        {/* Live indicator */}
+        <View style={[s.liveChip, liveConnected && s.liveChipOn]}>
+          <View style={[s.liveDot, liveConnected && s.liveDotOn]} />
+          <Text style={[s.liveText, liveConnected && s.liveTextOn]}>LIVE</Text>
+        </View>
         <TouchableOpacity
           style={[s.filterBtn, hasActiveFilters && s.filterBtnActive]}
           onPress={() => setFiltersOpen(!filtersOpen)}
@@ -328,8 +391,13 @@ function AuditLogsContent() {
           <Filter size={16} color={hasActiveFilters ? Colors.neonBlue : Colors.textMuted} />
           {!isWeb && <Text style={[s.filterBtnText, hasActiveFilters && { color: Colors.neonBlue }]}>Filter</Text>}
         </TouchableOpacity>
-        <TouchableOpacity style={s.refreshBtn} onPress={() => load(page, search)}>
+        <TouchableOpacity style={s.refreshBtn} onPress={() => { setNewCount(0); load(page, search); }}>
           <RefreshCw size={16} color={Colors.textMuted} />
+          {newCount > 0 && (
+            <View style={s.refreshBadge}>
+              <Text style={s.refreshBadgeText}>{newCount > 99 ? '99+' : newCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -406,12 +474,19 @@ function AuditLogsContent() {
         </View>
       )}
 
-      {/* Summary */}
+      {/* Summary + new logs banner */}
       {!loading && (
-        <Text style={s.summary}>
-          {total} log{total !== 1 ? 's' : ''}
-          {hasActiveFilters ? ' (filtered)' : ''}
-        </Text>
+        <View style={s.summaryRow}>
+          <Text style={s.summary}>
+            {total} log{total !== 1 ? 's' : ''}
+            {hasActiveFilters ? ' (filtered)' : ''}
+          </Text>
+          {newCount > 0 && (page > 0 || !!search) && (
+            <TouchableOpacity style={s.newBanner} onPress={() => { setNewCount(0); goPage(0); setSearch(''); }}>
+              <Text style={s.newBannerText}>{newCount} new — tap to refresh</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       {/* Error */}
@@ -469,12 +544,12 @@ function WebTable({ logs, loading, onViewDetails }: TableProps) {
     <View style={wt.wrap}>
       {/* Table header */}
       <View style={wt.headerRow}>
-        <Text style={[wt.th, { width: 90 }]}>Action</Text>
+        <Text style={[wt.th, { width: 100 }]}>Action</Text>
         <Text style={[wt.th, { width: 90 }]}>Entity</Text>
         <Text style={[wt.th, { flex: 1 }]}>Label / ID</Text>
-        <Text style={[wt.th, { width: 180 }]}>Admin</Text>
-        <Text style={[wt.th, { width: 150 }]}>Date</Text>
-        <Text style={[wt.th, { width: 60 }]}></Text>
+        <Text style={[wt.th, { width: 200 }]}>Admin</Text>
+        <Text style={[wt.th, { width: 140 }]}>Date</Text>
+        <Text style={[wt.th, { width: 40 }]}></Text>
       </View>
 
       <ScrollView style={wt.body} showsVerticalScrollIndicator={false}>
@@ -492,7 +567,7 @@ function WebTable({ logs, loading, onViewDetails }: TableProps) {
 
         {!loading && logs.map((log) => (
           <View key={log.id} style={wt.row}>
-            <View style={{ width: 90 }}>
+            <View style={{ width: 100 }}>
               <ActionBadge action={log.action} />
             </View>
             <View style={{ width: 90 }}>
@@ -509,14 +584,19 @@ function WebTable({ logs, loading, onViewDetails }: TableProps) {
                 <Text style={wt.subLabel}>—</Text>
               )}
             </View>
-            <View style={{ width: 180 }}>
-              <Text style={wt.label} numberOfLines={1}>{log.admin_email}</Text>
+            <View style={{ width: 200 }}>
+              <Text style={wt.label} numberOfLines={1}>{log.admin_name || log.admin_email}</Text>
+              {log.admin_role ? (
+                <Text style={wt.subLabel} numberOfLines={1}>{log.admin_role.replace('_', ' ')}</Text>
+              ) : (
+                <Text style={wt.subLabel} numberOfLines={1}>{log.admin_email}</Text>
+              )}
             </View>
-            <View style={{ width: 150 }}>
+            <View style={{ width: 140 }}>
               <Text style={wt.subLabel}>{formatDate(log.created_at)}</Text>
             </View>
             <TouchableOpacity
-              style={{ width: 60, alignItems: 'center' }}
+              style={{ width: 40, alignItems: 'center' }}
               onPress={() => onViewDetails(log)}
             >
               <Eye size={16} color={Colors.neonBlue} />
@@ -575,7 +655,10 @@ function MobileList({ logs, loading, onViewDetails }: MobileListProps) {
             <Text style={ml.cardLabel} numberOfLines={1}>{log.entity_label}</Text>
           )}
           <View style={ml.cardMeta}>
-            <Text style={ml.cardMetaText}>{log.admin_email}</Text>
+            <Text style={ml.cardMetaText}>
+              {log.admin_name || log.admin_email}
+              {log.admin_role ? ` · ${log.admin_role.replace('_', ' ')}` : ''}
+            </Text>
             <Text style={ml.cardMetaText}>{formatDate(log.created_at)}</Text>
           </View>
         </TouchableOpacity>
@@ -670,6 +753,57 @@ const s = StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
+    position: 'relative' as any,
+  },
+  refreshBadge: {
+    position: 'absolute' as any,
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.error,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  refreshBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  liveChip: {
+    flexDirection: 'row' as any,
+    alignItems: 'center' as any,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  liveChipOn: {
+    borderColor: Colors.success + '66',
+    backgroundColor: Colors.success + '15',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.textMuted,
+  },
+  liveDotOn: {
+    backgroundColor: Colors.success,
+  },
+  liveText: {
+    color: Colors.textMuted,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  liveTextOn: {
+    color: Colors.success,
   },
   filtersPanel: {
     borderBottomWidth: 1,
@@ -754,11 +888,29 @@ const s = StyleSheet.create({
     fontSize: FontSize.sm,
     fontWeight: '600',
   },
+  summaryRow: {
+    flexDirection: 'row' as any,
+    alignItems: 'center' as any,
+    justifyContent: 'space-between' as any,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 4,
+  },
   summary: {
     color: Colors.textMuted,
     fontSize: FontSize.xs,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 6,
+  },
+  newBanner: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.neonBlue + '20',
+    borderWidth: 1,
+    borderColor: Colors.neonBlue + '55',
+  },
+  newBannerText: {
+    color: Colors.neonBlue,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
   },
   errorBanner: {
     marginHorizontal: Spacing.lg,

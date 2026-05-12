@@ -221,7 +221,7 @@ function CategoriesScreen() {
     setDeleteId(null);
     await fetchCategories();
     showToast(t.categoryDeleted);
-    logAdminAction({ action: 'delete', entityType: 'category', entityId: id, entityLabel: cat?.slug, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'category', entityId: id, entityLabel: cat?.slug, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleRestore = async (id: string) => {
@@ -233,7 +233,7 @@ function CategoriesScreen() {
     await fetchCategories();
     showToast('Category restored');
     const cat = trashedCategories.find((c) => c.id === id);
-    logAdminAction({ action: 'update', entityType: 'category', entityId: id, entityLabel: cat?.slug, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'update', entityType: 'category', entityId: id, entityLabel: cat?.slug, metadata: { action: 'restore' }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleHardDelete = async (id: string) => {
@@ -242,7 +242,7 @@ function CategoriesScreen() {
     setHardDeleteId(null);
     await fetchCategories();
     showToast('Category permanently deleted');
-    logAdminAction({ action: 'delete', entityType: 'category', entityId: id, entityLabel: cat?.slug, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+    logAdminAction({ action: 'delete', entityType: 'category', entityId: id, entityLabel: cat?.slug, metadata: { permanent: true }, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '', adminName: admin?.name ?? '', adminRole: admin?.role ?? '' });
   };
 
   const handleAutoTranslate = async () => {
