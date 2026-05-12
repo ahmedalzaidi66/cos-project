@@ -786,15 +786,37 @@ export const EMPLOYEE_ROLES = [
   { value: 'content_editor', label: 'Content Editor' },
 ];
 
-export const EMPLOYEE_PERMISSIONS = [
-  { value: 'manage_products', label: 'Manage Products' },
-  { value: 'manage_orders', label: 'Manage Orders' },
-  { value: 'manage_customers', label: 'Manage Customers' },
-  { value: 'manage_employees', label: 'Manage Employees' },
-  { value: 'manage_content', label: 'Manage Content' },
-  { value: 'view_analytics', label: 'View Analytics' },
-  { value: 'manage_settings', label: 'Manage Settings' },
+// Canonical permission keys — labels are translated in the UI via i18n
+export const EMPLOYEE_PERMISSIONS: { value: string }[] = [
+  { value: 'view_dashboard' },
+  { value: 'manage_analytics' },
+  { value: 'manage_products' },
+  { value: 'manage_categories' },
+  { value: 'manage_orders' },
+  { value: 'manage_customers' },
+  { value: 'manage_loyalty' },
+  { value: 'manage_notifications' },
+  { value: 'manage_employees' },
+  { value: 'manage_reviews' },
+  { value: 'manage_coupons' },
+  { value: 'manage_shipping' },
+  { value: 'manage_sections' },
+  { value: 'manage_cms' },
+  { value: 'manage_about' },
+  { value: 'manage_cms_builder' },
+  { value: 'manage_layout' },
+  { value: 'manage_theme' },
+  { value: 'manage_settings' },
+  { value: 'manage_permissions' },
+  { value: 'view_audit_logs' },
+  { value: 'manage_campaigns' },
 ];
+
+// Map legacy permission keys saved in DB to canonical keys
+export const LEGACY_PERMISSION_MAP: Record<string, string> = {
+  manage_content:  'manage_cms',
+  view_analytics:  'manage_analytics',
+};
 
 export const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
 export const REVIEW_STATUSES = ['pending', 'approved', 'rejected'] as const;

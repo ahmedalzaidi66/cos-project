@@ -22,12 +22,105 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import MobileUnsupported from '@/components/admin/MobileUnsupported';
 import Toast from '@/components/admin/Toast';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
-import { supabase, adminSupabase, getAdminToken, Employee, EMPLOYEE_ROLES, EMPLOYEE_PERMISSIONS } from '@/lib/supabase';
+import { supabase, adminSupabase, getAdminToken, Employee, EMPLOYEE_ROLES, EMPLOYEE_PERMISSIONS, LEGACY_PERMISSION_MAP } from '@/lib/supabase';
+import type { Translations } from '@/constants/i18n';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { Colors, Spacing, FontSize, Radius } from '@/constants/theme';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+// ── Permission i18n helpers ───────────────────────────────────────────────────
+
+const PERM_LABEL_KEYS: Record<string, keyof Translations> = {
+  view_dashboard:       'permLabelViewDashboard',
+  manage_analytics:     'permLabelManageAnalytics',
+  manage_products:      'permLabelManageProducts',
+  manage_categories:    'permLabelManageCategories',
+  manage_orders:        'permLabelManageOrders',
+  manage_customers:     'permLabelManageCustomers',
+  manage_loyalty:       'permLabelManageLoyalty',
+  manage_notifications: 'permLabelManageNotifications',
+  manage_employees:     'permLabelManageEmployees',
+  manage_reviews:       'permLabelManageReviews',
+  manage_coupons:       'permLabelManageCoupons',
+  manage_shipping:      'permLabelManageShipping',
+  manage_sections:      'permLabelManageSections',
+  manage_cms:           'permLabelManageCms',
+  manage_about:         'permLabelManageAbout',
+  manage_cms_builder:   'permLabelManageCmsBuilder',
+  manage_layout:        'permLabelManageLayout',
+  manage_theme:         'permLabelManageTheme',
+  manage_settings:      'permLabelManageSettings',
+  manage_permissions:   'permLabelManagePermissions',
+  view_audit_logs:      'permLabelViewAuditLogs',
+  manage_campaigns:     'permLabelManageCampaigns',
+};
+
+const PERM_SECTION: Record<string, string> = {
+  view_dashboard:       'general',
+  manage_analytics:     'general',
+  manage_products:      'catalog',
+  manage_categories:    'catalog',
+  manage_orders:        'sales',
+  manage_customers:     'sales',
+  manage_loyalty:       'sales',
+  manage_notifications: 'sales',
+  manage_reviews:       'sales',
+  manage_coupons:       'sales',
+  manage_shipping:      'sales',
+  manage_sections:      'content',
+  manage_cms:           'content',
+  manage_about:         'content',
+  manage_cms_builder:   'content',
+  manage_layout:        'content',
+  manage_theme:         'content',
+  manage_employees:     'admin',
+  manage_settings:      'admin',
+  manage_permissions:   'admin',
+  view_audit_logs:      'admin',
+  manage_campaigns:     'marketing',
+};
+
+const SECTION_ORDER = ['general', 'catalog', 'sales', 'content', 'marketing', 'admin'];
+
+const SECTION_LABEL_KEYS: Record<string, keyof Translations> = {
+  general:   'permGeneral',
+  catalog:   'permCatalog',
+  sales:     'permSales',
+  content:   'permContent',
+  admin:     'permAdmin',
+  marketing: 'permMarketing',
+};
+
+const SECTION_COLORS: Record<string, string> = {
+  general:   '#00B4FF',
+  catalog:   '#FFB400',
+  sales:     '#00C896',
+  content:   '#60CDFF',
+  admin:     '#FF4D4D',
+  marketing: '#F472B6',
+};
+
+function getPermLabel(t: Translations, key: string): string {
+  const tKey = PERM_LABEL_KEYS[key];
+  if (tKey && t[tKey]) return t[tKey] as string;
+  return key.replace(/_/g, ' ');
+}
+
+function getSectionLabel(t: Translations, section: string): string {
+  const tKey = SECTION_LABEL_KEYS[section];
+  if (tKey && t[tKey]) return t[tKey] as string;
+  return section.charAt(0).toUpperCase() + section.slice(1);
+}
+
+// Normalize old/legacy permission keys to current canonical keys
+function normalizePermissions(perms: string[]): string[] {
+  const canonical = new Set(EMPLOYEE_PERMISSIONS.map((p) => p.value));
+  return perms
+    .map((p) => LEGACY_PERMISSION_MAP[p] ?? p)
+    .filter((p) => canonical.has(p));
+}
 
 const EMPTY_FORM = {
   full_name: '',
@@ -169,7 +262,7 @@ function EmployeesScreen() {
       email: e.email,
       phone: e.phone ?? '',
       role: e.role,
-      permissions: e.permissions ?? [],
+      permissions: normalizePermissions(e.permissions ?? []),
       is_active: e.is_active,
       join_date: e.join_date ?? new Date().toISOString().split('T')[0],
       password: '',
@@ -663,20 +756,43 @@ function EmployeesScreen() {
               </View>
 
               <FieldLabel label={t.permissions ?? 'Permissions'} />
-              <View style={styles.permissionsGrid}>
-                {EMPLOYEE_PERMISSIONS.map((p) => (
-                  <TouchableOpacity
-                    key={p.value}
-                    style={[styles.permChip, form.permissions.includes(p.value) && styles.permChipActive]}
-                    onPress={() => togglePermission(p.value)}
-                  >
-                    <View style={[styles.checkbox, form.permissions.includes(p.value) && styles.checkboxActive]}>
-                      {form.permissions.includes(p.value) && <View style={styles.checkboxInner} />}
+              {SECTION_ORDER.map((section) => {
+                const sectionPerms = EMPLOYEE_PERMISSIONS.filter((p) => PERM_SECTION[p.value] === section);
+                if (sectionPerms.length === 0) return null;
+                const color = SECTION_COLORS[section] ?? Colors.neonBlue;
+                const activeCount = sectionPerms.filter((p) => form.permissions.includes(p.value)).length;
+                return (
+                  <View key={section} style={styles.permSection}>
+                    <View style={[styles.permSectionHeader, { borderLeftColor: color }]}>
+                      <Text style={[styles.permSectionTitle, { color }]}>
+                        {getSectionLabel(t, section)}
+                      </Text>
+                      <View style={[styles.permSectionBadge, { backgroundColor: color + '22', borderColor: color + '44' }]}>
+                        <Text style={[styles.permSectionBadgeText, { color }]}>{activeCount}/{sectionPerms.length}</Text>
+                      </View>
                     </View>
-                    <Text style={[styles.permChipText, form.permissions.includes(p.value) && styles.permChipTextActive]}>{p.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                    <View style={styles.permissionsGrid}>
+                      {sectionPerms.map((p) => {
+                        const isOn = form.permissions.includes(p.value);
+                        return (
+                          <TouchableOpacity
+                            key={p.value}
+                            style={[styles.permChip, isOn && styles.permChipActive]}
+                            onPress={() => togglePermission(p.value)}
+                          >
+                            <View style={[styles.checkbox, isOn && styles.checkboxActive]}>
+                              {isOn && <View style={styles.checkboxInner} />}
+                            </View>
+                            <Text style={[styles.permChipText, isOn && styles.permChipTextActive]}>
+                              {getPermLabel(t, p.value)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })}
 
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>{t.activeEmployee}</Text>
@@ -810,6 +926,11 @@ const styles = StyleSheet.create({
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
   chip: { paddingHorizontal: Spacing.sm, paddingVertical: 6, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full },
   chipText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  permSection: { marginBottom: Spacing.md },
+  permSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderLeftWidth: 3, paddingLeft: Spacing.sm, marginBottom: 8, paddingVertical: 2 },
+  permSectionTitle: { fontSize: FontSize.xs, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
+  permSectionBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
+  permSectionBadgeText: { fontSize: 10, fontWeight: '700' },
   permissionsGrid: { gap: 8, marginBottom: 4 },
   permChip: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: Spacing.md, paddingVertical: 10, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md },
   permChipActive: { backgroundColor: Colors.neonBlueGlow, borderColor: Colors.neonBlueBorder },
