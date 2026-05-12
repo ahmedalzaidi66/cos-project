@@ -312,7 +312,7 @@ function AuditLogsContent() {
             style={s.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder={t('auditLogSearchPlaceholder')}
+            placeholder={t.auditLogSearchPlaceholder}
             placeholderTextColor={Colors.textMuted}
           />
           {search ? (
@@ -339,7 +339,7 @@ function AuditLogsContent() {
           <View style={s.filtersRow}>
             {/* Action filter */}
             <View style={s.filterGroup}>
-              <Text style={s.filterLabel}>{t('auditLogFilterAction')}</Text>
+              <Text style={s.filterLabel}>{t.auditLogFilterAction}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipRow}>
                 {ACTION_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -357,7 +357,7 @@ function AuditLogsContent() {
 
             {/* Entity filter */}
             <View style={s.filterGroup}>
-              <Text style={s.filterLabel}>{t('auditLogFilterEntity')}</Text>
+              <Text style={s.filterLabel}>{t.auditLogFilterEntity}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipRow}>
                 {ENTITY_OPTIONS.map((opt) => (
                   <TouchableOpacity
@@ -377,7 +377,7 @@ function AuditLogsContent() {
           {/* Date range */}
           <View style={s.dateRow}>
             <View style={s.dateField}>
-              <Text style={s.filterLabel}>{t('auditLogDateFrom')}</Text>
+              <Text style={s.filterLabel}>{t.auditLogDateFrom}</Text>
               <TextInput
                 style={s.dateInput}
                 value={dateFrom}
@@ -387,7 +387,7 @@ function AuditLogsContent() {
               />
             </View>
             <View style={s.dateField}>
-              <Text style={s.filterLabel}>{t('auditLogDateTo')}</Text>
+              <Text style={s.filterLabel}>{t.auditLogDateTo}</Text>
               <TextInput
                 style={s.dateInput}
                 value={dateTo}
@@ -598,14 +598,14 @@ export default function AuditLogsPage() {
 
   if (isWeb) {
     return (
-      <AdminWebLayout title={t('activityLogs')} noScroll>
+      <AdminWebLayout title={t.activityLogs} noScroll>
         {content}
       </AdminWebLayout>
     );
   }
 
   return (
-    <AdminMobileLayout title={t('activityLogs')}>
+    <AdminMobileLayout title={t.activityLogs}>
       {content}
     </AdminMobileLayout>
   );
