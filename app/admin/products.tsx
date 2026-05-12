@@ -44,6 +44,7 @@ import Toast from '@/components/admin/Toast';
 import ImageUploader from '@/components/admin/ImageUploader';
 import ProductImageGallery from '@/components/admin/ProductImageGallery';
 import { supabase, adminSupabase, getAdminToken, Product, Category, getProductName } from '@/lib/supabase';
+import { normalizeBrandTranslations } from '@/lib/brandProtection';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { adminSendNotification } from '@/context/NotificationContext';
 import { extractDominantColor } from '@/lib/colorExtract';
@@ -85,6 +86,12 @@ function formLangToGoogle(lang: string): string {
   const db = normalizeLang(lang);
   const entry = TRANSLATION_LANGUAGES.find((l) => l.code === db);
   return entry?.googleCode ?? db;
+}
+
+// Reverse: map Google Translate code back to our internal lang code
+function googleToFormLang(googleCode: string): string {
+  const entry = TRANSLATION_LANGUAGES.find((l) => l.googleCode === googleCode);
+  return entry?.code ?? googleCode;
 }
 
 type LangCode = 'en' | 'ar' | 'es' | 'de' | 'ru' | 'ckb';
@@ -225,10 +232,12 @@ function WebProductsScreen() {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Google Translate HTTP ${res.status}`);
     const data = await res.json();
-    const translated: string = data?.[0]?.[0]?.[0] ?? '';
-    console.log(`[gtranslate] SRC=${srcLang} TARGET=${targetLang} RESULT="${translated.slice(0, 60)}"`);
-    if (!translated) throw new Error(`Empty result for ${targetLang}`);
-    return translated;
+    const raw: string = data?.[0]?.[0]?.[0] ?? '';
+    console.log(`[gtranslate] SRC=${srcLang} TARGET=${targetLang} RESULT="${raw.slice(0, 60)}"`);
+    if (!raw) throw new Error(`Empty result for ${targetLang}`);
+    // Map Google lang codes back to our lang codes for brand normalization
+    const ourLang = googleToFormLang(targetLang);
+    return normalizeBrandTranslations(raw, ourLang);
   }
 
   // ── Auto-translate: AR → EN, ES, DE, RU via Google Translate ─────────────

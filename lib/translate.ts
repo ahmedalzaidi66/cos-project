@@ -1,3 +1,5 @@
+import { normalizeBrandTranslations, normalizeBrandTranslationResult } from './brandProtection';
+
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
@@ -16,6 +18,7 @@ function authHeaders() {
 
 /**
  * Translate a single text string from sourceLang to targetLang via OpenAI.
+ * Brand names (Lazurde / لازوردي) are protected after translation.
  * Throws on failure — callers must handle errors explicitly.
  */
 export async function translateOne(
@@ -44,16 +47,20 @@ export async function translateOne(
     throw new Error(data.error);
   }
 
-  const translated: string = data?.translated ?? '';
-  console.log(`[translate] ${sourceLang}→${targetLang} | result: "${translated.slice(0, 60)}"`);
+  const raw: string = data?.translated ?? '';
+  console.log(`[translate] ${sourceLang}→${targetLang} | result: "${raw.slice(0, 60)}"`);
 
-  if (!translated) throw new Error(`Empty translation result for ${sourceLang}→${targetLang}`);
+  if (!raw) throw new Error(`Empty translation result for ${sourceLang}→${targetLang}`);
+
+  // Apply brand protection before returning
+  const translated = normalizeBrandTranslations(raw, targetLang);
   return translated;
 }
 
 /**
  * Batch-translate multiple named fields from sourceLanguage into all targetLanguages.
  * Used by the re-translate (product list) flow which translates from English.
+ * Brand names (Lazurde / لازوردي) are protected in all results.
  * Throws on failure.
  */
 export async function autoTranslate(
@@ -86,5 +93,8 @@ export async function autoTranslate(
     throw new Error(data.error);
   }
 
-  return (data?.translations as TranslateResult) ?? {};
+  const raw = (data?.translations as TranslateResult) ?? {};
+
+  // Apply brand protection to every translated field in every language
+  return normalizeBrandTranslationResult(raw);
 }

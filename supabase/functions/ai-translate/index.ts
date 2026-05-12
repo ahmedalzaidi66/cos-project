@@ -12,12 +12,69 @@ const LANG_NAMES: Record<string, string> = {
   de: "German",
   ru: "Russian",
   ar: "Arabic",
+  ckb: "Central Kurdish (Sorani)",
 };
+
+// Languages that use Arabic script — brand stays as Arabic script in these
+const ARABIC_SCRIPT_LANGS = new Set(["ar", "ckb"]);
+
+const BRAND_LATIN = "Lazurde";
+const BRAND_ARABIC = "لازوردي";
 
 // Arabic Unicode block range check — used to detect untranslated fallback
 function isArabic(text: string): boolean {
   return /[\u0600-\u06FF]/.test(text);
 }
+
+/**
+ * Normalize brand names in a translated string.
+ * - Arabic/Kurdish: wrong Arabic-script variants → official BRAND_ARABIC
+ * - All other languages: wrong variants (including leaked Arabic) → BRAND_LATIN
+ */
+function normalizeBrand(text: string, targetLang: string): string {
+  if (!text) return text;
+
+  if (ARABIC_SCRIPT_LANGS.has(targetLang)) {
+    // Arabic/Kurdish: fix wrong Arabic-script variants and leaked Latin brand
+    return text
+      .replace(/لازردي/g, BRAND_ARABIC)
+      .replace(/لازورد(?!ي)/g, BRAND_ARABIC)
+      .replace(/لازوردى/g, BRAND_ARABIC)
+      .replace(/\bLazurde\b/gi, BRAND_ARABIC)
+      .replace(/\bLazourde\b/gi, BRAND_ARABIC);
+  } else {
+    // All other languages: fix wrong Latin, Cyrillic, and leaked Arabic script
+    return text
+      // Cyrillic variants
+      .replace(/Лазурде/gi, BRAND_LATIN)
+      .replace(/Лазурди/gi, BRAND_LATIN)
+      .replace(/Лазурда/gi, BRAND_LATIN)
+      .replace(/Лазурдэ/gi, BRAND_LATIN)
+      // Arabic script leaked into non-Arabic translation
+      .replace(/لازوردي/g, BRAND_LATIN)
+      .replace(/لازردي/g, BRAND_LATIN)
+      .replace(/لازورد/g, BRAND_LATIN)
+      // Wrong Latin variants
+      .replace(/\bLazourde\b/gi, BRAND_LATIN)
+      .replace(/\bLazorde\b/gi, BRAND_LATIN)
+      .replace(/\bLazurdi\b/gi, BRAND_LATIN)
+      .replace(/\bLazurdy\b/gi, BRAND_LATIN)
+      .replace(/\bLazordi\b/gi, BRAND_LATIN)
+      .replace(/\bLazordy\b/gi, BRAND_LATIN)
+      .replace(/\bLazurda\b/gi, BRAND_LATIN)
+      .replace(/\bLazurdo\b/gi, BRAND_LATIN)
+      // Restore correct capitalisation (e.g. "lazurde" → "Lazurde")
+      .replace(/\blazurde\b/gi, BRAND_LATIN);
+  }
+}
+
+/** Inject brand rules into every AI prompt */
+const BRAND_SYSTEM_INSTRUCTION = `CRITICAL BRAND RULES (follow exactly):
+- "Lazurde" and "Lazurde Beauty" are protected brand names. NEVER translate, transliterate, or modify them in any way.
+- When the target language uses Latin script (English, Spanish, German, Russian, etc.): always write "Lazurde" exactly (capital L, lowercase the rest).
+- When the target language uses Arabic script (Arabic, Kurdish/Sorani): always write "لازوردي" exactly as-is.
+- Do not convert "Lazurde" to Cyrillic, Arabic, or any other script.
+- Do not change the spelling: not "Lazourde", not "Lazorde", not "Lazurdi", not "Лазурде".`;
 
 async function translateWithOpenAI(
   text: string,
@@ -38,7 +95,7 @@ async function translateWithOpenAI(
     },
     body: JSON.stringify({
       model: "gpt-4.1-mini",
-      input: `Translate this ${sourceName} product text to ${targetName}.\nReturn only the translated text.\nDo not explain.\nPreserve cosmetic/product meaning.\n\nText: ${text}`,
+      input: `${BRAND_SYSTEM_INSTRUCTION}\n\nTranslate this ${sourceName} product text to ${targetName}.\nReturn only the translated text.\nDo not explain.\nPreserve cosmetic/product meaning.\n\nText: ${text}`,
     }),
   });
 
@@ -51,21 +108,24 @@ async function translateWithOpenAI(
   const data = await response.json();
 
   // Responses API: output is an array of message objects
-  const translated: string =
+  const raw: string =
     data?.output?.[0]?.content?.[0]?.text?.trim() ?? "";
 
-  console.log(`[ai-translate] ${sourceLang}→${targetLang} | result: ${translated.slice(0, 80)}`);
+  console.log(`[ai-translate] ${sourceLang}→${targetLang} | result: ${raw.slice(0, 80)}`);
 
-  if (!translated) {
+  if (!raw) {
     throw new Error(`Empty translation result for ${sourceLang}→${targetLang}`);
   }
 
-  // Guard: if target is not Arabic but result contains Arabic chars, translation failed
-  if (targetLang !== "ar" && isArabic(translated)) {
+  // Guard: if target is not Arabic/Kurdish but result contains Arabic chars, translation failed
+  if (!ARABIC_SCRIPT_LANGS.has(targetLang) && isArabic(raw)) {
     throw new Error(
-      `Translation result for ${targetLang} appears to still be Arabic: "${translated.slice(0, 60)}"`
+      `Translation result for ${targetLang} appears to still be Arabic: "${raw.slice(0, 60)}"`
     );
   }
+
+  // Apply brand protection as a post-processing safety net
+  const translated = normalizeBrand(raw, targetLang);
 
   return translated;
 }
