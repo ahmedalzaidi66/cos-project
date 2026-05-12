@@ -51,6 +51,8 @@ type ReminderState = 'dismissed' | 'snoozed' | 'completed' | null;
 type ActionType = 'banner' | 'discount' | 'notification' | 'coupon' | 'hero_slider';
 type SnoozeOption = '1d' | '3d' | '7d';
 type CampaignStatus = 'planned' | 'active' | 'completed' | 'dismissed';
+type ReminderType = 'in_app' | 'notification_draft' | 'campaign_note';
+type ReminderStatus = 'scheduled' | 'sent' | 'dismissed';
 
 interface SavedCampaign {
   id: string;
@@ -60,6 +62,31 @@ interface SavedCampaign {
   occasion_date: string | null;
   notes: string;
   status: CampaignStatus;
+  admin_email: string;
+  created_at: string;
+}
+
+interface CampaignBanner {
+  id: string;
+  occasion_key: string;
+  title: string;
+  cta_text: string;
+  image_url: string;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string;
+  admin_email: string;
+  created_at: string;
+}
+
+interface CampaignReminder {
+  id: string;
+  occasion_key: string;
+  title_en: string;
+  message_en: string;
+  reminder_type: ReminderType;
+  status: ReminderStatus;
+  reminder_date: string | null;
   admin_email: string;
   created_at: string;
 }
@@ -444,10 +471,12 @@ interface CardProps {
   onComplete: (key: string) => void;
   onAction: (key: string, type: ActionType) => void;
   onCreateCampaign: (occasion: Occasion) => void;
+  onCreateBanner: (occasion: Occasion) => void;
+  onSendReminder: (occasion: Occasion) => void;
   actionsDone: Set<string>;
 }
 
-function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onAction, onCreateCampaign, actionsDone }: CardProps) {
+function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onAction, onCreateCampaign, onCreateBanner, onSendReminder, actionsDone }: CardProps) {
   const { occasion, date, status, daysUntil: days, reminderState } = card;
   const [showSnooze, setShowSnooze] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -536,7 +565,7 @@ function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onA
 
             <TouchableOpacity
               style={[cardStyles.actionBtn, { borderColor: Colors.warning + '66' }]}
-              onPress={() => onAction(card.occasion.key, 'banner')}
+              onPress={() => onCreateBanner(occasion)}
               activeOpacity={0.75}
             >
               <LayoutTemplate size={12} color={Colors.warning} strokeWidth={2} />
@@ -547,7 +576,7 @@ function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onA
 
             <TouchableOpacity
               style={[cardStyles.actionBtn, { borderColor: Colors.success + '66' }]}
-              onPress={() => onAction(card.occasion.key, 'notification')}
+              onPress={() => onSendReminder(occasion)}
               activeOpacity={0.75}
             >
               <Bell size={12} color={Colors.success} strokeWidth={2} />
@@ -1140,6 +1169,521 @@ const acs = StyleSheet.create({
   actionChipText: { fontSize: 10, fontWeight: '700' },
 });
 
+// ─── Create Banner Modal ──────────────────────────────────────────────────────
+
+interface CreateBannerModalProps {
+  visible: boolean;
+  occasion: Occasion | null;
+  language: string;
+  adminEmail: string;
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+  onError: (msg: string) => void;
+}
+
+function CreateBannerModal({ visible, occasion, language, adminEmail, onClose, onSaved, onError }: CreateBannerModalProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [title, setTitle] = useState('');
+  const [cta, setCta] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible && occasion) {
+      const name = language === 'ar' ? occasion.nameAr : language === 'ckb' ? occasion.nameCkb : occasion.nameEn;
+      const type = language === 'ar' ? occasion.campaignTypeAr : language === 'ckb' ? occasion.campaignTypeCkb : occasion.campaignType;
+      setTitle(`${name} — ${type}`);
+      setCta(language === 'ar' ? 'تسوق الآن' : language === 'ckb' ? 'ئێستا بکڕە' : 'Shop Now');
+      setImageUrl('');
+      setNotes('');
+      const oDate = getOccasionDate(occasion);
+      if (oDate) {
+        const start = new Date(oDate);
+        start.setDate(start.getDate() - 7);
+        setStartDate(start.toISOString().split('T')[0]);
+        setEndDate(oDate.toISOString().split('T')[0]);
+      } else {
+        setStartDate('');
+        setEndDate('');
+      }
+    }
+  }, [visible, occasion, language]);
+
+  if (!occasion) return null;
+
+  const occasionName = language === 'ar' ? occasion.nameAr : language === 'ckb' ? occasion.nameCkb : occasion.nameEn;
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      const { error } = await adminSupabase().from('campaign_banners').insert({
+        occasion_key: occasion.key,
+        title: title.trim(),
+        cta_text: cta.trim(),
+        image_url: imageUrl.trim(),
+        start_date: startDate || null,
+        end_date: endDate || null,
+        notes: notes.trim(),
+        admin_email: adminEmail,
+      });
+      if (error) throw error;
+      onSaved(language === 'ar' ? 'تم حفظ البانر بنجاح' : language === 'ckb' ? 'بانەر بە سەرکەوتوویی پاشەکەوت کرا' : 'Banner saved successfully');
+      onClose();
+    } catch {
+      onError(language === 'ar' ? 'فشل في حفظ البانر' : language === 'ckb' ? 'شکستی هێنا لە پاشەکەوتکردنی بانەر' : 'Failed to save banner');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const L = {
+    header:     language === 'ar' ? 'إنشاء بانر'              : language === 'ckb' ? 'دروستکردنی بانەر'              : 'Create Banner',
+    titleLbl:   language === 'ar' ? 'عنوان البانر'            : language === 'ckb' ? 'سەردێڕی بانەر'                : 'Banner Title',
+    ctaLbl:     language === 'ar' ? 'نص زر الدعوة'           : language === 'ckb' ? 'دەقی دوگمەی کارەکان'          : 'CTA Button Text',
+    imgLbl:     language === 'ar' ? 'رابط الصورة (اختياري)'  : language === 'ckb' ? 'بەستەری وێنە (ئارەزوومەندانە)' : 'Image URL (optional)',
+    startLbl:   language === 'ar' ? 'تاريخ البداية'          : language === 'ckb' ? 'بەرواری دەستپێکردن'            : 'Start Date',
+    endLbl:     language === 'ar' ? 'تاريخ الانتهاء'         : language === 'ckb' ? 'بەرواری کۆتایی'               : 'End Date',
+    notesLbl:   language === 'ar' ? 'ملاحظات'                : language === 'ckb' ? 'تێبینیەکان'                    : 'Notes',
+    saveBtn:    language === 'ar' ? 'حفظ البانر'              : language === 'ckb' ? 'پاشەکەوتکردنی بانەر'           : 'Save Banner',
+    cancelBtn:  language === 'ar' ? 'إلغاء'                   : language === 'ckb' ? 'پاشگەزبوونەوە'                 : 'Cancel',
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={bm.overlay}>
+        <View style={bm.sheet}>
+          <View style={[bm.header, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={bm.headerLeft}>
+              <View style={[bm.iconWrap, { backgroundColor: Colors.warning + '22' }]}>
+                <LayoutTemplate size={18} color={Colors.warning} strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={[bm.headerTitle, isRtl && { textAlign: 'right' }]}>{L.header}</Text>
+                <Text style={[bm.headerSub, isRtl && { textAlign: 'right' }]}>{occasionName}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={bm.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={bm.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={bm.fieldWrap}>
+              <Text style={[bm.label, isRtl && { textAlign: 'right' }]}>{L.titleLbl}</Text>
+              <TextInput style={[bm.input, isRtl && { textAlign: 'right' }]} value={title} onChangeText={setTitle} placeholderTextColor={Colors.textMuted} placeholder={L.titleLbl} maxLength={120} />
+            </View>
+            <View style={bm.fieldWrap}>
+              <Text style={[bm.label, isRtl && { textAlign: 'right' }]}>{L.ctaLbl}</Text>
+              <TextInput style={[bm.input, isRtl && { textAlign: 'right' }]} value={cta} onChangeText={setCta} placeholderTextColor={Colors.textMuted} placeholder={L.ctaLbl} maxLength={60} />
+            </View>
+            <View style={bm.fieldWrap}>
+              <Text style={[bm.label, isRtl && { textAlign: 'right' }]}>{L.imgLbl}</Text>
+              <TextInput style={[bm.input, isRtl && { textAlign: 'right' }]} value={imageUrl} onChangeText={setImageUrl} placeholderTextColor={Colors.textMuted} placeholder="https://..." autoCapitalize="none" autoCorrect={false} />
+            </View>
+            <View style={[bm.row2, isRtl && { flexDirection: 'row-reverse' }]}>
+              <View style={[bm.fieldWrap, { flex: 1 }]}>
+                <Text style={[bm.label, isRtl && { textAlign: 'right' }]}>{L.startLbl}</Text>
+                <TextInput style={[bm.input, isRtl && { textAlign: 'right' }]} value={startDate} onChangeText={setStartDate} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
+              </View>
+              <View style={[bm.fieldWrap, { flex: 1 }]}>
+                <Text style={[bm.label, isRtl && { textAlign: 'right' }]}>{L.endLbl}</Text>
+                <TextInput style={[bm.input, isRtl && { textAlign: 'right' }]} value={endDate} onChangeText={setEndDate} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
+              </View>
+            </View>
+            <View style={bm.fieldWrap}>
+              <Text style={[bm.label, isRtl && { textAlign: 'right' }]}>{L.notesLbl}</Text>
+              <TextInput style={[bm.textarea, isRtl && { textAlign: 'right' }]} value={notes} onChangeText={setNotes} placeholderTextColor={Colors.textMuted} placeholder={L.notesLbl} multiline numberOfLines={3} maxLength={400} />
+            </View>
+          </ScrollView>
+
+          <View style={[bm.footer, isRtl && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity style={bm.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={bm.cancelText}>{L.cancelBtn}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[bm.saveBtn, (!title.trim() || saving) && bm.saveBtnDisabled]} onPress={handleSave} disabled={!title.trim() || saving} activeOpacity={0.8}>
+              {saving ? <ActivityIndicator size="small" color={Colors.background} /> : <Check size={15} color={Colors.background} strokeWidth={2.5} />}
+              <Text style={bm.saveText}>{L.saveBtn}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const bm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.backgroundSecondary, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: Colors.border, maxHeight: '92%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: '800' },
+  headerSub: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600', marginTop: 2 },
+  closeBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  body: { padding: Spacing.lg },
+  fieldWrap: { marginBottom: Spacing.md, gap: 6 },
+  label: { color: Colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, color: Colors.textPrimary, fontSize: FontSize.sm },
+  textarea: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, color: Colors.textPrimary, fontSize: FontSize.sm, minHeight: 72, textAlignVertical: 'top' },
+  row2: { flexDirection: 'row', gap: Spacing.md },
+  footer: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border },
+  cancelBtn: { flex: 1, height: 46, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  cancelText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' },
+  saveBtn: { flex: 2, height: 46, borderRadius: Radius.md, backgroundColor: Colors.warning, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  saveBtnDisabled: { opacity: 0.45 },
+  saveText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: '800' },
+});
+
+// ─── Send Reminder Modal ──────────────────────────────────────────────────────
+
+const REMINDER_TYPES: ReminderType[] = ['in_app', 'notification_draft', 'campaign_note'];
+
+function reminderTypeLabel(t: ReminderType, lang: string): string {
+  const map: Record<ReminderType, { en: string; ar: string; ckb: string }> = {
+    in_app:              { en: 'In-App Reminder',    ar: 'تذكير داخلي',           ckb: 'بیرخستنەوەی ناوەکی'       },
+    notification_draft:  { en: 'Notification Draft', ar: 'مسودة إشعار',           ckb: 'پێشنووسی ئاگادارکردنەوە' },
+    campaign_note:       { en: 'Campaign Note',      ar: 'ملاحظة حملة',           ckb: 'تێبینی کامپەین'           },
+  };
+  return lang === 'ar' ? map[t].ar : lang === 'ckb' ? map[t].ckb : map[t].en;
+}
+
+const REMINDER_TYPE_COLORS: Record<ReminderType, string> = {
+  in_app: Colors.neonBlue,
+  notification_draft: Colors.warning,
+  campaign_note: Colors.success,
+};
+
+const REMINDER_STATUS_COLORS: Record<ReminderStatus, string> = {
+  scheduled: Colors.neonBlue,
+  sent: Colors.success,
+  dismissed: Colors.textMuted,
+};
+
+function reminderStatusLabel(s: ReminderStatus, lang: string): string {
+  const map: Record<ReminderStatus, { en: string; ar: string; ckb: string }> = {
+    scheduled: { en: 'Scheduled', ar: 'مجدول',    ckb: 'کاتبەندیکراو'     },
+    sent:      { en: 'Sent',      ar: 'مُرسل',    ckb: 'نێردراو'           },
+    dismissed: { en: 'Dismissed', ar: 'مرفوض',    ckb: 'ڕەتکراوەتەوە'     },
+  };
+  return lang === 'ar' ? map[s].ar : lang === 'ckb' ? map[s].ckb : map[s].en;
+}
+
+interface SendReminderModalProps {
+  visible: boolean;
+  occasion: Occasion | null;
+  language: string;
+  adminEmail: string;
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+  onError: (msg: string) => void;
+}
+
+function SendReminderModal({ visible, occasion, language, adminEmail, onClose, onSaved, onError }: SendReminderModalProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const [reminderType, setReminderType] = useState<ReminderType>('in_app');
+  const [reminderDate, setReminderDate] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible && occasion) {
+      const name = language === 'ar' ? occasion.nameAr : language === 'ckb' ? occasion.nameCkb : occasion.nameEn;
+      setTitle(language === 'ar' ? `تذكير: ${name}` : language === 'ckb' ? `بیرخستنەوە: ${name}` : `Reminder: ${name}`);
+      setMessage(
+        language === 'ar'
+          ? `تذكير بمناسبة ${name}. قم بتجهيز حملتك التسويقية.`
+          : language === 'ckb'
+          ? `بیرخستنەوەی ئۆکازیۆنی ${name}. کامپەینی مارکتینگت ئامادە بکە.`
+          : `Reminder for ${name}. Prepare your marketing campaign.`
+      );
+      setReminderType('in_app');
+      const oDate = getOccasionDate(occasion);
+      if (oDate) {
+        const remind = new Date(oDate);
+        remind.setDate(remind.getDate() - 3);
+        setReminderDate(remind.toISOString().split('T')[0]);
+      } else {
+        setReminderDate('');
+      }
+    }
+  }, [visible, occasion, language]);
+
+  if (!occasion) return null;
+
+  const occasionName = language === 'ar' ? occasion.nameAr : language === 'ckb' ? occasion.nameCkb : occasion.nameEn;
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      const { error } = await adminSupabase().from('campaign_reminders').insert({
+        occasion_key: occasion.key,
+        event_key: occasion.key,
+        title_en: title.trim(),
+        message_en: message.trim(),
+        body_en: message.trim(),
+        reminder_type: reminderType,
+        status: 'scheduled',
+        reminder_date: reminderDate ? new Date(reminderDate).toISOString() : null,
+        admin_email: adminEmail,
+        created_by_email: adminEmail,
+        is_active: true,
+      });
+      if (error) throw error;
+      onSaved(language === 'ar' ? 'تم جدولة التذكير' : language === 'ckb' ? 'بیرخستنەوە کاتبەندی کرا' : 'Reminder scheduled');
+      onClose();
+    } catch {
+      onError(language === 'ar' ? 'فشل في حفظ التذكير' : language === 'ckb' ? 'شکستی هێنا لە پاشەکەوتکردنی بیرخستنەوە' : 'Failed to save reminder');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const L = {
+    header:    language === 'ar' ? 'إرسال تذكير'        : language === 'ckb' ? 'ناردنی بیرخستنەوە'   : 'Send Reminder',
+    titleLbl:  language === 'ar' ? 'عنوان التذكير'      : language === 'ckb' ? 'سەردێڕی بیرخستنەوە' : 'Reminder Title',
+    msgLbl:    language === 'ar' ? 'الرسالة'            : language === 'ckb' ? 'پەیام'               : 'Message',
+    typeLbl:   language === 'ar' ? 'نوع التذكير'        : language === 'ckb' ? 'جۆری بیرخستنەوە'    : 'Reminder Type',
+    dateLbl:   language === 'ar' ? 'تاريخ التذكير'      : language === 'ckb' ? 'بەرواری بیرخستنەوە' : 'Remind On',
+    saveBtn:   language === 'ar' ? 'جدولة التذكير'      : language === 'ckb' ? 'کاتبەندی بیرخستنەوە': 'Schedule Reminder',
+    cancelBtn: language === 'ar' ? 'إلغاء'               : language === 'ckb' ? 'پاشگەزبوونەوە'      : 'Cancel',
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={rm.overlay}>
+        <View style={rm.sheet}>
+          <View style={[rm.header, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={rm.headerLeft}>
+              <View style={[rm.iconWrap, { backgroundColor: Colors.success + '22' }]}>
+                <Bell size={18} color={Colors.success} strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={[rm.headerTitle, isRtl && { textAlign: 'right' }]}>{L.header}</Text>
+                <Text style={[rm.headerSub, isRtl && { textAlign: 'right' }]}>{occasionName}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={rm.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={rm.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={rm.fieldWrap}>
+              <Text style={[rm.label, isRtl && { textAlign: 'right' }]}>{L.titleLbl}</Text>
+              <TextInput style={[rm.input, isRtl && { textAlign: 'right' }]} value={title} onChangeText={setTitle} placeholderTextColor={Colors.textMuted} placeholder={L.titleLbl} maxLength={120} />
+            </View>
+
+            <View style={rm.fieldWrap}>
+              <Text style={[rm.label, isRtl && { textAlign: 'right' }]}>{L.typeLbl}</Text>
+              <View style={[rm.typeRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                {REMINDER_TYPES.map((t) => {
+                  const active = reminderType === t;
+                  const color = REMINDER_TYPE_COLORS[t];
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      style={[rm.typeChip, active && { backgroundColor: color + '22', borderColor: color + '66' }]}
+                      onPress={() => setReminderType(t)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[rm.typeChipText, active && { color, fontWeight: '800' }]}>
+                        {reminderTypeLabel(t, language)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={rm.fieldWrap}>
+              <Text style={[rm.label, isRtl && { textAlign: 'right' }]}>{L.dateLbl}</Text>
+              <TextInput style={[rm.input, isRtl && { textAlign: 'right' }]} value={reminderDate} onChangeText={setReminderDate} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
+            </View>
+
+            <View style={rm.fieldWrap}>
+              <Text style={[rm.label, isRtl && { textAlign: 'right' }]}>{L.msgLbl}</Text>
+              <TextInput style={[rm.textarea, isRtl && { textAlign: 'right' }]} value={message} onChangeText={setMessage} placeholderTextColor={Colors.textMuted} placeholder={L.msgLbl} multiline numberOfLines={4} maxLength={500} />
+            </View>
+          </ScrollView>
+
+          <View style={[rm.footer, isRtl && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity style={rm.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={rm.cancelText}>{L.cancelBtn}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[rm.saveBtn, (!title.trim() || saving) && rm.saveBtnDisabled]} onPress={handleSave} disabled={!title.trim() || saving} activeOpacity={0.8}>
+              {saving ? <ActivityIndicator size="small" color={Colors.background} /> : <Bell size={15} color={Colors.background} strokeWidth={2.5} />}
+              <Text style={rm.saveText}>{L.saveBtn}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const rm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.backgroundSecondary, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: Colors.border, maxHeight: '92%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: '800' },
+  headerSub: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600', marginTop: 2 },
+  closeBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  body: { padding: Spacing.lg },
+  fieldWrap: { marginBottom: Spacing.md, gap: 6 },
+  label: { color: Colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, color: Colors.textPrimary, fontSize: FontSize.sm },
+  textarea: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, color: Colors.textPrimary, fontSize: FontSize.sm, minHeight: 90, textAlignVertical: 'top' },
+  typeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  typeChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, backgroundColor: 'transparent' },
+  typeChipText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  footer: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border },
+  cancelBtn: { flex: 1, height: 46, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  cancelText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' },
+  saveBtn: { flex: 2, height: 46, borderRadius: Radius.md, backgroundColor: Colors.success, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  saveBtnDisabled: { opacity: 0.45 },
+  saveText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: '800' },
+});
+
+// ─── Reminders Section ────────────────────────────────────────────────────────
+
+interface RemindersSectionProps {
+  reminders: CampaignReminder[];
+  language: string;
+  onStatusChange: (id: string, status: ReminderStatus) => void;
+}
+
+function RemindersSection({ reminders, language, onStatusChange }: RemindersSectionProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [tab, setTab] = useState<'scheduled' | 'sent' | 'dismissed'>('scheduled');
+
+  if (reminders.length === 0) return null;
+
+  const filtered = reminders.filter(r => r.status === tab);
+  const tabColor = tab === 'scheduled' ? Colors.neonBlue : tab === 'sent' ? Colors.success : Colors.textMuted;
+
+  const tabs: { key: ReminderStatus; label: string }[] = [
+    { key: 'scheduled', label: language === 'ar' ? 'مجدول' : language === 'ckb' ? 'کاتبەندیکراو' : 'Scheduled' },
+    { key: 'sent',      label: language === 'ar' ? 'مُرسل'  : language === 'ckb' ? 'نێردراو'       : 'Sent'       },
+    { key: 'dismissed', label: language === 'ar' ? 'مرفوض'  : language === 'ckb' ? 'ڕەتکراوەتەوە' : 'Dismissed'  },
+  ];
+
+  const scheduledCount = reminders.filter(r => r.status === 'scheduled').length;
+
+  return (
+    <View>
+      <SectionHeader
+        title={language === 'ar' ? 'التذكيرات المجدولة' : language === 'ckb' ? 'بیرخستنەوەی کاتبەندیکراو' : 'Scheduled Reminders'}
+        count={scheduledCount > 0 ? scheduledCount : undefined}
+        color={Colors.neonBlue}
+      />
+
+      {/* Tabs */}
+      <View style={[rs.tabs, isRtl && { flexDirection: 'row-reverse' }]}>
+        {tabs.map((t) => {
+          const active = tab === t.key;
+          const color = REMINDER_STATUS_COLORS[t.key];
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[rs.tab, active && { borderBottomColor: color, borderBottomWidth: 2 }]}
+              onPress={() => setTab(t.key as typeof tab)}
+              activeOpacity={0.8}
+            >
+              <Text style={[rs.tabText, active && { color, fontWeight: '800' }]}>{t.label}</Text>
+              <View style={rs.tabCount}>
+                <Text style={rs.tabCountText}>{reminders.filter(r => r.status === t.key).length}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {filtered.length === 0 ? (
+        <View style={rs.empty}>
+          <Bell size={28} color={Colors.textMuted} strokeWidth={1.5} />
+          <Text style={rs.emptyText}>{language === 'ar' ? 'لا توجد تذكيرات' : language === 'ckb' ? 'هیچ بیرخستنەوەیەک نییە' : 'No reminders here'}</Text>
+        </View>
+      ) : (
+        filtered.map((r) => {
+          const color = REMINDER_STATUS_COLORS[r.status];
+          const typeColor = REMINDER_TYPE_COLORS[r.reminder_type] ?? Colors.textMuted;
+          return (
+            <View key={r.id} style={[rs.card, isRtl && { flexDirection: 'row-reverse' }]}>
+              <View style={[rs.statusBar, { backgroundColor: color }]} />
+              <View style={{ flex: 1, gap: 4 }}>
+                <View style={[rs.topRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                  <Text style={[rs.title, isRtl && { textAlign: 'right' }]} numberOfLines={1}>{r.title_en}</Text>
+                  <View style={[rs.typeBadge, { backgroundColor: typeColor + '22', borderColor: typeColor + '55' }]}>
+                    <Text style={[rs.typeBadgeText, { color: typeColor }]}>{reminderTypeLabel(r.reminder_type, language).toUpperCase()}</Text>
+                  </View>
+                </View>
+                {r.message_en ? <Text style={[rs.msg, isRtl && { textAlign: 'right' }]} numberOfLines={2}>{r.message_en}</Text> : null}
+                <View style={[rs.metaRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                  {r.reminder_date && (
+                    <View style={rs.dateChip}>
+                      <Clock size={10} color={Colors.textMuted} strokeWidth={2} />
+                      <Text style={rs.dateText}>{r.reminder_date.split('T')[0]}</Text>
+                    </View>
+                  )}
+                  <Text style={rs.adminText}>{r.admin_email}</Text>
+                </View>
+                {r.status !== 'sent' && r.status !== 'dismissed' && (
+                  <View style={[rs.actions, isRtl && { flexDirection: 'row-reverse' }]}>
+                    <TouchableOpacity style={[rs.actionChip, { borderColor: Colors.success + '66' }]} onPress={() => onStatusChange(r.id, 'sent')} activeOpacity={0.75}>
+                      <Check size={10} color={Colors.success} strokeWidth={2.5} />
+                      <Text style={[rs.actionChipText, { color: Colors.success }]}>
+                        {language === 'ar' ? 'تحديد كمُرسل' : language === 'ckb' ? 'نیشانەکردن وەکو نێردراو' : 'Mark Sent'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[rs.actionChip, { borderColor: Colors.error + '55' }]} onPress={() => onStatusChange(r.id, 'dismissed')} activeOpacity={0.75}>
+                      <X size={10} color={Colors.error} strokeWidth={2.5} />
+                      <Text style={[rs.actionChipText, { color: Colors.error }]}>
+                        {language === 'ar' ? 'رفض' : language === 'ckb' ? 'ڕەت' : 'Dismiss'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })
+      )}
+    </View>
+  );
+}
+
+const rs = StyleSheet.create({
+  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, marginBottom: Spacing.sm },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: Spacing.sm, borderBottomWidth: 2, borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'center', gap: 4 },
+  tabText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  tabCount: { backgroundColor: Colors.backgroundCard, borderRadius: Radius.full, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: Colors.border },
+  tabCountText: { color: Colors.textMuted, fontSize: 9, fontWeight: '700' },
+  empty: { alignItems: 'center', paddingVertical: Spacing.xl, gap: 8 },
+  emptyText: { color: Colors.textMuted, fontSize: FontSize.sm },
+  card: { flexDirection: 'row', backgroundColor: Colors.backgroundCard, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden', marginBottom: Spacing.sm },
+  statusBar: { width: 4, alignSelf: 'stretch' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'space-between', padding: Spacing.md, paddingBottom: 4 },
+  title: { color: Colors.textPrimary, fontSize: FontSize.sm, fontWeight: '700', flex: 1 },
+  typeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full, borderWidth: 1, flexShrink: 0 },
+  typeBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
+  msg: { color: Colors.textSecondary, fontSize: FontSize.xs, paddingHorizontal: Spacing.md },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: Spacing.md },
+  dateChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  dateText: { color: Colors.textMuted, fontSize: FontSize.xs },
+  adminText: { color: Colors.textMuted, fontSize: FontSize.xs, flex: 1, textAlign: 'right' },
+  actions: { flexDirection: 'row', gap: 6, paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, paddingTop: 4 },
+  actionChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.backgroundSecondary },
+  actionChipText: { fontSize: 10, fontWeight: '700' },
+});
+
 // ─── Action confirmation modal ────────────────────────────────────────────────
 
 function ActionModal({
@@ -1240,9 +1784,12 @@ function CampaignsContent() {
   const [overrides, setOverrides] = useState<OccasionOverride[]>([]);
   const [actionRecords, setActionRecords] = useState<ActionRecord[]>([]);
   const [savedCampaigns, setSavedCampaigns] = useState<SavedCampaign[]>([]);
+  const [reminders, setReminders] = useState<CampaignReminder[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [actionModal, setActionModal] = useState<{ key: string; type: ActionType } | null>(null);
   const [createModalOccasion, setCreateModalOccasion] = useState<Occasion | null>(null);
+  const [bannerModalOccasion, setBannerModalOccasion] = useState<Occasion | null>(null);
+  const [reminderModalOccasion, setReminderModalOccasion] = useState<Occasion | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -1258,14 +1805,20 @@ function CampaignsContent() {
   const load = async () => {
     setLoading(true);
     const db = adminSupabase();
-    const [ovRes, acRes, scRes] = await Promise.all([
+    const [ovRes, acRes, scRes, remRes] = await Promise.all([
       db.from('campaign_occasion_overrides').select('occasion_key,status,snoozed_until'),
       db.from('campaign_actions').select('occasion_key,action_type,created_at').order('created_at', { ascending: false }),
       db.from('saved_campaigns').select('*').not('status', 'eq', 'dismissed').order('created_at', { ascending: false }),
+      db.from('campaign_reminders').select('id,occasion_key,title_en,message_en,reminder_type,status,reminder_date,admin_email,created_at').order('created_at', { ascending: false }),
     ]);
     setOverrides(ovRes.data ?? []);
     setActionRecords(acRes.data ?? []);
     setSavedCampaigns(scRes.data ?? []);
+    setReminders((remRes.data ?? []).map((r: any) => ({
+      ...r,
+      reminder_type: r.reminder_type ?? 'in_app',
+      status: r.status ?? 'scheduled',
+    })));
     setLoading(false);
   };
 
@@ -1279,6 +1832,22 @@ function CampaignsContent() {
         status === 'completed'
           ? (language === 'ar' ? 'تم تحديد الحملة كمكتملة' : language === 'ckb' ? 'کامپەین وەکو تەواوکراو نیشانەکرا' : 'Campaign marked as completed')
           : (language === 'ar' ? 'تم تحديث الحالة' : language === 'ckb' ? 'دۆخ نوێکرایەوە' : 'Status updated')
+      );
+      await load();
+    }
+  };
+
+  const handleReminderStatusChange = async (id: string, status: ReminderStatus) => {
+    const update: Record<string, any> = { status, updated_at: new Date().toISOString() };
+    if (status === 'sent') update.sent_at = new Date().toISOString();
+    const { error } = await adminSupabase().from('campaign_reminders').update(update).eq('id', id);
+    if (error) {
+      showToast(language === 'ar' ? 'فشل تحديث التذكير' : 'Failed to update reminder', 'error');
+    } else {
+      showToast(
+        status === 'sent'
+          ? (language === 'ar' ? 'تم تحديد التذكير كمُرسل' : language === 'ckb' ? 'بیرخستنەوە وەکو نێردراو نیشانەکرا' : 'Reminder marked as sent')
+          : (language === 'ar' ? 'تم رفض التذكير' : language === 'ckb' ? 'بیرخستنەوە ڕەتکرایەوە' : 'Reminder dismissed')
       );
       await load();
     }
@@ -1390,6 +1959,24 @@ function CampaignsContent() {
         onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
         onError={(msg) => showToast(msg, 'error')}
       />
+      <CreateBannerModal
+        visible={!!bannerModalOccasion}
+        occasion={bannerModalOccasion}
+        language={language}
+        adminEmail={admin?.email ?? ''}
+        onClose={() => setBannerModalOccasion(null)}
+        onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
+        onError={(msg) => showToast(msg, 'error')}
+      />
+      <SendReminderModal
+        visible={!!reminderModalOccasion}
+        occasion={reminderModalOccasion}
+        language={language}
+        adminEmail={admin?.email ?? ''}
+        onClose={() => setReminderModalOccasion(null)}
+        onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
+        onError={(msg) => showToast(msg, 'error')}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[main.scroll, isRtl && { direction: 'rtl' } as any]}>
         {/* Header */}
@@ -1424,6 +2011,13 @@ function CampaignsContent() {
               onStatusChange={handleCampaignStatusChange}
             />
 
+            {/* Reminders section */}
+            <RemindersSection
+              reminders={reminders}
+              language={language}
+              onStatusChange={handleReminderStatusChange}
+            />
+
             {/* Active today */}
             {activeCards.length > 0 && (
               <>
@@ -1442,6 +2036,8 @@ function CampaignsContent() {
                     onComplete={handleComplete}
                     onAction={handleAction}
                     onCreateCampaign={setCreateModalOccasion}
+                    onCreateBanner={setBannerModalOccasion}
+                    onSendReminder={setReminderModalOccasion}
                     actionsDone={actionsDone}
                   />
                 ))}
@@ -1466,6 +2062,8 @@ function CampaignsContent() {
                     onComplete={handleComplete}
                     onAction={handleAction}
                     onCreateCampaign={setCreateModalOccasion}
+                    onCreateBanner={setBannerModalOccasion}
+                    onSendReminder={setReminderModalOccasion}
                     actionsDone={actionsDone}
                   />
                 ))}
@@ -1490,6 +2088,8 @@ function CampaignsContent() {
                     onComplete={handleComplete}
                     onAction={handleAction}
                     onCreateCampaign={setCreateModalOccasion}
+                    onCreateBanner={setBannerModalOccasion}
+                    onSendReminder={setReminderModalOccasion}
                     actionsDone={actionsDone}
                   />
                 ))}
