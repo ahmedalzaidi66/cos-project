@@ -199,6 +199,8 @@ export type Order = {
   reorder_count?: number;
   points_earned?: number;
   points_redeemed?: number;
+  redeemed_amount?: number;
+  loyalty_transaction_id?: string | null;
 };
 
 export type OrderItem = {

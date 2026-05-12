@@ -12,7 +12,7 @@ import {
   Clipboard,
   Platform,
 } from 'react-native';
-import { Search, X, Phone, MessageCircle, Copy, ChevronRight, CircleAlert as AlertCircle, RefreshCw, ShoppingCart, MapPin, Calendar, CreditCard, CircleCheck as CheckCircle, Printer, FileDown, Bell, Check } from 'lucide-react-native';
+import { Search, X, Phone, MessageCircle, Copy, ChevronRight, CircleAlert as AlertCircle, RefreshCw, ShoppingCart, MapPin, Calendar, CreditCard, CircleCheck as CheckCircle, Printer, FileDown, Bell, Check, Coins } from 'lucide-react-native';
 import { useLanguage } from '@/context/LanguageContext';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -63,6 +63,9 @@ type Order = {
   delivery_latitude?: number | null;
   delivery_longitude?: number | null;
   delivery_location_link?: string | null;
+  points_redeemed?: number;
+  redeemed_amount?: number;
+  loyalty_transaction_id?: string | null;
 };
 
 type OrderItem = {
@@ -358,6 +361,8 @@ function OrderDetailModal({
       notes: order.notes,
       subtotal: order.subtotal,
       shipping: order.shipping,
+      points_redeemed: order.points_redeemed,
+      redeemed_amount: order.redeemed_amount,
       total: order.total,
       status: order.status,
       payment_method: order.payment_method,
@@ -462,6 +467,36 @@ function OrderDetailModal({
               <Text style={modal.totalValue}>{formatPrice(Number(order.total), language)}</Text>
             </View>
           </View>
+
+          {/* Loyalty redemption summary */}
+          {(order.points_redeemed ?? 0) > 0 && (
+            <View style={[modal.card, { borderWidth: 1, borderColor: '#B8860B40' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm }}>
+                <Coins size={15} color="#B8860B" strokeWidth={2} />
+                <Text style={[modal.cardTitle, { color: '#B8860B', marginBottom: 0 }]}>خصم نقاط الولاء</Text>
+              </View>
+              {order.subtotal != null && (
+                <View style={modal.summaryRow}>
+                  <Text style={modal.summaryLabel}>المجموع قبل الخصم</Text>
+                  <Text style={modal.summaryValue}>{formatPrice(Number(order.subtotal), language)}</Text>
+                </View>
+              )}
+              <View style={modal.summaryRow}>
+                <Text style={modal.summaryLabel}>النقاط المستخدمة</Text>
+                <Text style={[modal.summaryValue, { color: '#B8860B' }]}>{order.points_redeemed} نقطة</Text>
+              </View>
+              {(order.redeemed_amount ?? 0) > 0 && (
+                <View style={modal.summaryRow}>
+                  <Text style={modal.summaryLabel}>قيمة الخصم</Text>
+                  <Text style={[modal.summaryValue, { color: Colors.success }]}>- {formatPrice(Number(order.redeemed_amount), language)}</Text>
+                </View>
+              )}
+              <View style={[modal.summaryRow, { borderTopWidth: 1, borderTopColor: '#B8860B30', paddingTop: Spacing.sm, marginTop: 2 }]}>
+                <Text style={[modal.summaryLabel, { color: Colors.textPrimary, fontWeight: '700' }]}>الإجمالي بعد الخصم</Text>
+                <Text style={[modal.totalValue, { color: '#B8860B' }]}>{formatPrice(Number(order.total), language)}</Text>
+              </View>
+            </View>
+          )}
 
           {/* Status timeline + changer */}
           <View style={modal.card}>
@@ -804,7 +839,7 @@ function OrdersContent() {
     try {
       const { data, error } = await adminSupabase()
         .from('orders')
-        .select('id, customer_first_name, customer_last_name, customer_email, customer_phone, street, city, state, zip, country, governorate, area, notes, subtotal, shipping, total, status, payment_method, payment_status, created_at, updated_at, tracking_number, completed_at, cancelled_at, cancelled_by, cancel_reason, previous_status, original_order_id, reorder_count, delivery_address_text, delivery_latitude, delivery_longitude, delivery_location_link')
+        .select('id, customer_first_name, customer_last_name, customer_email, customer_phone, street, city, state, zip, country, governorate, area, notes, subtotal, shipping, total, status, payment_method, payment_status, created_at, updated_at, tracking_number, completed_at, cancelled_at, cancelled_by, cancel_reason, previous_status, original_order_id, reorder_count, delivery_address_text, delivery_latitude, delivery_longitude, delivery_location_link, points_redeemed, redeemed_amount, loyalty_transaction_id')
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       setOrders(data ?? []);

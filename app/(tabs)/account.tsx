@@ -1339,7 +1339,7 @@ function ProfileView() {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, customer_email, customer_first_name, customer_last_name, customer_phone, street, city, state, zip, country, payment_method, subtotal, shipping, total, status, created_at, updated_at, tracking_number, completed_at, cancelled_at, cancelled_by, cancel_reason, previous_status, original_order_id, reorder_count')
+        .select('id, customer_email, customer_first_name, customer_last_name, customer_phone, street, city, state, zip, country, payment_method, subtotal, shipping, total, status, created_at, updated_at, tracking_number, completed_at, cancelled_at, cancelled_by, cancel_reason, previous_status, original_order_id, reorder_count, points_redeemed, redeemed_amount')
         .eq('customer_email', email)
         .order('created_at', { ascending: false });
       if (!error && data) setOrders(data);
@@ -2048,6 +2048,35 @@ function OrderCard({ order }: { order: Order }) {
               </Text>
             )}
           </Text>
+        </View>
+      )}
+
+      {expanded && !isCancelled && (order.points_redeemed ?? 0) > 0 && (
+        <View style={[orderCardStyles.loyaltyWrap, { borderTopColor: C.borderLight, backgroundColor: '#B8860B0A' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+            <Coins size={13} color="#B8860B" strokeWidth={2} />
+            <Text style={[orderCardStyles.loyaltyTitle, { color: '#B8860B' }]}>خصم نقاط الولاء</Text>
+          </View>
+          {order.subtotal != null && (
+            <View style={orderCardStyles.loyaltyRow}>
+              <Text style={[orderCardStyles.loyaltyLabel, { color: C.textSecondary }]}>المجموع قبل الخصم</Text>
+              <Text style={[orderCardStyles.loyaltyValue, { color: C.textPrimary }]}>{formatPrice(Number(order.subtotal), language)}</Text>
+            </View>
+          )}
+          <View style={orderCardStyles.loyaltyRow}>
+            <Text style={[orderCardStyles.loyaltyLabel, { color: C.textSecondary }]}>النقاط المستخدمة</Text>
+            <Text style={[orderCardStyles.loyaltyValue, { color: '#B8860B' }]}>{order.points_redeemed} نقطة</Text>
+          </View>
+          {(order.redeemed_amount ?? 0) > 0 && (
+            <View style={orderCardStyles.loyaltyRow}>
+              <Text style={[orderCardStyles.loyaltyLabel, { color: C.textSecondary }]}>قيمة الخصم</Text>
+              <Text style={[orderCardStyles.loyaltyValue, { color: Colors.success }]}>- {formatPrice(Number(order.redeemed_amount), language)}</Text>
+            </View>
+          )}
+          <View style={[orderCardStyles.loyaltyRow, { borderTopWidth: 1, borderTopColor: '#B8860B30', paddingTop: 6, marginTop: 2 }]}>
+            <Text style={[orderCardStyles.loyaltyLabel, { color: C.textPrimary, fontWeight: '700' }]}>الإجمالي بعد الخصم</Text>
+            <Text style={[orderCardStyles.loyaltyValue, { color: '#B8860B', fontWeight: '700' }]}>{formatPrice(Number(order.total), language)}</Text>
+          </View>
         </View>
       )}
 
@@ -2941,6 +2970,32 @@ const orderCardStyles = StyleSheet.create({
     fontSize: FontSize.xs,
     flex: 1,
     lineHeight: 16,
+  },
+  loyaltyWrap: {
+    borderTopWidth: 1,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+    paddingBottom: Spacing.sm,
+    borderRadius: Radius.sm,
+  },
+  loyaltyTitle: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  loyaltyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  loyaltyLabel: {
+    fontSize: FontSize.xs,
+  },
+  loyaltyValue: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
   },
 });
 

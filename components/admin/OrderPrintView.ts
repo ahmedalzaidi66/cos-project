@@ -43,6 +43,8 @@ export type PrintOrder = {
   subtotal?: number;
   shipping?: number;
   discount?: number;
+  points_redeemed?: number;
+  redeemed_amount?: number;
   total: number;
   status: string;
   payment_method?: string;
@@ -116,10 +118,12 @@ function buildHtml(order: PrintOrder, items: PrintOrderItem[]): string {
   const mapsLink = order.delivery_location_link ||
     (hasGps ? `https://www.google.com/maps?q=${order.delivery_latitude},${order.delivery_longitude}` : null);
 
-  const subtotal = Number(order.subtotal ?? 0);
-  const shipping = Number(order.shipping ?? 0);
-  const discount = Number(order.discount ?? 0);
-  const total    = Number(order.total ?? 0);
+  const subtotal        = Number(order.subtotal ?? 0);
+  const shipping        = Number(order.shipping ?? 0);
+  const discount        = Number(order.discount ?? 0);
+  const pointsRedeemed  = Number(order.points_redeemed ?? 0);
+  const redeemedAmount  = Number(order.redeemed_amount ?? 0);
+  const total           = Number(order.total ?? 0);
 
   const itemsHtml = items.map((item, idx) => {
     const lineTotal = (Number(item.unit_price) || 0) * (Number(item.quantity) || 0);
@@ -271,6 +275,7 @@ table.tt .trow td{border-top:2px solid #FF4D8D;padding-top:8px;font-size:15px;fo
       <tr><td>Subtotal</td><td>${fmt(subtotal)}</td></tr>
       <tr><td>Shipping</td><td>${shipping === 0 ? '<span class="free">Free</span>' : fmt(shipping)}</td></tr>
       ${discount > 0 ? `<tr><td>Discount / Coupon</td><td style="color:#00C853">- ${fmt(discount)}</td></tr>` : ''}
+      ${pointsRedeemed > 0 ? `<tr><td style="color:#B8860B">Loyalty Points (${pointsRedeemed} pts)</td><td style="color:#B8860B">- ${fmt(redeemedAmount)}</td></tr>` : ''}
       <tr class="trow"><td>Total</td><td>${fmt(total)}</td></tr>
     </table>
   </div>
@@ -346,10 +351,12 @@ export function downloadOrderPdf(order: PrintOrder, items: PrintOrderItem[]): vo
     order.country,
   ].filter(Boolean).join(', ') || '—';
 
-  const subtotal = Number(order.subtotal ?? 0);
-  const shipping = Number(order.shipping ?? 0);
-  const discount = Number(order.discount ?? 0);
-  const total    = Number(order.total ?? 0);
+  const subtotal       = Number(order.subtotal ?? 0);
+  const shipping       = Number(order.shipping ?? 0);
+  const discount       = Number(order.discount ?? 0);
+  const pointsRedeemed = Number(order.points_redeemed ?? 0);
+  const redeemedAmount = Number(order.redeemed_amount ?? 0);
+  const total          = Number(order.total ?? 0);
 
   // ── jsPDF setup ──
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -626,6 +633,7 @@ export function downloadOrderPdf(order: PrintOrder, items: PrintOrderItem[]): vo
   totRow('Subtotal', fmt(subtotal));
   totRow('Shipping', shipping === 0 ? 'Free' : fmt(shipping), false, shipping === 0 ? '#00C853' : DARK);
   if (discount > 0) totRow('Discount', `- ${fmt(discount)}`, false, '#00C853');
+  if (pointsRedeemed > 0) totRow(`Loyalty (${pointsRedeemed} pts)`, `- ${fmt(redeemedAmount)}`, false, '#B8860B');
 
   // Total divider
   setDraw(PINK);

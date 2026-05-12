@@ -273,6 +273,7 @@ export default function CheckoutScreen() {
           shipping:            shippingFee,
           total,
           points_redeemed:     pointsToRedeem,
+          redeemed_amount:     pointsDiscount,
           status:              'new',
         })
         .select()
@@ -304,12 +305,21 @@ export default function CheckoutScreen() {
 
       // Deduct redeemed points atomically via safe RPC (race-condition safe, balance-checked)
       if (pointsToRedeem > 0 && user?.id) {
-        await supabase.rpc('safe_redeem_loyalty_points', {
-          p_user_id:  user.id,
-          p_order_id: order.id,
-          p_points:   pointsToRedeem,
-          p_note:     `Redeemed for order #${order.id.slice(0, 8).toUpperCase()}`,
+        const { data: redeemResult } = await supabase.rpc('safe_redeem_loyalty_points', {
+          p_user_id:         user.id,
+          p_order_id:        order.id,
+          p_points:          pointsToRedeem,
+          p_note:            `Redeemed for order #${order.id.slice(0, 8).toUpperCase()}`,
+          p_redeemed_amount: pointsDiscount,
         });
+        // Back-patch loyalty_transaction_id onto the order for display & dedup
+        const txnId = (redeemResult as any)?.loyalty_transaction_id;
+        if (txnId) {
+          await supabase
+            .from('orders')
+            .update({ loyalty_transaction_id: txnId })
+            .eq('id', order.id);
+        }
         loyalty.refresh();
       }
 
