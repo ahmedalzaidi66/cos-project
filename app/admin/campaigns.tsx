@@ -9,6 +9,8 @@ import {
   Modal,
   Animated,
   Easing,
+  TextInput,
+  Platform,
 } from 'react-native';
 import {
   CalendarDays,
@@ -18,9 +20,6 @@ import {
   X,
   Zap,
   LayoutTemplate,
-  Tag,
-  Send,
-  Image as ImageIcon,
   ChevronRight,
   Sparkles,
   Gift,
@@ -31,6 +30,7 @@ import {
   Flag,
   Moon,
   ShoppingBag,
+  Plus,
 } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -50,6 +50,19 @@ type OccasionStatus = 'active' | 'upcoming' | 'past';
 type ReminderState = 'dismissed' | 'snoozed' | 'completed' | null;
 type ActionType = 'banner' | 'discount' | 'notification' | 'coupon' | 'hero_slider';
 type SnoozeOption = '1d' | '3d' | '7d';
+type CampaignStatus = 'planned' | 'active' | 'completed' | 'dismissed';
+
+interface SavedCampaign {
+  id: string;
+  occasion_key: string;
+  title: string;
+  occasion_name: string;
+  occasion_date: string | null;
+  notes: string;
+  status: CampaignStatus;
+  admin_email: string;
+  created_at: string;
+}
 
 interface Occasion {
   key: string;
@@ -430,24 +443,19 @@ interface CardProps {
   onSnooze: (key: string, opt: SnoozeOption) => void;
   onComplete: (key: string) => void;
   onAction: (key: string, type: ActionType) => void;
+  onCreateCampaign: (occasion: Occasion) => void;
   actionsDone: Set<string>;
 }
 
-function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onAction, actionsDone }: CardProps) {
+function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onAction, onCreateCampaign, actionsDone }: CardProps) {
   const { occasion, date, status, daysUntil: days, reminderState } = card;
-  const [expanded, setExpanded] = useState(false);
   const [showSnooze, setShowSnooze] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const expandAnim = useRef(new Animated.Value(0)).current;
   const isRtl = language === 'ar' || language === 'ckb';
 
   useEffect(() => {
     Animated.timing(slideAnim, { toValue: 1, duration: 500, easing: Easing.out(Easing.back(1.1)), useNativeDriver: true }).start();
   }, []);
-
-  useEffect(() => {
-    Animated.timing(expandAnim, { toValue: expanded ? 1 : 0, duration: 250, useNativeDriver: false }).start();
-  }, [expanded]);
 
   const name = language === 'ar' ? occasion.nameAr : language === 'ckb' ? occasion.nameCkb : occasion.nameEn;
   const campaign = language === 'ar' ? occasion.campaignTypeAr : language === 'ckb' ? occasion.campaignTypeCkb : occasion.campaignType;
@@ -458,16 +466,6 @@ function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onA
   if (reminderState === 'snoozed' && card.snoozedUntil && card.snoozedUntil > new Date()) return null;
 
   const Icon = occasion.icon;
-
-  const expandedHeight = expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 200] });
-
-  const actionItems: { type: ActionType; label: string; labelAr: string; labelCkb: string; icon: React.ComponentType<any>; color: string }[] = [
-    { type: 'banner', label: 'Homepage Banner', labelAr: 'بانر الرئيسية', labelCkb: 'بانەری سەرەکی', icon: LayoutTemplate, color: Colors.neonBlue },
-    { type: 'discount', label: 'Discount Campaign', labelAr: 'حملة خصم', labelCkb: 'کامپەینی داشکاندن', icon: Tag, color: Colors.warning },
-    { type: 'notification', label: 'Send Notification', labelAr: 'إرسال إشعار', labelCkb: 'ناردنی ئاگادارکردن', icon: Send, color: Colors.success },
-    { type: 'coupon', label: 'Create Coupon', labelAr: 'إنشاء قسيمة', labelCkb: 'دروستکردنی کووپۆن', icon: Tag, color: '#FF9800' },
-    { type: 'hero_slider', label: 'Update Hero Slider', labelAr: 'تحديث السلايدر', labelCkb: 'نوێکردنەوەی سلایدەر', icon: ImageIcon, color: '#42A5F5' },
-  ];
 
   return (
     <Animated.View style={[
@@ -523,41 +521,52 @@ function OccasionCardView({ card, language, onDismiss, onSnooze, onComplete, onA
             </View>
           )}
 
-          {/* Quick actions (expandable) */}
-          <TouchableOpacity
-            style={[cardStyles.expandTrigger, isRtl && { flexDirection: 'row-reverse' }]}
-            onPress={() => setExpanded(!expanded)}
-            activeOpacity={0.7}
-          >
-            <Text style={cardStyles.expandText}>
-              {language === 'ar' ? 'إجراءات سريعة' : language === 'ckb' ? 'کارە خێراکان' : 'Quick Actions'}
-              {card.actionsCount > 0 && ` (${card.actionsCount})`}
-            </Text>
-            <ChevronRight
-              size={13}
-              color={Colors.textMuted}
-              strokeWidth={2}
-              style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }] }}
-            />
-          </TouchableOpacity>
+          {/* 4 explicit action buttons */}
+          <View style={[cardStyles.actionButtonsRow, isRtl && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity
+              style={[cardStyles.actionBtn, { borderColor: Colors.neonBlue + '66' }]}
+              onPress={() => onCreateCampaign(occasion)}
+              activeOpacity={0.75}
+            >
+              <Plus size={12} color={Colors.neonBlue} strokeWidth={2.5} />
+              <Text style={[cardStyles.actionBtnText, { color: Colors.neonBlue }]}>
+                {language === 'ar' ? 'إنشاء حملة' : language === 'ckb' ? 'دروستکردنی کامپەین' : 'Create Campaign'}
+              </Text>
+            </TouchableOpacity>
 
-          <Animated.View style={{ maxHeight: expandedHeight, overflow: 'hidden' }}>
-            <View style={cardStyles.actionsGrid}>
-              {actionItems.map((a) => {
-                const doneKey = `${card.occasion.key}:${a.type}`;
-                return (
-                  <QuickActionBtn
-                    key={a.type}
-                    icon={a.icon}
-                    label={language === 'ar' ? a.labelAr : language === 'ckb' ? a.labelCkb : a.label}
-                    color={a.color}
-                    done={actionsDone.has(doneKey)}
-                    onPress={() => onAction(card.occasion.key, a.type)}
-                  />
-                );
-              })}
-            </View>
-          </Animated.View>
+            <TouchableOpacity
+              style={[cardStyles.actionBtn, { borderColor: Colors.warning + '66' }]}
+              onPress={() => onAction(card.occasion.key, 'banner')}
+              activeOpacity={0.75}
+            >
+              <LayoutTemplate size={12} color={Colors.warning} strokeWidth={2} />
+              <Text style={[cardStyles.actionBtnText, { color: Colors.warning }]}>
+                {language === 'ar' ? 'إنشاء بانر' : language === 'ckb' ? 'دروستکردنی بانەر' : 'Create Banner'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[cardStyles.actionBtn, { borderColor: Colors.success + '66' }]}
+              onPress={() => onAction(card.occasion.key, 'notification')}
+              activeOpacity={0.75}
+            >
+              <Bell size={12} color={Colors.success} strokeWidth={2} />
+              <Text style={[cardStyles.actionBtnText, { color: Colors.success }]}>
+                {language === 'ar' ? 'إرسال تذكير' : language === 'ckb' ? 'ناردنی بیرخستنەوە' : 'Send Reminder'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[cardStyles.actionBtn, cardStyles.actionBtnDone]}
+              onPress={() => onComplete(card.occasion.key)}
+              activeOpacity={0.75}
+            >
+              <Check size={12} color={Colors.success} strokeWidth={2.5} />
+              <Text style={[cardStyles.actionBtnText, { color: Colors.success }]}>
+                {language === 'ar' ? 'تم' : language === 'ckb' ? 'تەواو' : 'Mark Done'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Footer buttons */}
           {reminderState !== 'completed' && (
@@ -642,6 +651,19 @@ const cardStyles = StyleSheet.create({
   },
   expandText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm },
+  actionButtonsRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  actionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 6,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border,
+  },
+  actionBtnDone: { borderColor: Colors.success + '44', backgroundColor: Colors.success + '10' },
+  actionBtnText: { fontSize: FontSize.xs, fontWeight: '700' },
   footerRow: {
     flexDirection: 'row', gap: 6,
     paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm,
@@ -720,6 +742,402 @@ const sw = StyleSheet.create({
   card: { flex: 1, backgroundColor: Colors.backgroundCard, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', paddingVertical: 12, gap: 4 },
   num: { fontSize: FontSize.xl, fontWeight: '900' },
   label: { color: Colors.textMuted, fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+});
+
+// ─── Create Campaign Modal ────────────────────────────────────────────────────
+
+const STATUS_OPTIONS: CampaignStatus[] = ['planned', 'active', 'completed', 'dismissed'];
+
+const STATUS_COLORS: Record<CampaignStatus, string> = {
+  planned: Colors.neonBlue,
+  active: Colors.success,
+  completed: Colors.textMuted,
+  dismissed: Colors.error,
+};
+
+function statusLabel(s: CampaignStatus, lang: string): string {
+  const map: Record<CampaignStatus, { en: string; ar: string; ckb: string }> = {
+    planned:   { en: 'Planned',   ar: 'مخطط',    ckb: 'پلاندراو'      },
+    active:    { en: 'Active',    ar: 'نشط',      ckb: 'چالاک'         },
+    completed: { en: 'Completed', ar: 'مكتمل',    ckb: 'تەواوکراو'     },
+    dismissed: { en: 'Dismissed', ar: 'مرفوض',    ckb: 'ڕەتکراوەتەوە' },
+  };
+  return lang === 'ar' ? map[s].ar : lang === 'ckb' ? map[s].ckb : map[s].en;
+}
+
+interface CreateCampaignModalProps {
+  visible: boolean;
+  occasion: Occasion | null;
+  language: string;
+  adminEmail: string;
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+  onError: (msg: string) => void;
+}
+
+function CreateCampaignModal({ visible, occasion, language, adminEmail, onClose, onSaved, onError }: CreateCampaignModalProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState('');
+  const [status, setStatus] = useState<CampaignStatus>('planned');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible && occasion) {
+      const name = language === 'ar' ? occasion.nameAr : language === 'ckb' ? occasion.nameCkb : occasion.nameEn;
+      const type = language === 'ar' ? occasion.campaignTypeAr : language === 'ckb' ? occasion.campaignTypeCkb : occasion.campaignType;
+      setTitle(`${name} — ${type}`);
+      setNotes('');
+      setStatus('planned');
+    }
+  }, [visible, occasion, language]);
+
+  if (!occasion) return null;
+
+  const occasionName = language === 'ar' ? occasion.nameAr : language === 'ckb' ? occasion.nameCkb : occasion.nameEn;
+  const occasionDate = getOccasionDate(occasion);
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      const db = adminSupabase();
+      const { error } = await db.from('saved_campaigns').insert({
+        occasion_key: occasion.key,
+        title: title.trim(),
+        occasion_name: occasionName,
+        occasion_date: occasionDate ? occasionDate.toISOString().split('T')[0] : null,
+        notes: notes.trim(),
+        status,
+        admin_email: adminEmail,
+      });
+      if (error) throw error;
+      onSaved(language === 'ar' ? 'تم حفظ الحملة بنجاح' : language === 'ckb' ? 'کامپەین بە سەرکەوتوویی پاشەکەوت کرا' : 'Campaign saved successfully');
+      onClose();
+    } catch (e: any) {
+      onError(language === 'ar' ? 'فشل في حفظ الحملة' : language === 'ckb' ? 'شکستی هێنا لە پاشەکەوتکردنی کامپەین' : 'Failed to save campaign');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={ccm.overlay}>
+        <View style={ccm.sheet}>
+          {/* Header */}
+          <View style={[ccm.header, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={ccm.headerLeft}>
+              <View style={[ccm.iconWrap, { backgroundColor: occasion.color + '22' }]}>
+                {React.createElement(occasion.icon, { size: 18, color: occasion.color, strokeWidth: 2 })}
+              </View>
+              <View>
+                <Text style={[ccm.headerTitle, isRtl && { textAlign: 'right' }]}>
+                  {language === 'ar' ? 'إنشاء حملة' : language === 'ckb' ? 'دروستکردنی کامپەین' : 'Create Campaign'}
+                </Text>
+                <Text style={[ccm.headerSub, isRtl && { textAlign: 'right' }]}>{occasionName}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={ccm.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={ccm.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Occasion date chip */}
+            {occasionDate && (
+              <View style={[ccm.dateChip, isRtl && { flexDirection: 'row-reverse' }]}>
+                <CalendarDays size={13} color={occasion.color} strokeWidth={2} />
+                <Text style={[ccm.dateChipText, { color: occasion.color }]}>
+                  {formatDate(occasionDate, language)}
+                </Text>
+                <View style={[ccm.daysChip, { backgroundColor: occasion.color + '22', borderColor: occasion.color + '55' }]}>
+                  <Text style={[ccm.daysChipText, { color: occasion.color }]}>
+                    {daysUntil(occasionDate) === 0
+                      ? (language === 'ar' ? 'اليوم' : language === 'ckb' ? 'ئەمڕۆ' : 'Today')
+                      : (language === 'ar' ? `${daysUntil(occasionDate)} يوم` : language === 'ckb' ? `${daysUntil(occasionDate)} ڕۆژ` : `${daysUntil(occasionDate)} days`)
+                    }
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Campaign title */}
+            <View style={ccm.fieldWrap}>
+              <Text style={[ccm.label, isRtl && { textAlign: 'right' }]}>
+                {language === 'ar' ? 'عنوان الحملة' : language === 'ckb' ? 'سەردێڕی کامپەین' : 'Campaign Title'}
+              </Text>
+              <TextInput
+                style={[ccm.input, isRtl && { textAlign: 'right' }]}
+                value={title}
+                onChangeText={setTitle}
+                placeholder={language === 'ar' ? 'أدخل عنوان الحملة' : language === 'ckb' ? 'سەردێڕی کامپەین بنووسە' : 'Enter campaign title'}
+                placeholderTextColor={Colors.textMuted}
+                maxLength={120}
+              />
+            </View>
+
+            {/* Status selector */}
+            <View style={ccm.fieldWrap}>
+              <Text style={[ccm.label, isRtl && { textAlign: 'right' }]}>
+                {language === 'ar' ? 'الحالة' : language === 'ckb' ? 'دۆخ' : 'Status'}
+              </Text>
+              <View style={[ccm.statusRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                {STATUS_OPTIONS.map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    style={[
+                      ccm.statusChip,
+                      status === s && { backgroundColor: STATUS_COLORS[s] + '22', borderColor: STATUS_COLORS[s] + '66' },
+                    ]}
+                    onPress={() => setStatus(s)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[ccm.statusChipText, status === s && { color: STATUS_COLORS[s], fontWeight: '800' }]}>
+                      {statusLabel(s, language)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Notes */}
+            <View style={ccm.fieldWrap}>
+              <Text style={[ccm.label, isRtl && { textAlign: 'right' }]}>
+                {language === 'ar' ? 'ملاحظات' : language === 'ckb' ? 'تێبینیەکان' : 'Notes'}
+              </Text>
+              <TextInput
+                style={[ccm.textarea, isRtl && { textAlign: 'right' }]}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder={language === 'ar' ? 'أضف ملاحظاتك هنا...' : language === 'ckb' ? 'تێبینیەکانت لێرە زیاد بکە...' : 'Add your notes here...'}
+                placeholderTextColor={Colors.textMuted}
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+              />
+            </View>
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={[ccm.footer, isRtl && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity style={ccm.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={ccm.cancelText}>{language === 'ar' ? 'إلغاء' : language === 'ckb' ? 'پاشگەزبوونەوە' : 'Cancel'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[ccm.saveBtn, (!title.trim() || saving) && ccm.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={!title.trim() || saving}
+              activeOpacity={0.8}
+            >
+              {saving
+                ? <ActivityIndicator size="small" color={Colors.background} />
+                : <Check size={15} color={Colors.background} strokeWidth={2.5} />
+              }
+              <Text style={ccm.saveText}>{language === 'ar' ? 'حفظ الحملة' : language === 'ckb' ? 'پاشەکەوتکردنی کامپەین' : 'Save Campaign'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const ccm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: Colors.border,
+    maxHeight: '90%',
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: Spacing.lg,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: '800' },
+  headerSub: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600', marginTop: 2 },
+  closeBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  body: { padding: Spacing.lg },
+  dateChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginBottom: Spacing.md,
+    padding: Spacing.sm,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
+  },
+  dateChipText: { fontSize: FontSize.sm, fontWeight: '700', flex: 1 },
+  daysChip: {
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: Radius.full, borderWidth: 1,
+  },
+  daysChipText: { fontSize: FontSize.xs, fontWeight: '800' },
+  fieldWrap: { marginBottom: Spacing.md, gap: 6 },
+  label: { color: Colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: {
+    backgroundColor: Colors.backgroundCard,
+    borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+  },
+  textarea: {
+    backgroundColor: Colors.backgroundCard,
+    borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    minHeight: 96,
+    textAlignVertical: 'top',
+  },
+  statusRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  statusChip: {
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: 'transparent',
+  },
+  statusChipText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  footer: {
+    flexDirection: 'row', gap: Spacing.md,
+    padding: Spacing.lg,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  cancelBtn: {
+    flex: 1, height: 46, borderRadius: Radius.md,
+    backgroundColor: Colors.backgroundCard,
+    borderWidth: 1, borderColor: Colors.border,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  cancelText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' },
+  saveBtn: {
+    flex: 2, height: 46, borderRadius: Radius.md,
+    backgroundColor: Colors.neonBlue,
+    justifyContent: 'center', alignItems: 'center',
+    flexDirection: 'row', gap: 6,
+  },
+  saveBtnDisabled: { opacity: 0.45 },
+  saveText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: '800' },
+});
+
+// ─── Active Campaigns Section ────────────────────────────────────────────────
+
+interface ActiveCampaignsSectionProps {
+  campaigns: SavedCampaign[];
+  language: string;
+  onStatusChange: (id: string, status: CampaignStatus) => void;
+}
+
+function ActiveCampaignsSection({ campaigns, language, onStatusChange }: ActiveCampaignsSectionProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(slideAnim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, []);
+
+  if (campaigns.length === 0) return null;
+
+  return (
+    <Animated.View style={{ opacity: slideAnim }}>
+      <SectionHeader
+        title={language === 'ar' ? 'الحملات النشطة' : language === 'ckb' ? 'کامپەینە چالاکەکان' : 'Active Campaigns'}
+        count={campaigns.length}
+        color={Colors.success}
+      />
+      {campaigns.map((c) => {
+        const color = STATUS_COLORS[c.status];
+        return (
+          <View key={c.id} style={[acs.card, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={[acs.statusBar, { backgroundColor: color }]} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <View style={[acs.topRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                <Text style={[acs.title, isRtl && { textAlign: 'right' }]} numberOfLines={1}>{c.title}</Text>
+                <View style={[acs.badge, { backgroundColor: color + '22', borderColor: color + '55' }]}>
+                  <Text style={[acs.badgeText, { color }]}>{statusLabel(c.status, language).toUpperCase()}</Text>
+                </View>
+              </View>
+              <View style={[acs.metaRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                <Text style={acs.meta}>{c.occasion_name}</Text>
+                {c.occasion_date && <Text style={acs.meta}>{c.occasion_date}</Text>}
+              </View>
+              {c.notes ? <Text style={[acs.notes, isRtl && { textAlign: 'right' }]} numberOfLines={2}>{c.notes}</Text> : null}
+              {/* Status action row */}
+              <View style={[acs.actionRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                {c.status !== 'active' && (
+                  <TouchableOpacity style={[acs.actionChip, { borderColor: Colors.success + '66' }]} onPress={() => onStatusChange(c.id, 'active')} activeOpacity={0.75}>
+                    <Zap size={10} color={Colors.success} strokeWidth={2.5} />
+                    <Text style={[acs.actionChipText, { color: Colors.success }]}>
+                      {language === 'ar' ? 'تفعيل' : language === 'ckb' ? 'چالاک' : 'Activate'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {c.status !== 'completed' && (
+                  <TouchableOpacity style={[acs.actionChip, { borderColor: Colors.neonBlue + '66' }]} onPress={() => onStatusChange(c.id, 'completed')} activeOpacity={0.75}>
+                    <Check size={10} color={Colors.neonBlue} strokeWidth={2.5} />
+                    <Text style={[acs.actionChipText, { color: Colors.neonBlue }]}>
+                      {language === 'ar' ? 'مكتمل' : language === 'ckb' ? 'تەواو' : 'Complete'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {c.status !== 'dismissed' && (
+                  <TouchableOpacity style={[acs.actionChip, { borderColor: Colors.error + '55' }]} onPress={() => onStatusChange(c.id, 'dismissed')} activeOpacity={0.75}>
+                    <X size={10} color={Colors.error} strokeWidth={2.5} />
+                    <Text style={[acs.actionChipText, { color: Colors.error }]}>
+                      {language === 'ar' ? 'رفض' : language === 'ckb' ? 'ڕەت' : 'Dismiss'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </Animated.View>
+  );
+}
+
+const acs = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    marginBottom: Spacing.sm,
+  },
+  statusBar: { width: 4, alignSelf: 'stretch' },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'space-between', padding: Spacing.md, paddingBottom: 4 },
+  title: { color: Colors.textPrimary, fontSize: FontSize.sm, fontWeight: '800', flex: 1 },
+  badge: {
+    paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: Radius.full, borderWidth: 1, flexShrink: 0,
+  },
+  badgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  metaRow: { flexDirection: 'row', gap: 12, paddingHorizontal: Spacing.md },
+  meta: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  notes: { color: Colors.textSecondary, fontSize: FontSize.xs, paddingHorizontal: Spacing.md },
+  actionRow: {
+    flexDirection: 'row', gap: 6, flexWrap: 'wrap',
+    paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, paddingTop: 4,
+  },
+  actionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.backgroundSecondary,
+  },
+  actionChipText: { fontSize: 10, fontWeight: '700' },
 });
 
 // ─── Action confirmation modal ────────────────────────────────────────────────
@@ -821,14 +1239,16 @@ function CampaignsContent() {
   const [loading, setLoading] = useState(true);
   const [overrides, setOverrides] = useState<OccasionOverride[]>([]);
   const [actionRecords, setActionRecords] = useState<ActionRecord[]>([]);
+  const [savedCampaigns, setSavedCampaigns] = useState<SavedCampaign[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [actionModal, setActionModal] = useState<{ key: string; type: ActionType } | null>(null);
+  const [createModalOccasion, setCreateModalOccasion] = useState<Occasion | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, type });
-    toastTimer.current = setTimeout(() => setToast(null), 3000);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
   };
 
   useEffect(() => {
@@ -838,13 +1258,30 @@ function CampaignsContent() {
   const load = async () => {
     setLoading(true);
     const db = adminSupabase();
-    const [ovRes, acRes] = await Promise.all([
+    const [ovRes, acRes, scRes] = await Promise.all([
       db.from('campaign_occasion_overrides').select('occasion_key,status,snoozed_until'),
       db.from('campaign_actions').select('occasion_key,action_type,created_at').order('created_at', { ascending: false }),
+      db.from('saved_campaigns').select('*').not('status', 'eq', 'dismissed').order('created_at', { ascending: false }),
     ]);
     setOverrides(ovRes.data ?? []);
     setActionRecords(acRes.data ?? []);
+    setSavedCampaigns(scRes.data ?? []);
     setLoading(false);
+  };
+
+  const handleCampaignStatusChange = async (id: string, status: CampaignStatus) => {
+    const db = adminSupabase();
+    const { error } = await db.from('saved_campaigns').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) {
+      showToast(language === 'ar' ? 'فشل تحديث الحالة' : 'Failed to update status', 'error');
+    } else {
+      showToast(
+        status === 'completed'
+          ? (language === 'ar' ? 'تم تحديد الحملة كمكتملة' : language === 'ckb' ? 'کامپەین وەکو تەواوکراو نیشانەکرا' : 'Campaign marked as completed')
+          : (language === 'ar' ? 'تم تحديث الحالة' : language === 'ckb' ? 'دۆخ نوێکرایەوە' : 'Status updated')
+      );
+      await load();
+    }
   };
 
   // Build cards from OCCASIONS + DB state
@@ -907,15 +1344,26 @@ function CampaignsContent() {
   };
 
   const handleAction = async (key: string, type: ActionType) => {
-    // Log the action
-    await adminSupabase().from('campaign_actions').insert({
-      occasion_key: key,
-      action_type: type,
-      admin_email: admin?.email ?? '',
-    });
-    logAdminAction({ action: 'create', entityType: 'settings', entityLabel: `Campaign action: ${key} / ${type}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
-    setActionModal({ key, type });
-    await load();
+    try {
+      await adminSupabase().from('campaign_actions').insert({
+        occasion_key: key,
+        action_type: type,
+        admin_email: admin?.email ?? '',
+      });
+      logAdminAction({ action: 'create', entityType: 'settings', entityLabel: `Campaign action: ${key} / ${type}`, adminUserId: admin?.id ?? '', adminEmail: admin?.email ?? '' });
+
+      if (type === 'notification') {
+        showToast(language === 'ar' ? 'تم تسجيل التذكير' : language === 'ckb' ? 'بیرخستنەوە تۆمارکرا' : 'Reminder logged');
+      } else if (type === 'banner') {
+        showToast(language === 'ar' ? 'تم تسجيل إجراء البانر' : language === 'ckb' ? 'کاری بانەر تۆمارکرا' : 'Banner action logged');
+        setActionModal({ key, type });
+      } else {
+        setActionModal({ key, type });
+      }
+      await load();
+    } catch {
+      showToast(language === 'ar' ? 'حدث خطأ' : 'An error occurred', 'error');
+    }
   };
 
   const titleLabel = language === 'ar' ? 'المناسبات والعروض' : language === 'ckb' ? 'ئۆکازیۆن و کامپەینەکان' : 'Seasonal Campaigns';
@@ -932,6 +1380,15 @@ function CampaignsContent() {
         language={language}
         onClose={() => setActionModal(null)}
         onNavigate={(route) => router.push(route as any)}
+      />
+      <CreateCampaignModal
+        visible={!!createModalOccasion}
+        occasion={createModalOccasion}
+        language={language}
+        adminEmail={admin?.email ?? ''}
+        onClose={() => setCreateModalOccasion(null)}
+        onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
+        onError={(msg) => showToast(msg, 'error')}
       />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[main.scroll, isRtl && { direction: 'rtl' } as any]}>
@@ -960,6 +1417,13 @@ function CampaignsContent() {
             {/* Stats */}
             <StatsWidget cards={cards} />
 
+            {/* Saved/Active Campaigns from DB */}
+            <ActiveCampaignsSection
+              campaigns={savedCampaigns}
+              language={language}
+              onStatusChange={handleCampaignStatusChange}
+            />
+
             {/* Active today */}
             {activeCards.length > 0 && (
               <>
@@ -977,6 +1441,7 @@ function CampaignsContent() {
                     onSnooze={handleSnooze}
                     onComplete={handleComplete}
                     onAction={handleAction}
+                    onCreateCampaign={setCreateModalOccasion}
                     actionsDone={actionsDone}
                   />
                 ))}
@@ -1000,6 +1465,7 @@ function CampaignsContent() {
                     onSnooze={handleSnooze}
                     onComplete={handleComplete}
                     onAction={handleAction}
+                    onCreateCampaign={setCreateModalOccasion}
                     actionsDone={actionsDone}
                   />
                 ))}
@@ -1023,6 +1489,7 @@ function CampaignsContent() {
                     onSnooze={handleSnooze}
                     onComplete={handleComplete}
                     onAction={handleAction}
+                    onCreateCampaign={setCreateModalOccasion}
                     actionsDone={actionsDone}
                   />
                 ))}
