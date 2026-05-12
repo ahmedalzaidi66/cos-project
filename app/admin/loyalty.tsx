@@ -10,8 +10,8 @@ import {
   Modal,
   Switch,
 } from 'react-native';
-import { Coins, TrendingUp, Users, Gift, ChevronDown, ChevronUp, Plus, Minus, X, Check, Settings2, Crown, Truck, Star, Zap, Percent, PartyPopper } from 'lucide-react-native';
-import { adminSupabase } from '@/lib/supabase';
+import { Coins, TrendingUp, Users, Gift, ChevronDown, ChevronUp, Plus, Minus, X, Check, Settings2, Crown, Truck, Star, Zap, Percent, PartyPopper, ShieldAlert } from 'lucide-react-native';
+import { adminSupabase, supabase } from '@/lib/supabase';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { useAdmin } from '@/context/AdminContext';
 import { logAdminAction } from '@/lib/auditLog';
@@ -31,9 +31,14 @@ type LoyaltyMember = {
   total_points: number;
   lifetime_points: number;
   tier: LoyaltyTier;
+  tier_override_enabled: boolean;
+  override_tier: LoyaltyTier | null;
   updated_at: string;
   email?: string;
 };
+
+// Nil UUID used when the fixed admin has no real auth.users row
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
 type LoyaltySettings = {
   earning_enabled: boolean;
@@ -48,7 +53,7 @@ type LoyaltySettings = {
 function LoyaltyContent() {
   const { t, language } = useLanguage();
   const { isDesktop } = useAdminLayout();
-  const { guard: guardAction } = useActionPermission('manage_settings');
+  const { guard: guardAction } = useActionPermission('manage_loyalty');
   const { admin } = useAdmin();
   const DashboardShell = isDesktop ? AdminWebDashboard : AdminMobileDashboard;
   const shellTitle = (t as any).loyaltyAdmin ?? 'Loyalty & Rewards';
@@ -78,17 +83,23 @@ function LoyaltyContent() {
   // Adjust modal
   const [adjustMember, setAdjustMember] = useState<LoyaltyMember | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
-  const [adjustNote, setAdjustNote] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
   const [adjustMode, setAdjustMode] = useState<'add' | 'remove'>('add');
   const [adjusting, setAdjusting] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState('');
+  const [adjustMsgIsError, setAdjustMsgIsError] = useState(false);
+  // Tier override within modal
+  const [tierOverrideEnabled, setTierOverrideEnabled] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<LoyaltyTier>('bronze');
+  const [tierOverrideReason, setTierOverrideReason] = useState('');
+  const [tierSaving, setTierSaving] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const { data: loyaltyData } = await adminSupabase()
         .from('customer_loyalty')
-        .select('id, user_id, total_points, lifetime_points, tier, updated_at')
+        .select('id, user_id, total_points, lifetime_points, tier, tier_override_enabled, override_tier, updated_at')
         .order('total_points', { ascending: false });
 
       const { data: settingsData } = await adminSupabase()
@@ -125,6 +136,8 @@ function LoyaltyContent() {
 
       setMembers(loyaltyData.map((m: any) => ({
         ...m,
+        tier_override_enabled: m.tier_override_enabled ?? false,
+        override_tier: m.override_tier ?? null,
         email: emailMap[m.user_id] ?? '—',
       })));
     } finally {
@@ -147,7 +160,7 @@ function LoyaltyContent() {
   });
 
   const saveSettings = async () => {
-    if (!guardAction()) { setSettingsMsg('Permission denied: manage_settings required'); setTimeout(() => setSettingsMsg(''), 4000); return; }
+    if (!guardAction()) { setSettingsMsg('Permission denied: manage_loyalty required'); setTimeout(() => setSettingsMsg(''), 4000); return; }
     setSettingsSaving(true);
     setSettingsMsg('');
     const payload = {
@@ -177,7 +190,7 @@ function LoyaltyContent() {
   };
 
   const saveTierBenefits = async () => {
-    if (!guardAction()) { setTierBenMsg('Permission denied: manage_settings required'); setTimeout(() => setTierBenMsg(''), 4000); return; }
+    if (!guardAction()) { setTierBenMsg('Permission denied: manage_loyalty required'); setTimeout(() => setTierBenMsg(''), 4000); return; }
     setTierBenSaving(true);
     setTierBenMsg('');
     // Build rows — upsert one tier at a time to avoid partial failure masking errors
@@ -214,60 +227,144 @@ function LoyaltyContent() {
     }
   };
 
+  const showAdjustMsg = (msg: string, isError: boolean) => {
+    setAdjustMsg(msg);
+    setAdjustMsgIsError(isError);
+    if (!isError) setTimeout(() => setAdjustMsg(''), 3000);
+  };
+
   const handleAdjust = async () => {
-    if (!guardAction()) { setAdjustMsg('Permission denied: manage_settings required'); setTimeout(() => setAdjustMsg(''), 4000); return; }
+    if (!guardAction()) {
+      showAdjustMsg('Permission denied: manage_loyalty required', true);
+      return;
+    }
     if (!adjustMember) return;
+
     const pts = parseInt(adjustAmount, 10);
-    if (!pts || pts <= 0) return;
+    if (!pts || pts <= 0) {
+      showAdjustMsg('Enter a valid point amount greater than 0', true);
+      return;
+    }
+    if (!adjustReason.trim()) {
+      showAdjustMsg('A reason is required before saving', true);
+      return;
+    }
+
+    const delta = adjustMode === 'add' ? pts : -pts;
+
+    // Guard against negative balance on subtract
+    if (delta < 0 && Math.abs(delta) > adjustMember.total_points) {
+      showAdjustMsg(
+        `Cannot subtract ${pts} pts — current balance is only ${adjustMember.total_points} pts`,
+        true
+      );
+      return;
+    }
+
     setAdjusting(true);
     setAdjustMsg('');
-    const delta = adjustMode === 'add' ? pts : -pts;
-    const newTotal = Math.max(0, adjustMember.total_points + delta);
-    const newLifetime = adjustMode === 'add'
-      ? adjustMember.lifetime_points + pts
-      : adjustMember.lifetime_points;
-    const newTier = getTierFromLifetime(newLifetime);
 
-    const { error } = await adminSupabase()
-      .from('customer_loyalty')
-      .update({ total_points: newTotal, lifetime_points: newLifetime, tier: newTier, updated_at: new Date().toISOString() })
-      .eq('id', adjustMember.id);
-
-    if (!error) {
-      await adminSupabase().from('loyalty_transactions').insert({
-        user_id:      adjustMember.user_id,
-        type:         'adjust',
-        points:       delta,
-        balance_after: newTotal,
-        note:         adjustNote.trim() || 'Admin adjustment',
-      });
-    }
+    // Use the SECURITY DEFINER RPC — bypasses RLS, works with anon key + admin token
+    const adminId = admin?.id && admin.id !== 'admin-fixed' ? admin.id : NIL_UUID;
+    const { data, error } = await supabase.rpc('adjust_loyalty_points_admin', {
+      p_admin_id: adminId,
+      p_user_id:  adjustMember.user_id,
+      p_delta:    delta,
+      p_reason:   adjustReason.trim(),
+    });
 
     setAdjusting(false);
-    if (error) {
-      setAdjustMsg((t as any).adjustFailed ?? 'Failed to adjust points');
-    } else {
-      setAdjustMsg((t as any).adjustSuccess ?? 'Points adjusted');
-      logAdminAction({
-        action: 'update',
-        entityType: 'loyalty',
-        entityId: adjustMember.id,
-        entityLabel: adjustMember.email,
-        beforeData: { total_points: adjustMember.total_points, tier: adjustMember.tier } as any,
-        afterData: { total_points: newTotal, tier: newTier, delta, note: adjustNote.trim() || 'Admin adjustment' } as any,
-        adminUserId: admin?.id ?? '',
-        adminEmail: admin?.email ?? '',
-        adminName: admin?.name ?? '',
-        adminRole: admin?.role ?? '',
-      });
-      fetchData();
-      setTimeout(() => {
-        setAdjustMember(null);
-        setAdjustAmount('');
-        setAdjustNote('');
-        setAdjustMsg('');
-      }, 1200);
+
+    if (error || (data as any)?.error) {
+      const msg = error?.message ?? (data as any)?.error ?? 'Failed to adjust points';
+      console.error('[handleAdjust] RPC error:', msg, error);
+      showAdjustMsg(`Failed: ${msg}`, true);
+      return;
     }
+
+    const newBalance: number = (data as any)?.new_balance ?? adjustMember.total_points;
+    logAdminAction({
+      action: 'update',
+      entityType: 'loyalty',
+      entityId: adjustMember.id,
+      entityLabel: adjustMember.email,
+      beforeData: { total_points: adjustMember.total_points, tier: adjustMember.tier } as any,
+      afterData: { total_points: newBalance, delta, reason: adjustReason.trim() } as any,
+      adminUserId: admin?.id ?? '',
+      adminEmail: admin?.email ?? '',
+      adminName: admin?.name ?? '',
+      adminRole: admin?.role ?? '',
+    });
+
+    showAdjustMsg(`Done — new balance: ${newBalance.toLocaleString()} pts`, false);
+    fetchData();
+    setTimeout(() => {
+      setAdjustMember(null);
+      setAdjustAmount('');
+      setAdjustReason('');
+      setAdjustMsg('');
+    }, 1400);
+  };
+
+  const handleTierSave = async () => {
+    if (!guardAction()) {
+      showAdjustMsg('Permission denied: manage_loyalty required', true);
+      return;
+    }
+    if (!adjustMember) return;
+    if (tierOverrideEnabled && !tierOverrideReason.trim()) {
+      showAdjustMsg('A reason is required for tier override', true);
+      return;
+    }
+
+    setTierSaving(true);
+    setAdjustMsg('');
+
+    const adminId = admin?.id && admin.id !== 'admin-fixed' ? admin.id : NIL_UUID;
+    const { data, error } = await supabase.rpc('admin_set_loyalty_tier', {
+      p_admin_id:         adminId,
+      p_user_id:          adjustMember.user_id,
+      p_tier:             tierOverrideEnabled ? selectedTier : getTierFromLifetime(adjustMember.lifetime_points),
+      p_reason:           tierOverrideReason.trim() || null,
+      p_override_enabled: tierOverrideEnabled,
+    });
+
+    setTierSaving(false);
+
+    if (error || (data as any)?.error) {
+      const msg = error?.message ?? (data as any)?.error ?? 'Failed to save tier';
+      console.error('[handleTierSave] RPC error:', msg, error);
+      showAdjustMsg(`Failed: ${msg}`, true);
+      return;
+    }
+
+    const finalTier: string = (data as any)?.tier ?? selectedTier;
+    logAdminAction({
+      action: 'update',
+      entityType: 'loyalty',
+      entityId: adjustMember.id,
+      entityLabel: adjustMember.email,
+      beforeData: { tier: adjustMember.tier, tier_override_enabled: adjustMember.tier_override_enabled } as any,
+      afterData: { tier: finalTier, tier_override_enabled: tierOverrideEnabled, reason: tierOverrideReason.trim() } as any,
+      adminUserId: admin?.id ?? '',
+      adminEmail: admin?.email ?? '',
+      adminName: admin?.name ?? '',
+      adminRole: admin?.role ?? '',
+    });
+
+    showAdjustMsg(
+      tierOverrideEnabled
+        ? `Tier manually set to ${finalTier}`
+        : `Tier override removed — auto tier restored`,
+      false
+    );
+    fetchData();
+    setTimeout(() => {
+      setAdjustMember(null);
+      setTierOverrideEnabled(false);
+      setTierOverrideReason('');
+      setAdjustMsg('');
+    }, 1400);
   };
 
   const content = (
@@ -601,14 +698,29 @@ function LoyaltyContent() {
                 <Text style={[styles.memberPoints, { flex: 1, textAlign: 'right' }]}>
                   {member.total_points.toLocaleString()}
                 </Text>
-                <View style={[styles.tierPill, { flex: 1, alignItems: 'flex-end' }]}>
+                <View style={[styles.tierPill, { flex: 1, alignItems: 'flex-end', flexDirection: 'column', gap: 3 }]}>
                   <View style={[styles.tierPillInner, { backgroundColor: tierColor + '20', borderColor: tierColor + '50' }]}>
                     <Text style={[styles.tierPillText, { color: tierColor }]}>{tierLabel}</Text>
                   </View>
+                  {member.tier_override_enabled && (
+                    <View style={[styles.tierPillInner, { backgroundColor: 'rgba(255,160,0,0.12)', borderColor: 'rgba(255,160,0,0.4)' }]}>
+                      <Text style={[styles.tierPillText, { color: '#FFA000', fontSize: 8 }]}>MANUAL</Text>
+                    </View>
+                  )}
                 </View>
                 <TouchableOpacity
                   style={[styles.adjustBtn, { width: 32 }]}
-                  onPress={() => { setAdjustMember(member); setAdjustMode('add'); setAdjustAmount(''); setAdjustNote(''); setAdjustMsg(''); }}
+                  onPress={() => {
+                    setAdjustMember(member);
+                    setAdjustMode('add');
+                    setAdjustAmount('');
+                    setAdjustReason('');
+                    setAdjustMsg('');
+                    setAdjustMsgIsError(false);
+                    setTierOverrideEnabled(member.tier_override_enabled);
+                    setSelectedTier((member.override_tier ?? member.tier) as LoyaltyTier);
+                    setTierOverrideReason('');
+                  }}
                   activeOpacity={0.8}
                 >
                   <Coins size={14} color={Colors.gold} strokeWidth={2} />
@@ -634,7 +746,13 @@ function LoyaltyContent() {
       {/* Adjust Modal */}
       <Modal visible={!!adjustMember} transparent animationType="fade" onRequestClose={() => setAdjustMember(null)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <ScrollView
+            style={{ width: '100%', maxWidth: 460, alignSelf: 'center' }}
+            contentContainerStyle={styles.modalCard}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{(t as any).adjustPoints ?? 'Adjust Points'}</Text>
               <TouchableOpacity onPress={() => setAdjustMember(null)} style={{ padding: 4 }}>
@@ -645,66 +763,158 @@ function LoyaltyContent() {
             <Text style={styles.adjustEmail}>{adjustMember?.email}</Text>
             <Text style={styles.adjustBalance}>
               {(t as any).colBalance ?? 'Balance'}: {(adjustMember?.total_points ?? 0).toLocaleString()} pts
+              {adjustMember?.tier_override_enabled && (
+                <Text style={{ color: '#FFA000', fontSize: 11 }}> · Manual Tier: {adjustMember.override_tier ?? adjustMember?.tier}</Text>
+              )}
             </Text>
 
-            <View style={styles.modeRow}>
+            {/* ── Section A: Points Adjustment ── */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>
+                <Coins size={13} color={Colors.gold} strokeWidth={2} /> Points Adjustment
+              </Text>
+
+              <View style={styles.modeRow}>
+                <TouchableOpacity
+                  style={[styles.modeBtn, adjustMode === 'add' && styles.modeBtnActive]}
+                  onPress={() => setAdjustMode('add')}
+                  activeOpacity={0.8}
+                >
+                  <Plus size={14} color={adjustMode === 'add' ? Colors.white : Colors.textMuted} strokeWidth={2.5} />
+                  <Text style={[styles.modeBtnText, adjustMode === 'add' && styles.modeBtnTextActive]}>
+                    {(t as any).addPoints ?? 'Add Points'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modeBtn, adjustMode === 'remove' && styles.modeBtnRemove]}
+                  onPress={() => setAdjustMode('remove')}
+                  activeOpacity={0.8}
+                >
+                  <Minus size={14} color={adjustMode === 'remove' ? Colors.white : Colors.textMuted} strokeWidth={2.5} />
+                  <Text style={[styles.modeBtnText, adjustMode === 'remove' && styles.modeBtnTextActive]}>
+                    {(t as any).removePoints ?? 'Subtract Points'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <TextInput
+                style={styles.adjustInput}
+                value={adjustAmount}
+                onChangeText={(v) => setAdjustAmount(v.replace(/\D/g, ''))}
+                placeholder="0"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="number-pad"
+              />
+              <View>
+                <TextInput
+                  style={[styles.adjustInput, styles.adjustNoteInput, !adjustReason.trim() && adjustMsg && adjustMsgIsError ? styles.inputError : undefined]}
+                  value={adjustReason}
+                  onChangeText={setAdjustReason}
+                  placeholder={(t as any).adjustNotePlaceholder ?? 'Reason / Note (required)...'}
+                  placeholderTextColor={Colors.textMuted}
+                  multiline
+                />
+                <Text style={styles.fieldRequired}>* Required</Text>
+              </View>
+
               <TouchableOpacity
-                style={[styles.modeBtn, adjustMode === 'add' && styles.modeBtnActive]}
-                onPress={() => setAdjustMode('add')}
+                style={[styles.saveBtn, (adjusting || !adjustAmount) && { opacity: 0.5 }]}
+                onPress={handleAdjust}
                 activeOpacity={0.8}
+                disabled={adjusting || !adjustAmount}
               >
-                <Plus size={14} color={adjustMode === 'add' ? Colors.white : Colors.textMuted} strokeWidth={2.5} />
-                <Text style={[styles.modeBtnText, adjustMode === 'add' && styles.modeBtnTextActive]}>
-                  {(t as any).addPoints ?? 'Add'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modeBtn, adjustMode === 'remove' && styles.modeBtnRemove]}
-                onPress={() => setAdjustMode('remove')}
-                activeOpacity={0.8}
-              >
-                <Minus size={14} color={adjustMode === 'remove' ? Colors.white : Colors.textMuted} strokeWidth={2.5} />
-                <Text style={[styles.modeBtnText, adjustMode === 'remove' && styles.modeBtnTextActive]}>
-                  {(t as any).removePoints ?? 'Remove'}
-                </Text>
+                {adjusting
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Text style={styles.saveBtnText}>{(t as any).save ?? 'Save Points'}</Text>
+                }
               </TouchableOpacity>
             </View>
 
-            <TextInput
-              style={styles.adjustInput}
-              value={adjustAmount}
-              onChangeText={(v) => setAdjustAmount(v.replace(/\D/g, ''))}
-              placeholder="0"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="number-pad"
-            />
-            <TextInput
-              style={[styles.adjustInput, styles.adjustNoteInput]}
-              value={adjustNote}
-              onChangeText={setAdjustNote}
-              placeholder={(t as any).adjustNotePlaceholder ?? 'Reason / Note...'}
-              placeholderTextColor={Colors.textMuted}
-              multiline
-            />
+            {/* ── Section B: Tier Override ── */}
+            <View style={[styles.modalSection, { borderColor: '#FFA00040' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <ShieldAlert size={13} color="#FFA000" strokeWidth={2} />
+                  <Text style={[styles.modalSectionTitle, { color: '#FFA000' }]}>Manual Tier Override</Text>
+                </View>
+                <Switch
+                  value={tierOverrideEnabled}
+                  onValueChange={(v) => {
+                    setTierOverrideEnabled(v);
+                    if (!v) setTierOverrideReason('');
+                  }}
+                  trackColor={{ false: Colors.border, true: '#FFA00060' }}
+                  thumbColor={tierOverrideEnabled ? '#FFA000' : Colors.textMuted}
+                />
+              </View>
 
+              {!tierOverrideEnabled && (
+                <Text style={styles.overrideHint}>
+                  Auto: tier calculated from lifetime points
+                  {' — '}
+                  <Text style={{ color: TIER_COLORS[getTierFromLifetime(adjustMember?.lifetime_points ?? 0)], fontWeight: '700' }}>
+                    {getTierFromLifetime(adjustMember?.lifetime_points ?? 0).toUpperCase()}
+                  </Text>
+                </Text>
+              )}
+
+              {tierOverrideEnabled && (
+                <>
+                  <View style={styles.tierChips}>
+                    {(['bronze', 'silver', 'gold', 'platinum'] as LoyaltyTier[]).map((tier) => {
+                      const tc = TIER_COLORS[tier];
+                      const active = selectedTier === tier;
+                      return (
+                        <TouchableOpacity
+                          key={tier}
+                          style={[styles.tierChip, active && { backgroundColor: tc + '25', borderColor: tc + '70' }]}
+                          onPress={() => setSelectedTier(tier)}
+                          activeOpacity={0.8}
+                        >
+                          <Crown size={11} color={active ? tc : Colors.textMuted} strokeWidth={2} />
+                          <Text style={[styles.tierChipText, active && { color: tc }]}>
+                            {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <View>
+                    <TextInput
+                      style={[styles.adjustInput, styles.adjustNoteInput, !tierOverrideReason.trim() && adjustMsg && adjustMsgIsError ? styles.inputError : undefined]}
+                      value={tierOverrideReason}
+                      onChangeText={setTierOverrideReason}
+                      placeholder="Reason for tier override (required)..."
+                      placeholderTextColor={Colors.textMuted}
+                      multiline
+                    />
+                    <Text style={styles.fieldRequired}>* Required</Text>
+                  </View>
+                </>
+              )}
+
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: '#FFA00090' }, tierSaving && { opacity: 0.5 }]}
+                onPress={handleTierSave}
+                activeOpacity={0.8}
+                disabled={tierSaving}
+              >
+                {tierSaving
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Text style={styles.saveBtnText}>
+                      {tierOverrideEnabled ? 'Save Tier Override' : 'Remove Override & Restore Auto Tier'}
+                    </Text>
+                }
+              </TouchableOpacity>
+            </View>
+
+            {/* Shared message */}
             {adjustMsg ? (
-              <Text style={adjustMsg.includes('fail') || adjustMsg.includes('Failed') ? styles.errorMsg : styles.successMsg}>
+              <Text style={adjustMsgIsError ? styles.errorMsg : styles.successMsg}>
                 {adjustMsg}
               </Text>
             ) : null}
-
-            <TouchableOpacity
-              style={styles.saveBtn}
-              onPress={handleAdjust}
-              activeOpacity={0.8}
-              disabled={adjusting || !adjustAmount}
-            >
-              {adjusting
-                ? <ActivityIndicator size="small" color={Colors.white} />
-                : <Text style={styles.saveBtnText}>{(t as any).save ?? 'Save'}</Text>
-              }
-            </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </DashboardShell>
@@ -1136,5 +1346,56 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     minHeight: 60,
     textAlignVertical: 'top',
+  },
+  inputError: {
+    borderColor: Colors.error,
+  },
+  fieldRequired: {
+    color: Colors.textMuted,
+    fontSize: 9,
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  modalSection: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  modalSectionTitle: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.xs,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  overrideHint: {
+    color: Colors.textMuted,
+    fontSize: 11,
+    fontWeight: '500',
+    fontStyle: 'italic',
+  },
+  tierChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tierChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundSecondary,
+  },
+  tierChipText: {
+    color: Colors.textMuted,
+    fontSize: FontSize.xs,
+    fontWeight: '700',
   },
 });
