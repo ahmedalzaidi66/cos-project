@@ -131,10 +131,10 @@ export default function CheckoutScreen() {
 
   const loyalty = useLoyalty();
   const [loyaltySettings, setLoyaltySettings] = useState<{
-    redeeming_enabled: boolean;
-    iqd_per_point: number;
-    min_points_to_redeem: number;
-    max_redeem_percent: number;
+    redeem_enabled: boolean;
+    points_value: number;
+    min_redeem_points: number;
+    max_redeem_percentage: number;
   } | null>(null);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [redeemInput, setRedeemInput] = useState('');
@@ -143,13 +143,13 @@ export default function CheckoutScreen() {
   useEffect(() => {
     supabase
       .from('loyalty_settings')
-      .select('redeeming_enabled, iqd_per_point, min_points_to_redeem, max_redeem_percent')
+      .select('redeem_enabled, points_value, min_redeem_points, max_redeem_percentage')
       .eq('id', 1)
       .maybeSingle()
       .then(({ data }) => setLoyaltySettings(data));
   }, []);
 
-  const pointsDiscount = pointsToRedeem * (loyaltySettings?.iqd_per_point ?? 1);
+  const pointsDiscount = pointsToRedeem * (loyaltySettings?.points_value ?? 1);
 
   // Tier benefit: flat discount percentage applied to subtotal
   const tierBenefits = loyalty.tierBenefits;
@@ -562,7 +562,7 @@ export default function CheckoutScreen() {
           )}
 
           {/* Points Redemption */}
-          {loyalty.totalPoints >= (loyaltySettings?.min_points_to_redeem ?? 100) && loyaltySettings?.redeeming_enabled && (
+          {loyalty.totalPoints >= (loyaltySettings?.min_redeem_points ?? 100) && loyaltySettings?.redeem_enabled && (
             <View style={styles.redeemSection}>
               {!redeemOpen ? (
                 <TouchableOpacity
@@ -590,11 +590,11 @@ export default function CheckoutScreen() {
                   <Text style={styles.redeemRate}>
                     {((t as any).pointsValue ?? '{{n}} pts = {{amount}}')
                       .replace('{{n}}', '1')
-                      .replace('{{amount}}', formatPrice(loyaltySettings?.iqd_per_point ?? 1, language))}
+                      .replace('{{amount}}', formatPrice(loyaltySettings?.points_value ?? 1, language))}
                   </Text>
-                  {loyaltySettings?.max_redeem_percent > 0 && (
+                  {(loyaltySettings?.max_redeem_percentage ?? 0) > 0 && (
                     <Text style={styles.redeemMaxNote}>
-                      {((t as any).maxRedeemNote ?? 'Max {{pct}}% of order total').replace('{{pct}}', String(loyaltySettings.max_redeem_percent))}
+                      {((t as any).maxRedeemNote ?? 'Max {{pct}}% of order total').replace('{{pct}}', String(loyaltySettings?.max_redeem_percentage ?? 0))}
                     </Text>
                   )}
                   <View style={styles.redeemInputRow}>
@@ -607,8 +607,8 @@ export default function CheckoutScreen() {
                         setRedeemInput(digits);
                         const parsed = parseInt(digits, 10) || 0;
                         const maxByBalance = loyalty.totalPoints;
-                        const maxByPct = loyaltySettings.max_redeem_percent > 0
-                          ? Math.floor((subtotal + shippingFee) * loyaltySettings.max_redeem_percent / 100 / (loyaltySettings.iqd_per_point ?? 1))
+                        const maxByPct = (loyaltySettings?.max_redeem_percentage ?? 0) > 0
+                          ? Math.floor((subtotal + shippingFee) * (loyaltySettings?.max_redeem_percentage ?? 0) / 100 / (loyaltySettings?.points_value ?? 1))
                           : Infinity;
                         const capped = Math.min(parsed, maxByBalance, maxByPct);
                         setPointsToRedeem(capped);

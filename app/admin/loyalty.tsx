@@ -37,12 +37,12 @@ type LoyaltyMember = {
 
 type LoyaltySettings = {
   earning_enabled: boolean;
-  redeeming_enabled: boolean;
-  points_per_iqd: number;
-  iqd_per_point: number;
-  min_order_to_earn: number;
-  min_points_to_redeem: number;
-  max_redeem_percent: number;
+  redeem_enabled: boolean;
+  point_conversion_rate: number;
+  points_value: number;
+  minimum_order_amount: number;
+  min_redeem_points: number;
+  max_redeem_percentage: number;
 };
 
 function LoyaltyContent() {
@@ -58,12 +58,12 @@ function LoyaltyContent() {
   const [search, setSearch] = useState('');
   const [settings, setSettings] = useState<LoyaltySettings>({
     earning_enabled: true,
-    redeeming_enabled: true,
-    points_per_iqd: 0.001,
-    iqd_per_point: 1,
-    min_order_to_earn: 0,
-    min_points_to_redeem: 100,
-    max_redeem_percent: 50,
+    redeem_enabled: true,
+    point_conversion_rate: 0.001,
+    points_value: 1,
+    minimum_order_amount: 0,
+    min_redeem_points: 100,
+    max_redeem_percentage: 50,
   });
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsMsg, setSettingsMsg] = useState('');
@@ -152,14 +152,14 @@ function LoyaltyContent() {
     setSettingsMsg('');
     const payload = {
       id: 1,
-      earning_enabled:      settings.earning_enabled,
-      redeeming_enabled:    settings.redeeming_enabled,
-      points_per_iqd:       settings.points_per_iqd,
-      iqd_per_point:        settings.iqd_per_point,
-      min_order_to_earn:    settings.min_order_to_earn,
-      min_points_to_redeem: settings.min_points_to_redeem,
-      max_redeem_percent:   Math.min(100, Math.max(0, settings.max_redeem_percent)),
-      updated_at:           new Date().toISOString(),
+      earning_enabled:       settings.earning_enabled,
+      redeem_enabled:        settings.redeem_enabled,
+      point_conversion_rate: settings.point_conversion_rate,
+      points_value:          settings.points_value,
+      minimum_order_amount:  settings.minimum_order_amount,
+      min_redeem_points:     settings.min_redeem_points,
+      max_redeem_percentage: Math.min(100, Math.max(0, settings.max_redeem_percentage)),
+      updated_at:            new Date().toISOString(),
     };
     const { error } = await adminSupabase()
       .from('loyalty_settings')
@@ -332,44 +332,44 @@ function LoyaltyContent() {
           <View style={styles.settingsRow}>
             <Text style={styles.settingsLabel}>{(t as any).redeemingEnabled ?? 'Redeeming Enabled'}</Text>
             <Switch
-              value={settings.redeeming_enabled}
-              onValueChange={(v) => setSettings(s => ({ ...s, redeeming_enabled: v }))}
+              value={settings.redeem_enabled}
+              onValueChange={(v) => setSettings(s => ({ ...s, redeem_enabled: v }))}
               trackColor={{ false: Colors.border, true: Colors.neonBlueDim }}
-              thumbColor={settings.redeeming_enabled ? Colors.neonBlue : Colors.textMuted}
+              thumbColor={settings.redeem_enabled ? Colors.neonBlue : Colors.textMuted}
             />
           </View>
           <SettingInput
             label={`${(t as any).earnRate ?? 'Earning Rate'} (pts / IQD)`}
             hint={(t as any).earnRateDesc ?? 'Points earned per 1,000 IQD spent'}
-            value={String(settings.points_per_iqd)}
-            onChange={(v) => setSettings(s => ({ ...s, points_per_iqd: parseFloat(v) || 0 }))}
+            value={String(settings.point_conversion_rate)}
+            onChange={(v) => setSettings(s => ({ ...s, point_conversion_rate: parseFloat(v) || 0 }))}
             keyboardType="decimal-pad"
           />
           <SettingInput
             label={`${(t as any).redeemRate ?? 'Redemption Rate'} (IQD / pt)`}
             hint={(t as any).redeemRateDesc ?? 'IQD value per 1 point'}
-            value={String(settings.iqd_per_point)}
-            onChange={(v) => setSettings(s => ({ ...s, iqd_per_point: parseFloat(v) || 0 }))}
+            value={String(settings.points_value)}
+            onChange={(v) => setSettings(s => ({ ...s, points_value: parseFloat(v) || 0 }))}
             keyboardType="decimal-pad"
           />
           <SettingInput
             label={(t as any).minOrderToEarn ?? 'Min. Order to Earn (IQD)'}
-            value={String(settings.min_order_to_earn)}
-            onChange={(v) => setSettings(s => ({ ...s, min_order_to_earn: parseInt(v, 10) || 0 }))}
+            value={String(settings.minimum_order_amount)}
+            onChange={(v) => setSettings(s => ({ ...s, minimum_order_amount: parseInt(v, 10) || 0 }))}
             keyboardType="number-pad"
           />
           <SettingInput
             label={(t as any).minPointsToRedeem ?? 'Min. Points to Redeem'}
-            value={String(settings.min_points_to_redeem)}
-            onChange={(v) => setSettings(s => ({ ...s, min_points_to_redeem: parseInt(v, 10) || 0 }))}
+            value={String(settings.min_redeem_points)}
+            onChange={(v) => setSettings(s => ({ ...s, min_redeem_points: parseInt(v, 10) || 0 }))}
             keyboardType="number-pad"
           />
           <SettingInput
             label={`${(t as any).maxRedeemPercent ?? 'Max Redeem % of Order'} (0-100)`}
-            value={String(settings.max_redeem_percent)}
+            value={String(settings.max_redeem_percentage)}
             onChange={(v) => {
               const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
-              setSettings(s => ({ ...s, max_redeem_percent: n }));
+              setSettings(s => ({ ...s, max_redeem_percentage: n }));
             }}
             keyboardType="number-pad"
           />
