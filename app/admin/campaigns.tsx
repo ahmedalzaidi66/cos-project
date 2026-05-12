@@ -31,6 +31,11 @@ import {
   Moon,
   ShoppingBag,
   Plus,
+  Package,
+  Percent,
+  Tag,
+  Send,
+  ChevronDown,
 } from 'lucide-react-native';
 import { useAdmin } from '@/context/AdminContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -64,6 +69,31 @@ interface SavedCampaign {
   status: CampaignStatus;
   admin_email: string;
   created_at: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  auto_activate?: boolean;
+  offer_badge?: string;
+}
+
+interface CampaignProduct {
+  id: string;
+  campaign_id: string;
+  product_id: string | null;
+  category_slug: string;
+  is_featured: boolean;
+  sort_order: number;
+}
+
+interface CampaignDiscount {
+  id: string;
+  campaign_id: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  coupon_code: string;
+  min_order_amount: number;
+  max_uses: number | null;
+  usage_count: number;
+  is_active: boolean;
 }
 
 interface CampaignBanner {
@@ -1064,9 +1094,12 @@ interface ActiveCampaignsSectionProps {
   campaigns: SavedCampaign[];
   language: string;
   onStatusChange: (id: string, status: CampaignStatus) => void;
+  onLinkProducts: (campaign: SavedCampaign) => void;
+  onAddDiscount: (campaign: SavedCampaign) => void;
+  onNotify: (campaign: SavedCampaign) => void;
 }
 
-function ActiveCampaignsSection({ campaigns, language, onStatusChange }: ActiveCampaignsSectionProps) {
+function ActiveCampaignsSection({ campaigns, language, onStatusChange, onLinkProducts, onAddDiscount, onNotify }: ActiveCampaignsSectionProps) {
   const isRtl = language === 'ar' || language === 'ckb';
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -1126,6 +1159,24 @@ function ActiveCampaignsSection({ campaigns, language, onStatusChange }: ActiveC
                     </Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity style={[acs.actionChip, { borderColor: Colors.neonBlue + '55' }]} onPress={() => onLinkProducts(c)} activeOpacity={0.75}>
+                  <Package size={10} color={Colors.neonBlue} strokeWidth={2.5} />
+                  <Text style={[acs.actionChipText, { color: Colors.neonBlue }]}>
+                    {language === 'ar' ? 'منتجات' : language === 'ckb' ? 'بەرهەمەکان' : 'Products'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[acs.actionChip, { borderColor: Colors.warning + '55' }]} onPress={() => onAddDiscount(c)} activeOpacity={0.75}>
+                  <Percent size={10} color={Colors.warning} strokeWidth={2.5} />
+                  <Text style={[acs.actionChipText, { color: Colors.warning }]}>
+                    {language === 'ar' ? 'خصم' : language === 'ckb' ? 'داشکاندن' : 'Discount'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[acs.actionChip, { borderColor: Colors.success + '55' }]} onPress={() => onNotify(c)} activeOpacity={0.75}>
+                  <Send size={10} color={Colors.success} strokeWidth={2.5} />
+                  <Text style={[acs.actionChipText, { color: Colors.success }]}>
+                    {language === 'ar' ? 'إشعار' : language === 'ckb' ? 'ئاگادارکردنەوە' : 'Notify'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -1684,6 +1735,668 @@ const rs = StyleSheet.create({
   actionChipText: { fontSize: 10, fontWeight: '700' },
 });
 
+// ─── Campaign Products Modal ──────────────────────────────────────────────────
+
+interface CampaignProductsModalProps {
+  visible: boolean;
+  campaign: SavedCampaign | null;
+  language: string;
+  adminEmail: string;
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+  onError: (msg: string) => void;
+}
+
+function CampaignProductsModal({ visible, campaign, language, adminEmail, onClose, onSaved, onError }: CampaignProductsModalProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [rows, setRows] = useState<{ product_id: string; category_slug: string; is_featured: boolean }[]>([
+    { product_id: '', category_slug: '', is_featured: false },
+  ]);
+  const [existingIds, setExistingIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(false);
+
+  useEffect(() => {
+    if (visible && campaign) {
+      setLoadingExisting(true);
+      adminSupabase()
+        .from('campaign_products')
+        .select('id,product_id,category_slug,is_featured')
+        .eq('campaign_id', campaign.id)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setRows(data.map((r: any) => ({ product_id: r.product_id ?? '', category_slug: r.category_slug ?? '', is_featured: r.is_featured ?? false })));
+            setExistingIds(data.map((r: any) => r.id));
+          } else {
+            setRows([{ product_id: '', category_slug: '', is_featured: false }]);
+            setExistingIds([]);
+          }
+          setLoadingExisting(false);
+        });
+    }
+  }, [visible, campaign]);
+
+  if (!campaign) return null;
+
+  const addRow = () => setRows(prev => [...prev, { product_id: '', category_slug: '', is_featured: false }]);
+  const removeRow = (i: number) => setRows(prev => prev.filter((_, idx) => idx !== i));
+  const updateRow = (i: number, field: string, val: any) =>
+    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const db = adminSupabase();
+      // Delete existing rows for this campaign then re-insert
+      if (existingIds.length > 0) {
+        await db.from('campaign_products').delete().in('id', existingIds);
+      }
+      const validRows = rows.filter(r => r.product_id.trim() || r.category_slug.trim());
+      if (validRows.length > 0) {
+        const inserts = validRows.map((r, i) => ({
+          campaign_id: campaign.id,
+          product_id: r.product_id.trim() || null,
+          category_slug: r.category_slug.trim(),
+          is_featured: r.is_featured,
+          sort_order: i,
+          admin_email: adminEmail,
+        }));
+        const { error } = await db.from('campaign_products').insert(inserts);
+        if (error) throw error;
+      }
+      onSaved(language === 'ar' ? 'تم حفظ المنتجات' : language === 'ckb' ? 'بەرهەمەکان پاشەکەوت کران' : 'Products saved');
+      onClose();
+    } catch {
+      onError(language === 'ar' ? 'فشل في حفظ المنتجات' : language === 'ckb' ? 'شکستی هێنا لە پاشەکەوتکردنی بەرهەمەکان' : 'Failed to save products');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const L = {
+    header:    language === 'ar' ? 'منتجات الحملة'     : language === 'ckb' ? 'بەرهەمەکانی کامپەین'   : 'Campaign Products',
+    productId: language === 'ar' ? 'ID المنتج'         : language === 'ckb' ? 'ناسنامەی بەرهەم'       : 'Product ID',
+    category:  language === 'ar' ? 'الفئة'             : language === 'ckb' ? 'پۆل'                   : 'Category Slug',
+    featured:  language === 'ar' ? 'مميز'              : language === 'ckb' ? 'تایبەت'                : 'Featured',
+    addBtn:    language === 'ar' ? 'إضافة منتج'        : language === 'ckb' ? 'زیادکردنی بەرهەم'      : 'Add Row',
+    saveBtn:   language === 'ar' ? 'حفظ المنتجات'      : language === 'ckb' ? 'پاشەکەوتکردنی بەرهەم'  : 'Save Products',
+    cancelBtn: language === 'ar' ? 'إلغاء'              : language === 'ckb' ? 'پاشگەزبوونەوە'         : 'Cancel',
+    hint:      language === 'ar' ? 'اترك ID فارغاً لربط فئة كاملة' : language === 'ckb' ? 'ناسنامە بەتاڵ بهێڵە بۆ بەستنی هەموو پۆلێک' : 'Leave Product ID empty to link an entire category',
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={pm.overlay}>
+        <View style={pm.sheet}>
+          <View style={[pm.header, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={pm.headerLeft}>
+              <View style={pm.iconWrap}>
+                <Package size={18} color={Colors.neonBlue} strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={[pm.headerTitle, isRtl && { textAlign: 'right' }]}>{L.header}</Text>
+                <Text style={[pm.headerSub, isRtl && { textAlign: 'right' }]} numberOfLines={1}>{campaign.title}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={pm.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={pm.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={[pm.hint, isRtl && { textAlign: 'right' }]}>{L.hint}</Text>
+
+            {loadingExisting ? (
+              <ActivityIndicator size="small" color={Colors.neonBlue} style={{ marginVertical: 20 }} />
+            ) : (
+              rows.map((row, i) => (
+                <View key={i} style={pm.rowWrap}>
+                  <View style={[pm.rowFields, isRtl && { flexDirection: 'row-reverse' }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[pm.label, isRtl && { textAlign: 'right' }]}>{L.productId}</Text>
+                      <TextInput
+                        style={[pm.input, isRtl && { textAlign: 'right' }]}
+                        value={row.product_id}
+                        onChangeText={v => updateRow(i, 'product_id', v)}
+                        placeholder="uuid"
+                        placeholderTextColor={Colors.textMuted}
+                        autoCapitalize="none"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[pm.label, isRtl && { textAlign: 'right' }]}>{L.category}</Text>
+                      <TextInput
+                        style={[pm.input, isRtl && { textAlign: 'right' }]}
+                        value={row.category_slug}
+                        onChangeText={v => updateRow(i, 'category_slug', v)}
+                        placeholder="makeup"
+                        placeholderTextColor={Colors.textMuted}
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </View>
+                  <View style={[pm.rowMeta, isRtl && { flexDirection: 'row-reverse' }]}>
+                    <TouchableOpacity
+                      style={[pm.featuredChip, row.is_featured && pm.featuredChipActive]}
+                      onPress={() => updateRow(i, 'is_featured', !row.is_featured)}
+                      activeOpacity={0.75}
+                    >
+                      <Star size={11} color={row.is_featured ? Colors.gold : Colors.textMuted} strokeWidth={row.is_featured ? 3 : 2} />
+                      <Text style={[pm.featuredChipText, row.is_featured && { color: Colors.gold }]}>{L.featured}</Text>
+                    </TouchableOpacity>
+                    {rows.length > 1 && (
+                      <TouchableOpacity style={pm.removeBtn} onPress={() => removeRow(i)} activeOpacity={0.75}>
+                        <X size={13} color={Colors.error} strokeWidth={2} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))
+            )}
+
+            <TouchableOpacity style={pm.addRowBtn} onPress={addRow} activeOpacity={0.75}>
+              <Plus size={13} color={Colors.neonBlue} strokeWidth={2.5} />
+              <Text style={pm.addRowText}>{L.addBtn}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          <View style={[pm.footer, isRtl && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity style={pm.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={pm.cancelText}>{L.cancelBtn}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[pm.saveBtn, saving && pm.saveBtnDisabled]} onPress={handleSave} disabled={saving} activeOpacity={0.8}>
+              {saving ? <ActivityIndicator size="small" color={Colors.background} /> : <Check size={15} color={Colors.background} strokeWidth={2.5} />}
+              <Text style={pm.saveText}>{L.saveBtn}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const pm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.backgroundSecondary, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: Colors.border, maxHeight: '90%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.neonBlue + '20', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: '800' },
+  headerSub: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600', marginTop: 2, maxWidth: 220 },
+  closeBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  body: { padding: Spacing.lg },
+  hint: { color: Colors.textMuted, fontSize: FontSize.xs, marginBottom: Spacing.md, lineHeight: 16 },
+  rowWrap: { backgroundColor: Colors.backgroundCard, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.sm, gap: 8 },
+  rowFields: { flexDirection: 'row', gap: Spacing.sm },
+  label: { color: Colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+  input: { backgroundColor: Colors.backgroundSecondary, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 6, color: Colors.textPrimary, fontSize: FontSize.xs },
+  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  featuredChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, backgroundColor: 'transparent' },
+  featuredChipActive: { borderColor: Colors.gold + '66', backgroundColor: Colors.gold + '15' },
+  featuredChipText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  removeBtn: { marginLeft: 'auto' as any, padding: 4 },
+  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: Spacing.sm, marginTop: 4 },
+  addRowText: { color: Colors.neonBlue, fontSize: FontSize.sm, fontWeight: '700' },
+  footer: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border },
+  cancelBtn: { flex: 1, height: 46, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  cancelText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' },
+  saveBtn: { flex: 2, height: 46, borderRadius: Radius.md, backgroundColor: Colors.neonBlue, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  saveBtnDisabled: { opacity: 0.45 },
+  saveText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: '800' },
+});
+
+// ─── Campaign Discount Modal ───────────────────────────────────────────────────
+
+interface CampaignDiscountModalProps {
+  visible: boolean;
+  campaign: SavedCampaign | null;
+  language: string;
+  adminEmail: string;
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+  onError: (msg: string) => void;
+}
+
+function CampaignDiscountModal({ visible, campaign, language, adminEmail, onClose, onSaved, onError }: CampaignDiscountModalProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+  const [discountValue, setDiscountValue] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [minOrder, setMinOrder] = useState('');
+  const [maxUses, setMaxUses] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [autoActivate, setAutoActivate] = useState(true);
+  const [offerBadge, setOfferBadge] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [existingId, setExistingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible && campaign) {
+      setDiscountType('percentage');
+      setDiscountValue('');
+      setCouponCode('');
+      setMinOrder('');
+      setMaxUses('');
+      setStartDate(campaign.start_date ?? '');
+      setEndDate(campaign.end_date ?? '');
+      setAutoActivate(campaign.auto_activate ?? true);
+      setOfferBadge(campaign.offer_badge ?? '');
+      setIsActive(true);
+      setExistingId(null);
+      // Load existing discount if any
+      adminSupabase()
+        .from('campaign_discounts')
+        .select('*')
+        .eq('campaign_id', campaign.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setExistingId(data.id);
+            setDiscountType(data.discount_type);
+            setDiscountValue(String(data.discount_value));
+            setCouponCode(data.coupon_code);
+            setMinOrder(data.min_order_amount ? String(data.min_order_amount) : '');
+            setMaxUses(data.max_uses ? String(data.max_uses) : '');
+            setIsActive(data.is_active);
+          }
+        });
+    }
+  }, [visible, campaign]);
+
+  if (!campaign) return null;
+
+  const handleSave = async () => {
+    const val = parseFloat(discountValue);
+    if (isNaN(val) || val <= 0) return;
+    setSaving(true);
+    try {
+      const db = adminSupabase();
+      const payload = {
+        campaign_id: campaign.id,
+        discount_type: discountType,
+        discount_value: val,
+        coupon_code: couponCode.trim().toUpperCase(),
+        min_order_amount: parseFloat(minOrder) || 0,
+        max_uses: maxUses ? parseInt(maxUses) : null,
+        is_active: isActive,
+        admin_email: adminEmail,
+        updated_at: new Date().toISOString(),
+      };
+      let discError;
+      if (existingId) {
+        ({ error: discError } = await db.from('campaign_discounts').update(payload).eq('id', existingId));
+      } else {
+        ({ error: discError } = await db.from('campaign_discounts').insert(payload));
+      }
+      if (discError) throw discError;
+
+      // Also update campaign start/end/auto_activate/offer_badge
+      await db.from('saved_campaigns').update({
+        start_date: startDate || null,
+        end_date: endDate || null,
+        auto_activate: autoActivate,
+        offer_badge: offerBadge.trim(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', campaign.id);
+
+      // Propagate offer_badge to linked products
+      if (offerBadge.trim()) {
+        const { data: linked } = await db.from('campaign_products').select('product_id').eq('campaign_id', campaign.id).not('product_id', 'is', null);
+        if (linked && linked.length > 0) {
+          const ids = linked.map((r: any) => r.product_id).filter(Boolean);
+          if (ids.length > 0) {
+            await db.from('products').update({ badge: offerBadge.trim() }).in('id', ids);
+          }
+        }
+      }
+
+      onSaved(language === 'ar' ? 'تم حفظ الخصم' : language === 'ckb' ? 'داشکاندن پاشەکەوت کرا' : 'Discount saved');
+      onClose();
+    } catch {
+      onError(language === 'ar' ? 'فشل في حفظ الخصم' : language === 'ckb' ? 'شکستی هێنا لە پاشەکەوتکردنی داشکاندن' : 'Failed to save discount');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const L = {
+    header:      language === 'ar' ? 'خصم الحملة'                 : language === 'ckb' ? 'داشکاندنی کامپەین'                : 'Campaign Discount',
+    typeLbl:     language === 'ar' ? 'نوع الخصم'                  : language === 'ckb' ? 'جۆری داشکاندن'                    : 'Discount Type',
+    valueLbl:    language === 'ar' ? 'قيمة الخصم'                 : language === 'ckb' ? 'بەهای داشکاندن'                   : 'Discount Value',
+    couponLbl:   language === 'ar' ? 'كود الكوبون'                : language === 'ckb' ? 'کۆدی کووپۆن'                      : 'Coupon Code',
+    minLbl:      language === 'ar' ? 'الحد الأدنى للطلب'          : language === 'ckb' ? 'کەمترین داواکاری'                 : 'Min Order (IQD)',
+    maxLbl:      language === 'ar' ? 'الحد الأقصى للاستخدام'      : language === 'ckb' ? 'زۆرترین بەکارهێنان'               : 'Max Uses',
+    startLbl:    language === 'ar' ? 'تاريخ البداية'               : language === 'ckb' ? 'بەرواری دەستپێکردن'               : 'Start Date',
+    endLbl:      language === 'ar' ? 'تاريخ الانتهاء'              : language === 'ckb' ? 'بەرواری کۆتایی'                   : 'End Date',
+    autoLbl:     language === 'ar' ? 'تفعيل تلقائي'               : language === 'ckb' ? 'خودکار چالاک'                     : 'Auto-activate',
+    badgeLbl:    language === 'ar' ? 'نص شارة العرض'              : language === 'ckb' ? 'دەقی نیشانەی پێشکەش'              : 'Offer Badge Text',
+    activeLbl:   language === 'ar' ? 'الخصم نشط'                  : language === 'ckb' ? 'داشکاندن چالاکە'                  : 'Discount Active',
+    saveBtn:     language === 'ar' ? 'حفظ الخصم'                  : language === 'ckb' ? 'پاشەکەوتکردنی داشکاندن'           : 'Save Discount',
+    cancelBtn:   language === 'ar' ? 'إلغاء'                       : language === 'ckb' ? 'پاشگەزبوونەوە'                    : 'Cancel',
+    pctLabel:    language === 'ar' ? 'نسبة %'                      : language === 'ckb' ? '٪ ڕێژە'                           : '% Percentage',
+    fixedLabel:  language === 'ar' ? 'مبلغ ثابت'                  : language === 'ckb' ? 'بڕی دیاریکراو'                    : 'Fixed Amount',
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={dm2.overlay}>
+        <View style={dm2.sheet}>
+          <View style={[dm2.header, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={dm2.headerLeft}>
+              <View style={dm2.iconWrap}>
+                <Percent size={18} color={Colors.warning} strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={[dm2.headerTitle, isRtl && { textAlign: 'right' }]}>{L.header}</Text>
+                <Text style={[dm2.headerSub, isRtl && { textAlign: 'right' }]} numberOfLines={1}>{campaign.title}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={dm2.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={dm2.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Discount type */}
+            <View style={dm2.fieldWrap}>
+              <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.typeLbl}</Text>
+              <View style={[dm2.typeRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                <TouchableOpacity
+                  style={[dm2.typeChip, discountType === 'percentage' && { backgroundColor: Colors.warning + '22', borderColor: Colors.warning + '66' }]}
+                  onPress={() => setDiscountType('percentage')} activeOpacity={0.75}
+                >
+                  <Percent size={12} color={discountType === 'percentage' ? Colors.warning : Colors.textMuted} strokeWidth={2} />
+                  <Text style={[dm2.typeChipText, discountType === 'percentage' && { color: Colors.warning, fontWeight: '800' }]}>{L.pctLabel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[dm2.typeChip, discountType === 'fixed' && { backgroundColor: Colors.success + '22', borderColor: Colors.success + '66' }]}
+                  onPress={() => setDiscountType('fixed')} activeOpacity={0.75}
+                >
+                  <Tag size={12} color={discountType === 'fixed' ? Colors.success : Colors.textMuted} strokeWidth={2} />
+                  <Text style={[dm2.typeChipText, discountType === 'fixed' && { color: Colors.success, fontWeight: '800' }]}>{L.fixedLabel}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Value + Coupon */}
+            <View style={[dm2.row2, isRtl && { flexDirection: 'row-reverse' }]}>
+              <View style={[dm2.fieldWrap, { flex: 1 }]}>
+                <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.valueLbl}</Text>
+                <TextInput
+                  style={[dm2.input, isRtl && { textAlign: 'right' }]}
+                  value={discountValue} onChangeText={setDiscountValue}
+                  keyboardType="decimal-pad" placeholderTextColor={Colors.textMuted}
+                  placeholder={discountType === 'percentage' ? '10' : '5000'}
+                />
+              </View>
+              <View style={[dm2.fieldWrap, { flex: 1 }]}>
+                <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.couponLbl}</Text>
+                <TextInput
+                  style={[dm2.input, isRtl && { textAlign: 'right' }]}
+                  value={couponCode} onChangeText={v => setCouponCode(v.toUpperCase())}
+                  placeholder="EID2026" placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="characters" autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            {/* Min order + Max uses */}
+            <View style={[dm2.row2, isRtl && { flexDirection: 'row-reverse' }]}>
+              <View style={[dm2.fieldWrap, { flex: 1 }]}>
+                <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.minLbl}</Text>
+                <TextInput style={[dm2.input, isRtl && { textAlign: 'right' }]} value={minOrder} onChangeText={setMinOrder} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={Colors.textMuted} />
+              </View>
+              <View style={[dm2.fieldWrap, { flex: 1 }]}>
+                <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.maxLbl}</Text>
+                <TextInput style={[dm2.input, isRtl && { textAlign: 'right' }]} value={maxUses} onChangeText={setMaxUses} keyboardType="number-pad" placeholder="∞" placeholderTextColor={Colors.textMuted} />
+              </View>
+            </View>
+
+            {/* Start + End dates */}
+            <View style={[dm2.row2, isRtl && { flexDirection: 'row-reverse' }]}>
+              <View style={[dm2.fieldWrap, { flex: 1 }]}>
+                <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.startLbl}</Text>
+                <TextInput style={[dm2.input, isRtl && { textAlign: 'right' }]} value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.textMuted} />
+              </View>
+              <View style={[dm2.fieldWrap, { flex: 1 }]}>
+                <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.endLbl}</Text>
+                <TextInput style={[dm2.input, isRtl && { textAlign: 'right' }]} value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" placeholderTextColor={Colors.textMuted} />
+              </View>
+            </View>
+
+            {/* Offer badge */}
+            <View style={dm2.fieldWrap}>
+              <Text style={[dm2.label, isRtl && { textAlign: 'right' }]}>{L.badgeLbl}</Text>
+              <TextInput style={[dm2.input, isRtl && { textAlign: 'right' }]} value={offerBadge} onChangeText={setOfferBadge} placeholder="SALE • 10% OFF" placeholderTextColor={Colors.textMuted} maxLength={30} />
+            </View>
+
+            {/* Toggles */}
+            <View style={[dm2.toggleRow, isRtl && { flexDirection: 'row-reverse' }]}>
+              <TouchableOpacity
+                style={[dm2.toggleChip, autoActivate && { borderColor: Colors.success + '66', backgroundColor: Colors.success + '15' }]}
+                onPress={() => setAutoActivate(v => !v)} activeOpacity={0.75}
+              >
+                <Zap size={12} color={autoActivate ? Colors.success : Colors.textMuted} strokeWidth={2.5} />
+                <Text style={[dm2.toggleChipText, autoActivate && { color: Colors.success }]}>{L.autoLbl}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dm2.toggleChip, isActive && { borderColor: Colors.neonBlue + '66', backgroundColor: Colors.neonBlue + '15' }]}
+                onPress={() => setIsActive(v => !v)} activeOpacity={0.75}
+              >
+                <Check size={12} color={isActive ? Colors.neonBlue : Colors.textMuted} strokeWidth={2.5} />
+                <Text style={[dm2.toggleChipText, isActive && { color: Colors.neonBlue }]}>{L.activeLbl}</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <View style={[dm2.footer, isRtl && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity style={dm2.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={dm2.cancelText}>{L.cancelBtn}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[dm2.saveBtn, (saving || !discountValue) && dm2.saveBtnDisabled]}
+              onPress={handleSave} disabled={saving || !discountValue} activeOpacity={0.8}
+            >
+              {saving ? <ActivityIndicator size="small" color={Colors.background} /> : <Check size={15} color={Colors.background} strokeWidth={2.5} />}
+              <Text style={dm2.saveText}>{L.saveBtn}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const dm2 = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.backgroundSecondary, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: Colors.border, maxHeight: '92%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.warning + '20', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: '800' },
+  headerSub: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600', marginTop: 2, maxWidth: 220 },
+  closeBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  body: { padding: Spacing.lg },
+  fieldWrap: { marginBottom: Spacing.md, gap: 6 },
+  label: { color: Colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, color: Colors.textPrimary, fontSize: FontSize.sm },
+  row2: { flexDirection: 'row', gap: Spacing.md },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: 'transparent' },
+  typeChipText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  toggleRow: { flexDirection: 'row', gap: 8, marginBottom: Spacing.md },
+  toggleChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, backgroundColor: 'transparent' },
+  toggleChipText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  footer: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border },
+  cancelBtn: { flex: 1, height: 46, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  cancelText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' },
+  saveBtn: { flex: 2, height: 46, borderRadius: Radius.md, backgroundColor: Colors.warning, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  saveBtnDisabled: { opacity: 0.45 },
+  saveText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: '800' },
+});
+
+// ─── Campaign Notification Modal ───────────────────────────────────────────────
+
+interface CampaignNotifyModalProps {
+  visible: boolean;
+  campaign: SavedCampaign | null;
+  language: string;
+  adminEmail: string;
+  onClose: () => void;
+  onSaved: (msg: string) => void;
+  onError: (msg: string) => void;
+}
+
+function CampaignNotifyModal({ visible, campaign, language, adminEmail, onClose, onSaved, onError }: CampaignNotifyModalProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [notifyType, setNotifyType] = useState<'in_app' | 'email_draft'>('in_app');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (visible && campaign) {
+      setTitle(campaign.title);
+      setBody(
+        language === 'ar'
+          ? `حملة ${campaign.occasion_name} متاحة الآن. استفد من العروض الحصرية.`
+          : language === 'ckb'
+          ? `کامپەینی ${campaign.occasion_name} ئێستا بەردەستە. سوود لە پێشکەشکردنەکان وەربگرە.`
+          : `${campaign.occasion_name} campaign is now live. Take advantage of exclusive offers.`
+      );
+      setNotifyType('in_app');
+    }
+  }, [visible, campaign, language]);
+
+  if (!campaign) return null;
+
+  const handleSend = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      // Save as a campaign reminder with type notification_draft
+      const { error } = await adminSupabase().from('campaign_reminders').insert({
+        occasion_key: campaign.occasion_key,
+        event_key: campaign.occasion_key,
+        title_en: title.trim(),
+        message_en: body.trim(),
+        body_en: body.trim(),
+        reminder_type: notifyType === 'in_app' ? 'in_app' : 'notification_draft',
+        status: 'scheduled',
+        admin_email: adminEmail,
+        created_by_email: adminEmail,
+        is_active: true,
+        campaign_id: campaign.id,
+      });
+      if (error) throw error;
+      onSaved(language === 'ar' ? 'تم إرسال الإشعار' : language === 'ckb' ? 'ئاگادارکردنەوە نێردرا' : 'Notification sent');
+      onClose();
+    } catch {
+      onError(language === 'ar' ? 'فشل في الإرسال' : language === 'ckb' ? 'شکستی هێنا لە ناردن' : 'Failed to send notification');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={nm.overlay}>
+        <View style={nm.sheet}>
+          <View style={[nm.header, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={nm.headerLeft}>
+              <View style={nm.iconWrap}>
+                <Send size={18} color={Colors.success} strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={[nm.headerTitle, isRtl && { textAlign: 'right' }]}>
+                  {language === 'ar' ? 'إرسال إشعار' : language === 'ckb' ? 'ناردنی ئاگادارکردنەوە' : 'Send Notification'}
+                </Text>
+                <Text style={[nm.headerSub, isRtl && { textAlign: 'right' }]} numberOfLines={1}>{campaign.title}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={nm.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={18} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={nm.body} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Type */}
+            <View style={nm.fieldWrap}>
+              <Text style={[nm.label, isRtl && { textAlign: 'right' }]}>
+                {language === 'ar' ? 'طريقة الإرسال' : language === 'ckb' ? 'ڕێگای ناردن' : 'Delivery Method'}
+              </Text>
+              <View style={[nm.typeRow, isRtl && { flexDirection: 'row-reverse' }]}>
+                {(['in_app', 'email_draft'] as const).map((t) => {
+                  const active = notifyType === t;
+                  const label = t === 'in_app'
+                    ? (language === 'ar' ? 'داخل التطبيق' : language === 'ckb' ? 'ناوەکی' : 'In-App')
+                    : (language === 'ar' ? 'مسودة بريد' : language === 'ckb' ? 'پێشنووسی ئیمەیل' : 'Email Draft');
+                  return (
+                    <TouchableOpacity key={t} style={[nm.typeChip, active && { borderColor: Colors.success + '66', backgroundColor: Colors.success + '15' }]} onPress={() => setNotifyType(t)} activeOpacity={0.75}>
+                      <Text style={[nm.typeChipText, active && { color: Colors.success, fontWeight: '800' }]}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={nm.fieldWrap}>
+              <Text style={[nm.label, isRtl && { textAlign: 'right' }]}>
+                {language === 'ar' ? 'عنوان الإشعار' : language === 'ckb' ? 'سەردێڕی ئاگادارکردنەوە' : 'Title'}
+              </Text>
+              <TextInput style={[nm.input, isRtl && { textAlign: 'right' }]} value={title} onChangeText={setTitle} placeholderTextColor={Colors.textMuted} placeholder="..." maxLength={120} />
+            </View>
+
+            <View style={nm.fieldWrap}>
+              <Text style={[nm.label, isRtl && { textAlign: 'right' }]}>
+                {language === 'ar' ? 'نص الإشعار' : language === 'ckb' ? 'دەقی ئاگادارکردنەوە' : 'Message Body'}
+              </Text>
+              <TextInput style={[nm.textarea, isRtl && { textAlign: 'right' }]} value={body} onChangeText={setBody} placeholderTextColor={Colors.textMuted} placeholder="..." multiline numberOfLines={4} maxLength={400} />
+            </View>
+          </ScrollView>
+
+          <View style={[nm.footer, isRtl && { flexDirection: 'row-reverse' }]}>
+            <TouchableOpacity style={nm.cancelBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={nm.cancelText}>{language === 'ar' ? 'إلغاء' : language === 'ckb' ? 'پاشگەزبوونەوە' : 'Cancel'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[nm.sendBtn, (!title.trim() || saving) && nm.sendBtnDisabled]} onPress={handleSend} disabled={!title.trim() || saving} activeOpacity={0.8}>
+              {saving ? <ActivityIndicator size="small" color={Colors.background} /> : <Send size={15} color={Colors.background} strokeWidth={2.5} />}
+              <Text style={nm.sendText}>{language === 'ar' ? 'إرسال' : language === 'ckb' ? 'بنێرە' : 'Send'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const nm = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.backgroundSecondary, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: Colors.border, maxHeight: '88%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.success + '20', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: '800' },
+  headerSub: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600', marginTop: 2, maxWidth: 220 },
+  closeBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  body: { padding: Spacing.lg },
+  fieldWrap: { marginBottom: Spacing.md, gap: 6 },
+  label: { color: Colors.textSecondary, fontSize: FontSize.xs, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, color: Colors.textPrimary, fontSize: FontSize.sm },
+  textarea: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, color: Colors.textPrimary, fontSize: FontSize.sm, minHeight: 90, textAlignVertical: 'top' },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeChip: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border },
+  typeChipText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
+  footer: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border },
+  cancelBtn: { flex: 1, height: 46, borderRadius: Radius.md, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
+  cancelText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: '600' },
+  sendBtn: { flex: 2, height: 46, borderRadius: Radius.md, backgroundColor: Colors.success, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  sendBtnDisabled: { opacity: 0.45 },
+  sendText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: '800' },
+});
+
 // ─── Action confirmation modal ────────────────────────────────────────────────
 
 function ActionModal({
@@ -1790,6 +2503,9 @@ function CampaignsContent() {
   const [createModalOccasion, setCreateModalOccasion] = useState<Occasion | null>(null);
   const [bannerModalOccasion, setBannerModalOccasion] = useState<Occasion | null>(null);
   const [reminderModalOccasion, setReminderModalOccasion] = useState<Occasion | null>(null);
+  const [productsModalCampaign, setProductsModalCampaign] = useState<SavedCampaign | null>(null);
+  const [discountModalCampaign, setDiscountModalCampaign] = useState<SavedCampaign | null>(null);
+  const [notifyModalCampaign, setNotifyModalCampaign] = useState<SavedCampaign | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -1813,7 +2529,25 @@ function CampaignsContent() {
     ]);
     setOverrides(ovRes.data ?? []);
     setActionRecords(acRes.data ?? []);
-    setSavedCampaigns(scRes.data ?? []);
+
+    // Auto-activate / auto-expire campaigns based on dates
+    const campaigns: SavedCampaign[] = scRes.data ?? [];
+    const today = new Date().toISOString().split('T')[0];
+    const autoActivate = campaigns.filter(c => c.auto_activate && c.status === 'planned' && c.start_date && c.start_date <= today);
+    const autoExpire = campaigns.filter(c => c.status === 'active' && c.end_date && c.end_date < today);
+    if (autoActivate.length > 0 || autoExpire.length > 0) {
+      const dbAuto = adminSupabase();
+      await Promise.all([
+        ...autoActivate.map(c => dbAuto.from('saved_campaigns').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', c.id)),
+        ...autoExpire.map(c => dbAuto.from('saved_campaigns').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', c.id)),
+      ]);
+      // Reload after auto-update
+      const { data: refreshed } = await dbAuto.from('saved_campaigns').select('*').not('status', 'eq', 'dismissed').order('created_at', { ascending: false });
+      setSavedCampaigns(refreshed ?? []);
+    } else {
+      setSavedCampaigns(campaigns);
+    }
+
     setReminders((remRes.data ?? []).map((r: any) => ({
       ...r,
       reminder_type: r.reminder_type ?? 'in_app',
@@ -1977,6 +2711,33 @@ function CampaignsContent() {
         onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
         onError={(msg) => showToast(msg, 'error')}
       />
+      <CampaignProductsModal
+        visible={!!productsModalCampaign}
+        campaign={productsModalCampaign}
+        language={language}
+        adminEmail={admin?.email ?? ''}
+        onClose={() => setProductsModalCampaign(null)}
+        onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
+        onError={(msg) => showToast(msg, 'error')}
+      />
+      <CampaignDiscountModal
+        visible={!!discountModalCampaign}
+        campaign={discountModalCampaign}
+        language={language}
+        adminEmail={admin?.email ?? ''}
+        onClose={() => setDiscountModalCampaign(null)}
+        onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
+        onError={(msg) => showToast(msg, 'error')}
+      />
+      <CampaignNotifyModal
+        visible={!!notifyModalCampaign}
+        campaign={notifyModalCampaign}
+        language={language}
+        adminEmail={admin?.email ?? ''}
+        onClose={() => setNotifyModalCampaign(null)}
+        onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
+        onError={(msg) => showToast(msg, 'error')}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[main.scroll, isRtl && { direction: 'rtl' } as any]}>
         {/* Header */}
@@ -2009,6 +2770,9 @@ function CampaignsContent() {
               campaigns={savedCampaigns}
               language={language}
               onStatusChange={handleCampaignStatusChange}
+              onLinkProducts={setProductsModalCampaign}
+              onAddDiscount={setDiscountModalCampaign}
+              onNotify={setNotifyModalCampaign}
             />
 
             {/* Reminders section */}
