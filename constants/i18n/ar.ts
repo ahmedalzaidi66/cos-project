@@ -645,7 +645,11 @@ export default {
   resetToRole: 'إعادة تعيين للدور',
   customBadge: 'مخصص',
   noEmployeesFound: 'لا يوجد موظفون',
+  noRolesFound: 'لا توجد أدوار',
   roleDefaultNotice: 'يستخدم الإعدادات الافتراضية للدور',
+  searchPermissions: 'بحث في الصلاحيات…',
+  noPermissionsMatch: 'لا توجد صلاحيات تطابق البحث',
+  permissionsGranted: 'صلاحية',
 
   // Admin Employees extra
   changePwd: 'تغيير كلمة المرور',

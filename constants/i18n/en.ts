@@ -645,7 +645,11 @@ export default {
   resetToRole: 'Reset to Role',
   customBadge: 'Custom',
   noEmployeesFound: 'No employees found',
+  noRolesFound: 'No roles found',
   roleDefaultNotice: 'Using role defaults',
+  searchPermissions: 'Search permissions…',
+  noPermissionsMatch: 'No permissions match your search',
+  permissionsGranted: 'permissions',
 
   // Admin Employees extra
   changePwd: 'Change Password',

@@ -704,5 +704,9 @@ export default {
   resetToRole: 'گەڕانەوەبۆ ڕۆڵ',
   customBadge: 'تایبەت',
   noEmployeesFound: 'هیچ کارمەندێک نەدۆزرایەوە',
+  noRolesFound: 'هیچ ڕۆڵێک نەدۆزرایەوە',
   roleDefaultNotice: 'کۆتایی ڕۆڵ بەکار دێت',
+  searchPermissions: 'گەڕان لە مۆڵەتەکان…',
+  noPermissionsMatch: 'هیچ مۆڵەتێک نەدۆزرایەوە',
+  permissionsGranted: 'مۆڵەت',
 };

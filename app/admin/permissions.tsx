@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Switch,
+  TextInput,
 } from 'react-native';
 import { useAdminLayout } from '@/hooks/useAdminLayout';
 import { useLanguage } from '@/context/LanguageContext';
@@ -18,6 +19,8 @@ import {
   CircleAlert as AlertCircle,
   ChevronDown,
   ChevronRight,
+  Search,
+  RotateCcw,
 } from 'lucide-react-native';
 import AdminWebDashboard from '@/components/admin/AdminWebDashboard';
 import AdminMobileDashboard from '@/components/admin/AdminMobileDashboard';
@@ -54,8 +57,8 @@ type Employee = {
 
 type Tab = 'roles' | 'employees';
 
-// Roles that cannot have their permissions edited
-const LOCKED_ROLES = new Set(['super_admin', 'admin', 'user']);
+// Roles that cannot have their permissions edited (super_admin manages everything, user is customer)
+const LOCKED_ROLES = new Set(['super_admin', 'admin_fixed', 'user']);
 
 const SECTION_COLORS: Record<string, string> = {
   general:   Colors.neonBlue,
@@ -66,9 +69,11 @@ const SECTION_COLORS: Record<string, string> = {
   marketing: '#F472B6',
 };
 
+// Preferred section order
+const SECTION_ORDER = ['general', 'catalog', 'sales', 'content', 'marketing', 'admin'];
+
 // ─── i18n helpers ─────────────────────────────────────────────────────────────
 
-// Map permission key → translation key suffix for label
 const PERM_LABEL_KEYS: Record<string, keyof Translations> = {
   view_dashboard:       'permLabelViewDashboard',
   manage_analytics:     'permLabelManageAnalytics',
@@ -162,6 +167,31 @@ function getSectionLabel(t: Translations, section: string): string {
   return section.charAt(0).toUpperCase() + section.slice(1);
 }
 
+function sortedSections(sectionedPerms: Record<string, Permission[]>): [string, Permission[]][] {
+  const known = SECTION_ORDER.filter((s) => sectionedPerms[s]);
+  const unknown = Object.keys(sectionedPerms).filter((s) => !SECTION_ORDER.includes(s)).sort();
+  return [...known, ...unknown].map((s) => [s, sectionedPerms[s]]);
+}
+
+function filterPermissions(
+  sectionedPerms: Record<string, Permission[]>,
+  query: string,
+  t: Translations
+): Record<string, Permission[]> {
+  if (!query.trim()) return sectionedPerms;
+  const q = query.toLowerCase();
+  const result: Record<string, Permission[]> = {};
+  for (const [section, perms] of Object.entries(sectionedPerms)) {
+    const matched = perms.filter((p) => {
+      const label = getPermLabel(t, p.key, p.label).toLowerCase();
+      const desc = getPermDesc(t, p.key, p.description).toLowerCase();
+      return label.includes(q) || desc.includes(q) || p.key.includes(q);
+    });
+    if (matched.length > 0) result[section] = matched;
+  }
+  return result;
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 function PermissionsScreen() {
@@ -178,15 +208,14 @@ function PermissionsScreen() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -229,7 +258,6 @@ function PermissionsScreen() {
       p_role_key: roleKey,
       p_permissions: perms,
     });
-
     if (error) showToast((t.saveFailed ?? 'Failed to save') + ': ' + error.message, 'error');
     else showToast((t.saveRolePermissions ?? 'Saved') + ' — ' + getRoleLabel(t, roleKey));
     setSaving(null);
@@ -256,7 +284,6 @@ function PermissionsScreen() {
       p_email: emp.email,
       p_permissions: perms,
     });
-
     if (error) showToast((t.saveFailed ?? 'Failed to save') + ': ' + error.message, 'error');
     else showToast((t.savePermissions ?? 'Saved') + ' — ' + emp.full_name);
     setSaving(null);
@@ -274,6 +301,9 @@ function PermissionsScreen() {
     return acc;
   }, {});
 
+  const filteredSectionedPerms = filterPermissions(sectionedPerms, search, t);
+  const totalPerms = permissions.length;
+
   if (isMobile) {
     return (
       <AdminMobileDashboard title={t.permissions} showBack>
@@ -285,24 +315,42 @@ function PermissionsScreen() {
   return (
     <AdminWebDashboard title={t.permissions}>
       <View style={[styles.container, isRTL && styles.containerRtl]}>
-        {/* Tab bar */}
-        <View style={[styles.tabBar, isRTL && styles.tabBarRtl]}>
-          <TouchableOpacity
-            style={[styles.tabBtn, tab === 'roles' && styles.tabBtnActive]}
-            onPress={() => setTab('roles')}
-            activeOpacity={0.7}
-          >
-            <ShieldAlert size={16} color={tab === 'roles' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
-            <Text style={[styles.tabLabel, tab === 'roles' && styles.tabLabelActive]}>{t.roleDefaults}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabBtn, tab === 'employees' && styles.tabBtnActive]}
-            onPress={() => setTab('employees')}
-            activeOpacity={0.7}
-          >
-            <Users size={16} color={tab === 'employees' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
-            <Text style={[styles.tabLabel, tab === 'employees' && styles.tabLabelActive]}>{t.employeeOverrides}</Text>
-          </TouchableOpacity>
+        {/* Tab bar + Search row */}
+        <View style={[styles.topRow, isRTL && styles.rowRtl]}>
+          <View style={[styles.tabBar, isRTL && styles.tabBarRtl]}>
+            <TouchableOpacity
+              style={[styles.tabBtn, tab === 'roles' && styles.tabBtnActive]}
+              onPress={() => setTab('roles')}
+              activeOpacity={0.7}
+            >
+              <ShieldAlert size={16} color={tab === 'roles' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
+              <Text style={[styles.tabLabel, tab === 'roles' && styles.tabLabelActive]}>{t.roleDefaults}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tabBtn, tab === 'employees' && styles.tabBtnActive]}
+              onPress={() => setTab('employees')}
+              activeOpacity={0.7}
+            >
+              <Users size={16} color={tab === 'employees' ? Colors.neonBlue : Colors.textMuted} strokeWidth={2} />
+              <Text style={[styles.tabLabel, tab === 'employees' && styles.tabLabelActive]}>{t.employeeOverrides}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.searchWrap, isRTL && styles.rowRtl]}>
+            <Search size={15} color={Colors.textMuted} strokeWidth={2} />
+            <TextInput
+              style={[styles.searchInput, isRTL && styles.textRtl]}
+              placeholder={t.searchPermissions ?? 'Search permissions…'}
+              placeholderTextColor={Colors.textMuted}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
+                <RotateCcw size={14} color={Colors.textMuted} strokeWidth={2} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {loading ? (
@@ -313,7 +361,8 @@ function PermissionsScreen() {
           <RolesTab
             roles={roles}
             rolePermMap={rolePermMap}
-            sectionedPerms={sectionedPerms}
+            sectionedPerms={filteredSectionedPerms}
+            totalPerms={totalPerms}
             expandedRole={expandedRole}
             setExpandedRole={setExpandedRole}
             toggleRolePerm={toggleRolePerm}
@@ -325,7 +374,8 @@ function PermissionsScreen() {
           <EmployeesTab
             employees={employees}
             rolePermMap={rolePermMap}
-            sectionedPerms={sectionedPerms}
+            sectionedPerms={filteredSectionedPerms}
+            totalPerms={totalPerms}
             expandedEmployee={expandedEmployee}
             setExpandedEmployee={setExpandedEmployee}
             toggleEmployeeCustom={toggleEmployeeCustom}
@@ -348,6 +398,7 @@ type RolesTabProps = {
   roles: Role[];
   rolePermMap: Record<string, Set<string>>;
   sectionedPerms: Record<string, Permission[]>;
+  totalPerms: number;
   expandedRole: string | null;
   setExpandedRole: (key: string | null) => void;
   toggleRolePerm: (roleKey: string, permKey: string) => void;
@@ -356,8 +407,18 @@ type RolesTabProps = {
   isRTL: boolean;
 };
 
-function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpandedRole, toggleRolePerm, saveRolePerms, saving, isRTL }: RolesTabProps) {
+function RolesTab({ roles, rolePermMap, sectionedPerms, totalPerms, expandedRole, setExpandedRole, toggleRolePerm, saveRolePerms, saving, isRTL }: RolesTabProps) {
   const { t } = useLanguage();
+
+  if (roles.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <ShieldAlert size={40} color={Colors.textMuted} strokeWidth={1.5} />
+        <Text style={styles.emptyText}>{t.noRolesFound ?? 'No roles found'}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.tabContent}>
       <View style={[styles.infoBox, isRTL && styles.infoBoxRtl]}>
@@ -367,10 +428,10 @@ function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpande
 
       {roles.map((role) => {
         const perms = rolePermMap[role.key] ?? new Set<string>();
-        const totalPerms = Object.values(sectionedPerms).flat().length;
         const isExpanded = expandedRole === role.key;
         const isSaving = saving === role.key;
         const localLabel = getRoleLabel(t, role.key);
+        const visibleCount = Object.values(sectionedPerms).flat().length;
 
         return (
           <View key={role.key} style={styles.card}>
@@ -380,10 +441,14 @@ function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpande
               activeOpacity={0.7}
             >
               <View style={[styles.cardHeaderLeft, isRTL && styles.rowRtl]}>
-                <UserCog size={18} color={Colors.neonBlue} strokeWidth={2} />
+                <View style={styles.roleIcon}>
+                  <UserCog size={17} color={Colors.neonBlue} strokeWidth={2} />
+                </View>
                 <View>
                   <Text style={[styles.cardTitle, isRTL && styles.textRtl]}>{localLabel}</Text>
-                  <Text style={[styles.cardSubtitle, isRTL && styles.textRtl]}>{perms.size} / {totalPerms}</Text>
+                  <Text style={[styles.cardSubtitle, isRTL && styles.textRtl]}>
+                    {perms.size} / {totalPerms} {t.permissionsGranted ?? 'permissions'}
+                  </Text>
                 </View>
               </View>
               <View style={[styles.cardHeaderRight, isRTL && styles.rowRtl]}>
@@ -399,38 +464,14 @@ function RolesTab({ roles, rolePermMap, sectionedPerms, expandedRole, setExpande
 
             {isExpanded && (
               <View style={styles.cardBody}>
-                {Object.entries(sectionedPerms).map(([section, sectionPerms]) => (
-                  <View key={section} style={styles.section}>
-                    <View style={[
-                      styles.sectionHeader,
-                      isRTL ? { borderRightWidth: 3, borderRightColor: SECTION_COLORS[section] ?? Colors.textMuted, borderLeftWidth: 0, paddingRight: Spacing.sm, paddingLeft: 0 }
-                             : { borderLeftColor: SECTION_COLORS[section] ?? Colors.textMuted }
-                    ]}>
-                      <Text style={[styles.sectionTitle, isRTL && styles.textRtl]}>
-                        {getSectionLabel(t, section)}
-                      </Text>
-                    </View>
-                    {sectionPerms.map((perm) => {
-                      const label = getPermLabel(t, perm.key, perm.label);
-                      const desc = getPermDesc(t, perm.key, perm.description);
-                      return (
-                        <View key={perm.key} style={[styles.permRow, isRTL && styles.rowRtl]}>
-                          <View style={styles.permInfo}>
-                            <Text style={[styles.permLabel, isRTL && styles.textRtl]}>{label}</Text>
-                            <Text style={[styles.permDesc, isRTL && styles.textRtl]}>{desc}</Text>
-                          </View>
-                          <Switch
-                            value={perms.has(perm.key)}
-                            onValueChange={() => toggleRolePerm(role.key, perm.key)}
-                            trackColor={{ false: Colors.backgroundCard, true: Colors.neonBlueGlow }}
-                            thumbColor={perms.has(perm.key) ? Colors.neonBlue : Colors.textMuted}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                ))}
-
+                <PermissionSections
+                  sectionedPerms={sectionedPerms}
+                  activePerms={perms}
+                  onToggle={(key) => toggleRolePerm(role.key, key)}
+                  isRTL={isRTL}
+                  visibleCount={visibleCount}
+                  totalPerms={totalPerms}
+                />
                 <TouchableOpacity
                   style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
                   onPress={() => saveRolePerms(role.key)}
@@ -458,6 +499,7 @@ type EmployeesTabProps = {
   employees: Employee[];
   rolePermMap: Record<string, Set<string>>;
   sectionedPerms: Record<string, Permission[]>;
+  totalPerms: number;
   expandedEmployee: string | null;
   setExpandedEmployee: (id: string | null) => void;
   toggleEmployeeCustom: (emp: Employee, permKey: string) => void;
@@ -467,7 +509,7 @@ type EmployeesTabProps = {
   isRTL: boolean;
 };
 
-function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee, setExpandedEmployee, toggleEmployeeCustom, saveEmployeePerms, resetEmployeeToRole, saving, isRTL }: EmployeesTabProps) {
+function EmployeesTab({ employees, rolePermMap, sectionedPerms, totalPerms, expandedEmployee, setExpandedEmployee, toggleEmployeeCustom, saveEmployeePerms, resetEmployeeToRole, saving, isRTL }: EmployeesTabProps) {
   const { t } = useLanguage();
   const editableEmployees = employees.filter((e) => !LOCKED_ROLES.has(e.role));
 
@@ -490,7 +532,7 @@ function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee
         const effectivePerms = new Set(emp.custom_permissions ?? Array.from(rolePermMap[emp.role] ?? []));
         const isExpanded = expandedEmployee === emp.id;
         const isSaving = saving === emp.id;
-        const totalPerms = Object.values(sectionedPerms).flat().length;
+        const visibleCount = Object.values(sectionedPerms).flat().length;
         const roleLocalLabel = getRoleLabel(t, emp.role);
 
         return (
@@ -539,37 +581,14 @@ function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee
                   </View>
                 )}
 
-                {Object.entries(sectionedPerms).map(([section, sectionPerms]) => (
-                  <View key={section} style={styles.section}>
-                    <View style={[
-                      styles.sectionHeader,
-                      isRTL ? { borderRightWidth: 3, borderRightColor: SECTION_COLORS[section] ?? Colors.textMuted, borderLeftWidth: 0, paddingRight: Spacing.sm, paddingLeft: 0 }
-                             : { borderLeftColor: SECTION_COLORS[section] ?? Colors.textMuted }
-                    ]}>
-                      <Text style={[styles.sectionTitle, isRTL && styles.textRtl]}>
-                        {getSectionLabel(t, section)}
-                      </Text>
-                    </View>
-                    {sectionPerms.map((perm) => {
-                      const label = getPermLabel(t, perm.key, perm.label);
-                      const desc = getPermDesc(t, perm.key, perm.description);
-                      return (
-                        <View key={perm.key} style={[styles.permRow, isRTL && styles.rowRtl]}>
-                          <View style={styles.permInfo}>
-                            <Text style={[styles.permLabel, isRTL && styles.textRtl]}>{label}</Text>
-                            <Text style={[styles.permDesc, isRTL && styles.textRtl]}>{desc}</Text>
-                          </View>
-                          <Switch
-                            value={effectivePerms.has(perm.key)}
-                            onValueChange={() => toggleEmployeeCustom(emp, perm.key)}
-                            trackColor={{ false: Colors.backgroundCard, true: Colors.neonBlueGlow }}
-                            thumbColor={effectivePerms.has(perm.key) ? Colors.neonBlue : Colors.textMuted}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                ))}
+                <PermissionSections
+                  sectionedPerms={sectionedPerms}
+                  activePerms={effectivePerms}
+                  onToggle={(key) => toggleEmployeeCustom(emp, key)}
+                  isRTL={isRTL}
+                  visibleCount={visibleCount}
+                  totalPerms={totalPerms}
+                />
 
                 <View style={[styles.actionRow, isRTL && styles.rowRtl]}>
                   {hasCustom && (
@@ -578,6 +597,7 @@ function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee
                       onPress={() => resetEmployeeToRole(emp)}
                       activeOpacity={0.7}
                     >
+                      <RotateCcw size={14} color={Colors.textSecondary} strokeWidth={2} />
                       <Text style={styles.resetBtnText}>{t.resetToRole}</Text>
                     </TouchableOpacity>
                   )}
@@ -596,6 +616,82 @@ function EmployeesTab({ employees, rolePermMap, sectionedPerms, expandedEmployee
                 </View>
               </View>
             )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Permission Sections (shared renderer) ───────────────────────────────────
+
+type PermissionSectionsProps = {
+  sectionedPerms: Record<string, Permission[]>;
+  activePerms: Set<string>;
+  onToggle: (key: string) => void;
+  isRTL: boolean;
+  visibleCount: number;
+  totalPerms: number;
+};
+
+function PermissionSections({ sectionedPerms, activePerms, onToggle, isRTL }: PermissionSectionsProps) {
+  const { t } = useLanguage();
+  const sections = sortedSections(sectionedPerms);
+
+  if (sections.length === 0) {
+    return (
+      <View style={styles.noResultsWrap}>
+        <Text style={styles.noResultsText}>{t.noPermissionsMatch ?? 'No permissions match your search'}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.sectionsWrap}>
+      {sections.map(([section, sectionPerms]) => {
+        const sectionColor = SECTION_COLORS[section] ?? Colors.textMuted;
+        return (
+          <View key={section} style={styles.section}>
+            <View style={[
+              styles.sectionHeader,
+              isRTL
+                ? { borderRightWidth: 3, borderRightColor: sectionColor, borderLeftWidth: 0, paddingRight: Spacing.sm, paddingLeft: 0 }
+                : { borderLeftColor: sectionColor },
+            ]}>
+              <Text style={[styles.sectionTitle, isRTL && styles.textRtl, { color: sectionColor }]}>
+                {getSectionLabel(t, section)}
+              </Text>
+              <View style={[styles.sectionBadge, { backgroundColor: sectionColor + '22', borderColor: sectionColor + '44' }]}>
+                <Text style={[styles.sectionBadgeText, { color: sectionColor }]}>
+                  {sectionPerms.filter((p) => activePerms.has(p.key)).length}/{sectionPerms.length}
+                </Text>
+              </View>
+            </View>
+
+            {sectionPerms.map((perm) => {
+              const label = getPermLabel(t, perm.key, perm.label);
+              const desc = getPermDesc(t, perm.key, perm.description);
+              const isOn = activePerms.has(perm.key);
+              return (
+                <TouchableOpacity
+                  key={perm.key}
+                  style={[styles.permRow, isOn && styles.permRowActive, isRTL && styles.rowRtl]}
+                  onPress={() => onToggle(perm.key)}
+                  activeOpacity={0.6}
+                >
+                  <View style={styles.permInfo}>
+                    <Text style={[styles.permLabel, isRTL && styles.textRtl, isOn && styles.permLabelOn]}>{label}</Text>
+                    <Text style={[styles.permDesc, isRTL && styles.textRtl]}>{desc}</Text>
+                  </View>
+                  <Switch
+                    value={isOn}
+                    onValueChange={() => onToggle(perm.key)}
+                    trackColor={{ false: Colors.backgroundCard, true: Colors.neonBlueGlow }}
+                    thumbColor={isOn ? Colors.neonBlue : Colors.textMuted}
+                  />
+                </TouchableOpacity>
+              );
+            })}
           </View>
         );
       })}
@@ -622,10 +718,17 @@ const styles = StyleSheet.create({
   containerRtl: {
     direction: 'rtl' as any,
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
+    gap: Spacing.md,
+    flexWrap: 'wrap',
+  },
   tabBar: {
     flexDirection: 'row',
     gap: Spacing.sm,
-    marginBottom: Spacing.lg,
     backgroundColor: Colors.backgroundSecondary,
     borderRadius: Radius.lg,
     padding: 4,
@@ -661,6 +764,26 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: Colors.neonBlue,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 9,
+    minWidth: 220,
+    flex: 1,
+    maxWidth: 340,
+  },
+  searchInput: {
+    flex: 1,
+    color: Colors.textPrimary,
+    fontSize: FontSize.sm,
+    outlineStyle: 'none' as any,
   },
   tabContent: {
     gap: Spacing.md,
@@ -713,6 +836,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
+  roleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cardTitle: {
     color: Colors.textPrimary,
     fontSize: FontSize.md,
@@ -746,20 +879,36 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     gap: Spacing.md,
   },
+  sectionsWrap: {
+    gap: Spacing.md,
+  },
   section: {
     gap: 2,
   },
   sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderLeftWidth: 3,
     paddingLeft: Spacing.sm,
     marginBottom: Spacing.xs,
+    paddingVertical: 2,
   },
   sectionTitle: {
-    color: Colors.textSecondary,
     fontSize: FontSize.xs,
     fontWeight: '800',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
+  },
+  sectionBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  sectionBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   permRow: {
     flexDirection: 'row',
@@ -769,14 +918,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     borderRadius: Radius.sm,
   },
+  permRowActive: {
+    backgroundColor: 'rgba(0,180,255,0.04)',
+  },
   permInfo: {
     flex: 1,
     paddingRight: Spacing.md,
   },
   permLabel: {
-    color: Colors.textPrimary,
+    color: Colors.textSecondary,
     fontSize: FontSize.sm,
     fontWeight: '600',
+  },
+  permLabelOn: {
+    color: Colors.textPrimary,
   },
   permDesc: {
     color: Colors.textMuted,
@@ -854,14 +1009,15 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingVertical: 12,
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.backgroundSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   resetBtnText: {
     color: Colors.textSecondary,
@@ -876,5 +1032,13 @@ const styles = StyleSheet.create({
   emptyText: {
     color: Colors.textMuted,
     fontSize: FontSize.md,
+  },
+  noResultsWrap: {
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    color: Colors.textMuted,
+    fontSize: FontSize.sm,
   },
 });
