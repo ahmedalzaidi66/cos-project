@@ -2397,6 +2397,200 @@ const nm = StyleSheet.create({
   sendText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: '800' },
 });
 
+// ─── Calendar Modal ───────────────────────────────────────────────────────────
+
+interface CalendarModalProps {
+  visible: boolean;
+  language: string;
+  cards: OccasionCard[];
+  onClose: () => void;
+  onCreateCampaign: (occ: Occasion) => void;
+  onCreateBanner: (occ: Occasion) => void;
+  onSendReminder: (occ: Occasion) => void;
+  onMarkDone: (key: string) => void;
+}
+
+function CalendarModal({ visible, language, cards, onClose, onCreateCampaign, onCreateBanner, onSendReminder, onMarkDone }: CalendarModalProps) {
+  const isRtl = language === 'ar' || language === 'ckb';
+  const [selectedCard, setSelectedCard] = useState<OccasionCard | null>(null);
+
+  const MONTH_NAMES_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MONTH_NAMES_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const MONTH_NAMES_CKB = ['کانوونی دووەم','شوبات','ئازار','نیسان','ئایار','حوزەیران','تەمووز','ئاب','ئەیلوول','تشرینی یەکەم','تشرینی دووەم','کانوونی یەکەم'];
+
+  const monthNames = language === 'ar' ? MONTH_NAMES_AR : language === 'ckb' ? MONTH_NAMES_CKB : MONTH_NAMES_EN;
+
+  // Group cards by month
+  const byMonth: Record<number, OccasionCard[]> = {};
+  cards.forEach(c => {
+    const m = c.date.getMonth();
+    if (!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(c);
+  });
+
+  // Sort months, putting future/current first, past at end
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const months = Object.keys(byMonth)
+    .map(Number)
+    .sort((a, b) => {
+      const aNorm = a >= currentMonth ? a : a + 12;
+      const bNorm = b >= currentMonth ? b : b + 12;
+      return aNorm - bNorm;
+    });
+
+  const statusColor = (c: OccasionCard) => {
+    if (c.reminderState === 'dismissed') return Colors.textMuted;
+    if (c.reminderState === 'completed') return Colors.success;
+    if (c.daysUntil === 0) return Colors.success;
+    if (c.daysUntil > 0 && c.daysUntil <= 7) return Colors.warning;
+    if (c.daysUntil > 7) return Colors.neonBlue;
+    return Colors.textMuted;
+  };
+
+  const countdownLabel = (c: OccasionCard) => {
+    if (c.daysUntil === 0) return language === 'ar' ? 'اليوم' : language === 'ckb' ? 'ئەمڕۆ' : 'Today';
+    if (c.daysUntil > 0) return language === 'ar' ? `${c.daysUntil} يوم` : language === 'ckb' ? `${c.daysUntil} ڕۆژ` : `${c.daysUntil}d`;
+    return language === 'ar' ? 'انتهى' : language === 'ckb' ? 'تەواوبو' : 'Past';
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={cal.overlay}>
+        <View style={cal.sheet}>
+          {/* Header */}
+          <View style={[cal.header, isRtl && { flexDirection: 'row-reverse' }]}>
+            <View style={[cal.headerLeft, isRtl && { flexDirection: 'row-reverse' }]}>
+              <View style={cal.headerIcon}>
+                <CalendarDays size={20} color={Colors.neonBlue} strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={[cal.headerTitle, isRtl && { textAlign: 'right' }]}>
+                  {language === 'ar' ? 'تقويم المناسبات' : language === 'ckb' ? 'ڕۆژمێری ئۆکازیۆنەکان' : 'Occasions Calendar'}
+                </Text>
+                <Text style={[cal.headerSub, isRtl && { textAlign: 'right' }]}>
+                  {cards.length} {language === 'ar' ? 'مناسبة' : language === 'ckb' ? 'ئۆکازیۆن' : 'occasions'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={cal.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={20} color={Colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Calendar body */}
+          <ScrollView style={cal.body} showsVerticalScrollIndicator={false}>
+            {months.map(month => (
+              <View key={month} style={cal.monthSection}>
+                <View style={[cal.monthHeader, isRtl && { flexDirection: 'row-reverse' }]}>
+                  <Text style={[cal.monthName, isRtl && { textAlign: 'right' }]}>{monthNames[month]}</Text>
+                  <View style={cal.monthDivider} />
+                </View>
+                {byMonth[month].sort((a, b) => a.date.getDate() - b.date.getDate()).map(c => {
+                  const Icon = c.occasion.icon;
+                  const name = language === 'ar' ? c.occasion.nameAr : language === 'ckb' ? c.occasion.nameCkb : c.occasion.nameEn;
+                  const color = statusColor(c);
+                  const isSelected = selectedCard?.occasion.key === c.occasion.key;
+                  return (
+                    <View key={c.occasion.key}>
+                      <TouchableOpacity
+                        style={[cal.eventRow, isRtl && { flexDirection: 'row-reverse' }, isSelected && cal.eventRowSelected]}
+                        onPress={() => setSelectedCard(isSelected ? null : c)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={[cal.dayCircle, { backgroundColor: c.occasion.color + '22' }]}>
+                          <Text style={[cal.dayNum, { color: c.occasion.color }]}>{c.date.getDate()}</Text>
+                        </View>
+                        <View style={[cal.iconCircle, { backgroundColor: c.occasion.color + '18' }]}>
+                          <Icon size={14} color={c.occasion.color} strokeWidth={2} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[cal.eventName, isRtl && { textAlign: 'right' }]} numberOfLines={1}>{name}</Text>
+                          <Text style={[cal.eventType, isRtl && { textAlign: 'right' }]} numberOfLines={1}>
+                            {language === 'ar' ? c.occasion.campaignTypeAr : language === 'ckb' ? c.occasion.campaignTypeCkb : c.occasion.campaignType}
+                          </Text>
+                        </View>
+                        <View style={[cal.countdownBadge, { backgroundColor: color + '22', borderColor: color + '55' }]}>
+                          <Text style={[cal.countdownText, { color }]}>{countdownLabel(c)}</Text>
+                        </View>
+                        <View style={[cal.chevron, isSelected && cal.chevronOpen]}>
+                          <ChevronDown size={14} color={Colors.textMuted} strokeWidth={2} />
+                        </View>
+                      </TouchableOpacity>
+
+                      {/* Expanded action panel */}
+                      {isSelected && (
+                        <View style={[cal.actionPanel, isRtl && { flexDirection: 'row-reverse' }]}>
+                          <TouchableOpacity style={cal.actionBtn} onPress={() => { onCreateCampaign(c.occasion); onClose(); }} activeOpacity={0.75}>
+                            <Zap size={13} color={Colors.neonBlue} strokeWidth={2.5} />
+                            <Text style={[cal.actionBtnText, { color: Colors.neonBlue }]}>
+                              {language === 'ar' ? 'حملة' : language === 'ckb' ? 'کامپەین' : 'Campaign'}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={cal.actionBtn} onPress={() => { onCreateBanner(c.occasion); onClose(); }} activeOpacity={0.75}>
+                            <LayoutTemplate size={13} color={Colors.warning} strokeWidth={2.5} />
+                            <Text style={[cal.actionBtnText, { color: Colors.warning }]}>
+                              {language === 'ar' ? 'بانر' : language === 'ckb' ? 'بانەر' : 'Banner'}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={cal.actionBtn} onPress={() => { onSendReminder(c.occasion); onClose(); }} activeOpacity={0.75}>
+                            <Bell size={13} color={Colors.neonBlue} strokeWidth={2.5} />
+                            <Text style={[cal.actionBtnText, { color: Colors.neonBlue }]}>
+                              {language === 'ar' ? 'تذكير' : language === 'ckb' ? 'بیرخستنەوە' : 'Reminder'}
+                            </Text>
+                          </TouchableOpacity>
+                          {c.reminderState !== 'completed' && (
+                            <TouchableOpacity style={cal.actionBtn} onPress={() => { onMarkDone(c.occasion.key); setSelectedCard(null); }} activeOpacity={0.75}>
+                              <Check size={13} color={Colors.success} strokeWidth={2.5} />
+                              <Text style={[cal.actionBtnText, { color: Colors.success }]}>
+                                {language === 'ar' ? 'تم' : language === 'ckb' ? 'تەواو' : 'Done'}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const cal = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.backgroundSecondary, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, borderWidth: 1, borderBottomWidth: 0, borderColor: Colors.border, maxHeight: '92%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  headerIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.neonBlue + '20', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: '800' },
+  headerSub: { color: Colors.textMuted, fontSize: FontSize.xs, marginTop: 2 },
+  closeBtn: { padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.border },
+  body: { padding: Spacing.lg },
+  monthSection: { marginBottom: Spacing.lg },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: Spacing.sm },
+  monthName: { color: Colors.textSecondary, fontSize: FontSize.xs, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, flexShrink: 0 },
+  monthDivider: { flex: 1, height: 1, backgroundColor: Colors.border },
+  eventRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: Spacing.sm, borderRadius: Radius.md, marginBottom: 2 },
+  eventRowSelected: { backgroundColor: Colors.backgroundCard, borderWidth: 1, borderColor: Colors.neonBlue + '33' },
+  dayCircle: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  dayNum: { fontSize: FontSize.md, fontWeight: '800' },
+  iconCircle: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  eventName: { color: Colors.textPrimary, fontSize: FontSize.sm, fontWeight: '700' },
+  eventType: { color: Colors.textMuted, fontSize: FontSize.xs, marginTop: 1 },
+  countdownBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: Radius.full, borderWidth: 1, flexShrink: 0 },
+  countdownText: { fontSize: 10, fontWeight: '800' },
+  chevron: { flexShrink: 0 },
+  chevronOpen: { transform: [{ rotate: '180deg' }] },
+  actionPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: Spacing.sm, paddingBottom: 10, paddingTop: 2 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.backgroundSecondary },
+  actionBtnText: { fontSize: 11, fontWeight: '700' },
+});
+
 // ─── Action confirmation modal ────────────────────────────────────────────────
 
 function ActionModal({
@@ -2506,6 +2700,10 @@ function CampaignsContent() {
   const [productsModalCampaign, setProductsModalCampaign] = useState<SavedCampaign | null>(null);
   const [discountModalCampaign, setDiscountModalCampaign] = useState<SavedCampaign | null>(null);
   const [notifyModalCampaign, setNotifyModalCampaign] = useState<SavedCampaign | null>(null);
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [calendarOccasion, setCalendarOccasion] = useState<Occasion | null>(null);
+  type OccasionFilter = 'all' | 'active' | 'urgent' | 'upcoming' | 'completed';
+  const [occasionFilter, setOccasionFilter] = useState<OccasionFilter>('all');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -2611,7 +2809,7 @@ function CampaignsContent() {
 
   const activeCards = cards.filter(c => c.status === 'active' && c.reminderState !== 'dismissed');
   const urgentCards = cards.filter(c => c.daysUntil > 0 && c.daysUntil <= 7 && c.reminderState !== 'dismissed' && c.reminderState !== 'completed');
-  const upcomingCards = cards.filter(c => c.daysUntil > 7 && c.daysUntil <= 90 && c.reminderState !== 'dismissed');
+  const upcomingCards = cards.filter(c => c.daysUntil > 7 && c.reminderState !== 'dismissed');
   const dismissedCards = cards.filter(c => c.reminderState === 'dismissed');
 
   const upsertOverride = async (key: string, status: 'dismissed' | 'snoozed' | 'completed', snoozedUntil?: Date) => {
@@ -2738,6 +2936,16 @@ function CampaignsContent() {
         onSaved={async (msg) => { showToast(msg, 'success'); await load(); }}
         onError={(msg) => showToast(msg, 'error')}
       />
+      <CalendarModal
+        visible={calendarVisible}
+        language={language}
+        cards={cards}
+        onClose={() => setCalendarVisible(false)}
+        onCreateCampaign={(occ) => { setCalendarVisible(false); setCreateModalOccasion(occ); }}
+        onCreateBanner={(occ) => { setCalendarVisible(false); setBannerModalOccasion(occ); }}
+        onSendReminder={(occ) => { setCalendarVisible(false); setReminderModalOccasion(occ); }}
+        onMarkDone={(key) => handleComplete(key)}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[main.scroll, isRtl && { direction: 'rtl' } as any]}>
         {/* Header */}
@@ -2756,6 +2964,17 @@ function CampaignsContent() {
               }
             </Text>
           </View>
+          <TouchableOpacity
+            style={main.calBtn}
+            onPress={() => setCalendarVisible(true)}
+            activeOpacity={0.75}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <CalendarDays size={18} color={Colors.neonBlue} strokeWidth={2} />
+            <Text style={main.calBtnText}>
+              {language === 'ar' ? 'التقويم' : language === 'ckb' ? 'ڕۆژمێر' : 'Calendar'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {loading ? (
@@ -2764,6 +2983,40 @@ function CampaignsContent() {
           <>
             {/* Stats */}
             <StatsWidget cards={cards} />
+
+            {/* Filter tabs */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[main.filterRow, isRtl && { flexDirection: 'row-reverse' }]}
+              style={{ marginBottom: Spacing.md }}
+            >
+              {([
+                { key: 'all', en: 'All', ar: 'الكل', ckb: 'هەمووی', color: Colors.textSecondary },
+                { key: 'active', en: 'Active', ar: 'نشط', ckb: 'چالاک', color: Colors.success },
+                { key: 'urgent', en: 'Urgent', ar: 'عاجل', ckb: 'بەپەلە', color: Colors.warning },
+                { key: 'upcoming', en: 'Upcoming', ar: 'قادم', ckb: 'داهاتوو', color: Colors.neonBlue },
+                { key: 'completed', en: 'Completed', ar: 'مكتمل', ckb: 'تەواو', color: Colors.textMuted },
+              ] as const).map(tab => {
+                const active = occasionFilter === tab.key;
+                const label = language === 'ar' ? tab.ar : language === 'ckb' ? tab.ckb : tab.en;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[
+                      main.filterTab,
+                      active && { backgroundColor: tab.color + '20', borderColor: tab.color + '66' },
+                    ]}
+                    onPress={() => setOccasionFilter(tab.key)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[main.filterTabText, active && { color: tab.color, fontWeight: '800' }]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
             {/* Saved/Active Campaigns from DB */}
             <ActiveCampaignsSection
@@ -2783,7 +3036,7 @@ function CampaignsContent() {
             />
 
             {/* Active today */}
-            {activeCards.length > 0 && (
+            {(occasionFilter === 'all' || occasionFilter === 'active') && activeCards.length > 0 && (
               <>
                 <SectionHeader
                   title={language === 'ar' ? 'نشط الآن' : language === 'ckb' ? 'ئێستا چالاکە' : 'Active Now'}
@@ -2809,7 +3062,7 @@ function CampaignsContent() {
             )}
 
             {/* Urgent (≤7 days) */}
-            {urgentCards.length > 0 && (
+            {(occasionFilter === 'all' || occasionFilter === 'urgent') && urgentCards.length > 0 && (
               <>
                 <SectionHeader
                   title={language === 'ar' ? 'تذكيرات عاجلة — أقل من 7 أيام' : language === 'ckb' ? 'بیرخستنەوەی بەپەلە — کەمتر لە ٧ ڕۆژ' : 'Urgent — within 7 days'}
@@ -2834,8 +3087,8 @@ function CampaignsContent() {
               </>
             )}
 
-            {/* Upcoming (8–90 days) */}
-            {upcomingCards.length > 0 && (
+            {/* Upcoming (>7 days) */}
+            {(occasionFilter === 'all' || occasionFilter === 'upcoming') && upcomingCards.length > 0 && (
               <>
                 <SectionHeader
                   title={language === 'ar' ? 'مناسبات قادمة' : language === 'ckb' ? 'ئۆکازیۆنە داهاتووەکان' : 'Upcoming Occasions'}
@@ -2861,7 +3114,7 @@ function CampaignsContent() {
             )}
 
             {/* Dismissed */}
-            {dismissedCards.length > 0 && (
+            {(occasionFilter === 'all' || occasionFilter === 'completed') && dismissedCards.length > 0 && (
               <>
                 <SectionHeader
                   title={language === 'ar' ? 'التذكيرات المرفوضة' : language === 'ckb' ? 'بیرخستنەوەی ڕەتکراوەکان' : 'Dismissed Reminders'}
@@ -2949,6 +3202,23 @@ const main = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 60, gap: Spacing.sm },
   emptyTitle: { color: Colors.textPrimary, fontSize: FontSize.xl, fontWeight: '700' },
   emptySubtitle: { color: Colors.textMuted, fontSize: FontSize.md },
+  calBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.neonBlue + '15',
+    borderWidth: 1, borderColor: Colors.neonBlue + '44',
+    flexShrink: 0,
+  },
+  calBtnText: { color: Colors.neonBlue, fontSize: FontSize.xs, fontWeight: '700' },
+  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 2, paddingVertical: 4 },
+  filterTab: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: Radius.full,
+    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.backgroundCard,
+  },
+  filterTabText: { color: Colors.textMuted, fontSize: FontSize.xs, fontWeight: '600' },
 });
 
 // ─── Export ───────────────────────────────────────────────────────────────────
