@@ -81,10 +81,10 @@ export default function HeroSlider({ slides, heroContent }: Props) {
   const isMobile = width < 768;
   const isTablet = width >= 768 && width < 1200;
   const heroHeight = isMobile
-    ? Math.min(390, Math.max(270, Math.round(width * 0.78)))
+    ? Math.min(585, Math.max(405, Math.round(width * 1.17)))
     : isTablet
-    ? Math.min(500, Math.max(380, Math.round(width * 0.42)))
-    : Math.min(520, Math.max(400, Math.round(width * 0.42)));
+    ? Math.min(750, Math.max(570, Math.round(width * 0.63)))
+    : Math.min(780, Math.max(600, Math.round(width * 0.63)));
 
   const activeSlides = slides.filter(s => s.is_active);
 

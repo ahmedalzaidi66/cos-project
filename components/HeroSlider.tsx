@@ -71,7 +71,7 @@ function AnimatedDot({ active, onPress }: { active: boolean; onPress: () => void
 export default function HeroSlider({ slides, heroContent }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const heroHeight = Math.max(360, Math.round(width * 0.87));
+  const heroHeight = Math.max(540, Math.round(width * 1.305));
 
   const activeSlides = slides.filter(s => s.is_active);
 
