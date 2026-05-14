@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { LayoutDashboard, Package, ShoppingCart, Users, UserCog, File as FileEdit, Settings, LogOut, Menu, X, ShieldCheck, ChevronLeft, MessageSquare, Tag, ShieldAlert, Truck, Bell, LayoutList, ChartBar as BarChart3, Coins, ClipboardList, CalendarDays } from 'lucide-react-native';
+import { LayoutDashboard, Package, ShoppingCart, Users, UserCog, File as FileEdit, Settings, LogOut, Menu, X, ShieldCheck, ChevronLeft, MessageSquare, Tag, ShieldAlert, Truck, Bell, LayoutList, ChartBar as BarChart3, Coins, ClipboardList, CalendarDays, Store } from 'lucide-react-native';
 import { useAdmin, ROLE_LABELS } from '@/context/AdminContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useLanguage } from '@/context/LanguageContext';
@@ -182,7 +182,15 @@ export default function AdminMobileLayout({ children, title, showBack }: Props) 
         </View>
 
         <Text style={styles.topBarTitle} numberOfLines={1}>{title}</Text>
-        <View style={styles.topBarRight} />
+        <TouchableOpacity
+          style={styles.storeBtn}
+          onPress={() => router.replace('/' as any)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+        >
+          <Store size={13} color={Colors.neonBlue} strokeWidth={2} />
+          <Text style={styles.storeBtnText} numberOfLines={1}>{(t as any).backToStore}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Full-width content — zero left offset */}
@@ -313,8 +321,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  topBarRight: {
-    minWidth: 80,
+  storeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 70,
+    maxWidth: 110,
+    backgroundColor: Colors.neonBlueGlow,
+    borderWidth: 1,
+    borderColor: Colors.neonBlueBorder,
+    borderRadius: Radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    justifyContent: 'center',
+  },
+  storeBtnText: {
+    color: Colors.neonBlue,
+    fontSize: 10,
+    fontWeight: '700',
+    flexShrink: 1,
   },
   iconBtn: {
     width: 40,
