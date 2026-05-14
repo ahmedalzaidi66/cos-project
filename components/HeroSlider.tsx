@@ -71,7 +71,7 @@ function AnimatedDot({ active, onPress }: { active: boolean; onPress: () => void
 export default function HeroSlider({ slides, heroContent }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const heroHeight = Math.max(240, Math.round(width * 0.58));
+  const heroHeight = Math.max(360, Math.round(width * 0.87));
 
   const activeSlides = slides.filter(s => s.is_active);
 
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 20,
-    paddingBottom: 52,
+    paddingBottom: 72,
     alignItems: 'center',
   },
   badge: {

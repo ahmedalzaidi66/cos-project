@@ -79,9 +79,12 @@ export default function HeroSlider({ slides, heroContent }: Props) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+  const isTablet = width >= 768 && width < 1200;
   const heroHeight = isMobile
-    ? Math.min(260, Math.max(180, Math.round(width * 0.52)))
-    : Math.min(340, Math.max(260, Math.round(width * 0.28)));
+    ? Math.min(390, Math.max(270, Math.round(width * 0.78)))
+    : isTablet
+    ? Math.min(500, Math.max(380, Math.round(width * 0.42)))
+    : Math.min(520, Math.max(400, Math.round(width * 0.42)));
 
   const activeSlides = slides.filter(s => s.is_active);
 
@@ -313,7 +316,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 18,
-    paddingBottom: 40,
+    paddingBottom: 56,
     alignItems: 'center',
   },
   badge: {
