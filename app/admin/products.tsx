@@ -43,7 +43,7 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import Toast from '@/components/admin/Toast';
 import ImageUploader from '@/components/admin/ImageUploader';
 import ProductImageGallery from '@/components/admin/ProductImageGallery';
-import { supabase, adminSupabase, getAdminToken, Product, Category, Subcategory, getProductName, fetchSubcategories, getSubcategoryName } from '@/lib/supabase';
+import { supabase, adminSupabase, getAdminToken, clearStorefrontCache, Product, Category, Subcategory, getProductName, fetchSubcategories, getSubcategoryName } from '@/lib/supabase';
 import { normalizeBrandTranslations } from '@/lib/brandProtection';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { adminSendNotification } from '@/context/NotificationContext';
@@ -510,7 +510,7 @@ function WebProductsScreen() {
           .order('sort_order'),
         supabase
           .from('product_shades')
-          .select('id, name, color_hex, shade_image, product_image, sort_order, is_available')
+          .select('id, name, color_hex, shade_image, product_image, sort_order, is_available, stock')
           .eq('product_id', p.id)
           .order('sort_order'),
       ]);
@@ -670,24 +670,62 @@ function WebProductsScreen() {
       await db.from('product_images').insert(rows);
     }
 
-    // Persist shades: delete all then re-insert in order
-    await db.from('product_shades').delete().eq('product_id', productId);
-    if (shades.length > 0) {
-      const shadeRows = shades.map((s, i) => ({
-        product_id: productId,
-        name: s.name,
-        color_hex: s.color_hex,
-        shade_image: s.shade_image,
-        product_image: s.product_image,
-        sort_order: i,
-        is_available: s.is_available !== false,
-        stock: Math.max(0, parseInt(String(s.stock ?? 0), 10) || 0),
-      }));
-      await db.from('product_shades').insert(shadeRows);
+    // Persist shades: upsert existing (preserve id/FK) and delete removed ones
+    {
+      const existingIds = shades.filter((s) => !s.id.startsWith('new-')).map((s) => s.id);
+      // Delete shades that were removed by the admin
+      const { data: dbShades } = await db
+        .from('product_shades')
+        .select('id')
+        .eq('product_id', productId);
+      const dbIds = (dbShades ?? []).map((r: any) => r.id);
+      const toDelete = dbIds.filter((id: string) => !existingIds.includes(id));
+      if (toDelete.length > 0) {
+        await db.from('product_shades').delete().in('id', toDelete);
+      }
 
-      // Sync product-level stock = sum of all shade stocks
-      const totalShadeStock = shadeRows.reduce((sum, r) => sum + r.stock, 0);
-      await db.from('products').update({ stock: totalShadeStock }).eq('id', productId);
+      if (shades.length > 0) {
+        const newShades = shades.filter((s) => s.id.startsWith('new-'));
+        const updatedShades = shades.filter((s) => !s.id.startsWith('new-'));
+
+        if (newShades.length > 0) {
+          await db.from('product_shades').insert(
+            newShades.map((s, i) => ({
+              product_id: productId,
+              name: s.name,
+              color_hex: s.color_hex,
+              shade_image: s.shade_image,
+              product_image: s.product_image,
+              sort_order: shades.indexOf(s),
+              is_available: s.is_available !== false,
+              stock: Math.max(0, parseInt(String(s.stock ?? 0), 10) || 0),
+            }))
+          );
+        }
+
+        if (updatedShades.length > 0) {
+          await Promise.all(
+            updatedShades.map((s) =>
+              db.from('product_shades').update({
+                name: s.name,
+                color_hex: s.color_hex,
+                shade_image: s.shade_image,
+                product_image: s.product_image,
+                sort_order: shades.indexOf(s),
+                is_available: s.is_available !== false,
+                stock: Math.max(0, parseInt(String(s.stock ?? 0), 10) || 0),
+              }).eq('id', s.id)
+            )
+          );
+        }
+
+        // Sync product-level stock = sum of all shade stocks
+        const totalShadeStock = shades.reduce(
+          (sum, s) => sum + Math.max(0, parseInt(String(s.stock ?? 0), 10) || 0),
+          0
+        );
+        await db.from('products').update({ stock: totalShadeStock }).eq('id', productId);
+      }
     }
 
     // Upsert product_translations — AR is source of truth, others fall back to AR
@@ -732,6 +770,7 @@ function WebProductsScreen() {
       }).catch((e) => console.warn('[products] notify failed:', e));
     }
 
+    clearStorefrontCache();
     await fetchProducts();
     setSaving(false);
     setShowForm(false);
