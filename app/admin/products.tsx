@@ -43,7 +43,7 @@ import AdminGuard from '@/components/admin/AdminGuard';
 import Toast from '@/components/admin/Toast';
 import ImageUploader from '@/components/admin/ImageUploader';
 import ProductImageGallery from '@/components/admin/ProductImageGallery';
-import { supabase, adminSupabase, getAdminToken, Product, Category, getProductName } from '@/lib/supabase';
+import { supabase, adminSupabase, getAdminToken, Product, Category, Subcategory, getProductName, fetchSubcategories, getSubcategoryName } from '@/lib/supabase';
 import { normalizeBrandTranslations } from '@/lib/brandProtection';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { adminSendNotification } from '@/context/NotificationContext';
@@ -123,6 +123,7 @@ const EMPTY_FORM = {
   category: 'accessories',
   try_on_type: '' as TryOnTypeOption,
   makeup_subcategory: '' as MakeupSubcategory | '',
+  subcategory_id: '' as string,
   description: '',
   image_url: '',
   stock: '',
@@ -191,6 +192,7 @@ function WebProductsScreen() {
   const [trashedProducts, setTrashedProducts] = useState<Product[]>([]);
   const [showTrash, setShowTrash] = useState(false);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
+  const [dbSubcategories, setDbSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -472,6 +474,14 @@ function WebProductsScreen() {
 
   const fetchProducts = loadAll;
 
+  // Load subcategories whenever category changes (form open or editing)
+  useEffect(() => {
+    if (!showForm) return;
+    const cat = dbCategories.find((c) => c.slug === form.category);
+    if (!cat) { setDbSubcategories([]); return; }
+    fetchSubcategories(cat.id, language).then(setDbSubcategories).catch(() => setDbSubcategories([]));
+  }, [form.category, showForm]);
+
   const openAdd = () => {
     setEditProduct(null);
     setForm(EMPTY_FORM);
@@ -536,6 +546,7 @@ function WebProductsScreen() {
         category: p.category ?? 'accessories',
         try_on_type: (p.try_on_type ?? '') as TryOnTypeOption,
         makeup_subcategory: ((p as any).makeup_subcategory ?? '') as MakeupSubcategory | '',
+        subcategory_id: (p as any).subcategory_id ?? '',
         description: enDesc,
         image_url: p.image_url ?? '',
         stock: String(p.stock ?? ''),
@@ -611,6 +622,7 @@ function WebProductsScreen() {
       category: form.category,
       try_on_type: form.try_on_type || null,
       makeup_subcategory: form.category === 'makeup' ? (form.makeup_subcategory || null) : null,
+      subcategory_id: form.subcategory_id || null,
       description: enDesc,
       image_url: primaryUrl,
       main_image: primaryUrl,
@@ -1158,7 +1170,7 @@ function WebProductsScreen() {
                       <TouchableOpacity
                         key={slug}
                         style={[styles.catChip, form.category === slug && styles.catChipActive]}
-                        onPress={() => setForm((f) => ({ ...f, category: slug, makeup_subcategory: slug === 'makeup' ? f.makeup_subcategory : '' }))}
+                        onPress={() => setForm((f) => ({ ...f, category: slug, makeup_subcategory: slug === 'makeup' ? f.makeup_subcategory : '', subcategory_id: '' }))}
                         activeOpacity={0.7}
                       >
                         <Text style={[styles.catChipText, form.category === slug && styles.catChipTextActive]}>{label}</Text>
@@ -1183,6 +1195,40 @@ function WebProductsScreen() {
                         </TouchableOpacity>
                       ))}
                     </View>
+                  </>
+                )}
+                {dbSubcategories.length > 0 && (
+                  <>
+                    <Text style={styles.fieldLabel}>{(t as any).subcategoryLabel ?? 'Subcategory'}</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
+                      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                        <TouchableOpacity
+                          key="__none__"
+                          style={[styles.catChip, !form.subcategory_id && styles.subCatChipNone]}
+                          onPress={() => setForm((f) => ({ ...f, subcategory_id: '' }))}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.catChipText, !form.subcategory_id && styles.subCatChipNoneText]}>
+                            {(t as any).noSubcategoryOption ?? 'None'}
+                          </Text>
+                        </TouchableOpacity>
+                        {dbSubcategories.map((sub) => {
+                          const subLabel = getSubcategoryName(sub, language);
+                          return (
+                            <TouchableOpacity
+                              key={sub.id}
+                              style={[styles.catChip, form.subcategory_id === sub.id && styles.catChipActive]}
+                              onPress={() => setForm((f) => ({ ...f, subcategory_id: sub.id }))}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.catChipText, form.subcategory_id === sub.id && styles.catChipTextActive]}>
+                                {subLabel}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </ScrollView>
                   </>
                 )}
                 <View style={styles.switchRow}>
@@ -2564,6 +2610,14 @@ const styles = StyleSheet.create({
   },
   catChipTextActive: {
     color: Colors.neonBlue,
+  },
+  subCatChipNone: {
+    backgroundColor: Colors.backgroundCard,
+    borderColor: Colors.textMuted + '55',
+  },
+  subCatChipNoneText: {
+    color: Colors.textMuted,
+    fontStyle: 'italic',
   },
   makeupSubRow: {
     flexDirection: 'row',

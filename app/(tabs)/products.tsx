@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ShoppingBag, Check, Search } from 'lucide-react-native';
 import SearchModal from '@/components/SearchModal';
 import { ProductGridSkeleton } from '@/components/Skeleton';
-import { fetchProducts, fetchCategories, getProductName, getProductImage, getCategoryName, Product, Category } from '@/lib/supabase';
+import { fetchProducts, fetchCategories, fetchSubcategories, getProductName, getProductImage, getCategoryName, getSubcategoryName, Product, Category, Subcategory } from '@/lib/supabase';
 import { useLanguage } from '@/context/LanguageContext';
 import { useCart } from '@/context/CartContext';
 import AppHeader from '@/components/AppHeader';
@@ -127,6 +127,8 @@ export default function ProductsScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryParam ?? null);
   const [selectedMakeupSub, setSelectedMakeupSub] = useState<MakeupSubcategory | null>(null);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -143,15 +145,26 @@ export default function ProductsScreen() {
   useEffect(() => {
     setSelectedCategory(categoryParam ?? null);
     setSelectedMakeupSub(null);
+    setSelectedSubcategoryId(null);
   }, [categoryParam]);
 
+  // Load subcategories when category changes
+  useEffect(() => {
+    setSelectedSubcategoryId(null);
+    if (!selectedCategory || !categories.length) { setSubcategories([]); return; }
+    const cat = categories.find((c) => c.slug === selectedCategory);
+    if (!cat) { setSubcategories([]); return; }
+    fetchSubcategories(cat.id, language).then(setSubcategories).catch(() => setSubcategories([]));
+  }, [selectedCategory, categories, language]);
+
   // Stale-request guard
-  const loadedFor = useRef({ language: '', category: selectedCategory, makeupSub: selectedMakeupSub });
+  const loadedFor = useRef({ language: '', category: selectedCategory, makeupSub: selectedMakeupSub, subcatId: selectedSubcategoryId });
 
   const loadPage = useCallback(async (page: number, replace: boolean) => {
     const fetchLang = language;
     const fetchCat = selectedCategory;
     const fetchMakeupSub = selectedMakeupSub;
+    const fetchSubcatId = selectedSubcategoryId;
 
     if (replace) setLoading(true);
     else setLoadingMore(true);
@@ -162,6 +175,7 @@ export default function ProductsScreen() {
           language: fetchLang,
           category: fetchCat ?? undefined,
           makeup_subcategory: fetchCat === 'makeup' && fetchMakeupSub ? fetchMakeupSub : undefined,
+          subcategory_id: fetchSubcatId ?? undefined,
           limit: PAGE_SIZE,
           offset: page * PAGE_SIZE,
         }),
@@ -172,7 +186,8 @@ export default function ProductsScreen() {
       if (
         loadedFor.current.language !== fetchLang ||
         loadedFor.current.category !== fetchCat ||
-        loadedFor.current.makeupSub !== fetchMakeupSub
+        loadedFor.current.makeupSub !== fetchMakeupSub ||
+        loadedFor.current.subcatId !== fetchSubcatId
       ) return;
 
       setProducts((prev) => replace ? prods : [...prev, ...prods]);
@@ -182,16 +197,16 @@ export default function ProductsScreen() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [language, selectedCategory, selectedMakeupSub]);
+  }, [language, selectedCategory, selectedMakeupSub, selectedSubcategoryId]);
 
   // Reset and reload when filters change
   useEffect(() => {
-    loadedFor.current = { language, category: selectedCategory, makeupSub: selectedMakeupSub };
+    loadedFor.current = { language, category: selectedCategory, makeupSub: selectedMakeupSub, subcatId: selectedSubcategoryId };
     pageRef.current = 0;
     setProducts([]);
     setHasMore(true);
     loadPage(0, true);
-  }, [loadPage, language, selectedCategory, selectedMakeupSub]);
+  }, [loadPage, language, selectedCategory, selectedMakeupSub, selectedSubcategoryId]);
 
   const handleLoadMore = useCallback(() => {
     if (loadingMore || !hasMore || loading) return;
@@ -285,6 +300,36 @@ export default function ProductsScreen() {
                 >
                   <Text style={[styles.subChipText, selectedMakeupSub === sub && styles.subChipTextActive]}>
                     {subLabel[sub]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+        {subcategories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.subFilterContent}
+          >
+            <TouchableOpacity
+              style={[styles.subChip, selectedSubcategoryId === null && styles.subChipActive]}
+              onPress={() => setSelectedSubcategoryId(null)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.subChipText, selectedSubcategoryId === null && styles.subChipTextActive]}>{t.allLabel}</Text>
+            </TouchableOpacity>
+            {subcategories.map((sub) => {
+              const active = selectedSubcategoryId === sub.id;
+              return (
+                <TouchableOpacity
+                  key={sub.id}
+                  style={[styles.subChip, active && styles.subChipActive]}
+                  onPress={() => setSelectedSubcategoryId(sub.id)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.subChipText, active && styles.subChipTextActive]}>
+                    {getSubcategoryName(sub, language)}
                   </Text>
                 </TouchableOpacity>
               );

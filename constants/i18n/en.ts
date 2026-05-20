@@ -1045,11 +1045,30 @@ export default {
   outOfStock2: 'Out of Stock',
   addedToCartToast: 'Added to cart',
   outOfStockToast: 'Out of stock',
-  // Makeup subcategory labels
+  // Makeup subcategory labels (legacy)
   subCatLips: 'Lips',
   subCatFace: 'Face',
   subCatEye: 'Eye',
   subCatNail: 'Nail',
+
+  // Subcategory system
+  subcategories: 'Subcategories',
+  manageSubcategories: 'Manage Subcategories',
+  addSubcategory: 'Add Subcategory',
+  editSubcategory: 'Edit Subcategory',
+  createSubcategory: 'Create Subcategory',
+  updateSubcategory: 'Update Subcategory',
+  deleteSubcategory: 'Delete Subcategory?',
+  deleteSubcategoryWarning: 'This will remove the subcategory and all its translations. Products linked to it will lose their subcategory.',
+  noSubcategoriesYet: 'No subcategories yet',
+  addFirstSubcategory: 'Add subcategories to help customers browse more easily',
+  subcategoryFor: 'Subcategory for',
+  subcategoryLabel: 'Subcategory',
+  selectSubcategory: 'Select subcategory',
+  noSubcategoryOption: 'No subcategory',
+  subcategoryCreated: 'Subcategory created',
+  subcategoryUpdated: 'Subcategory updated',
+  subcategoryDeleted: 'Subcategory deleted',
 
   // Phone login / OTP
   phoneBrandTagline: 'Luxury Beauty & Cosmetics',

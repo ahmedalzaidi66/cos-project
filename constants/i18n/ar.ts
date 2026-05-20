@@ -1051,6 +1051,25 @@ export default {
   subCatEye: 'عيون',
   subCatNail: 'أظافر',
 
+  // Subcategory system
+  subcategories: 'الفئات الفرعية',
+  manageSubcategories: 'إدارة الفئات الفرعية',
+  addSubcategory: 'إضافة فئة فرعية',
+  editSubcategory: 'تعديل الفئة الفرعية',
+  createSubcategory: 'إنشاء فئة فرعية',
+  updateSubcategory: 'تحديث الفئة الفرعية',
+  deleteSubcategory: 'حذف الفئة الفرعية؟',
+  deleteSubcategoryWarning: 'سيؤدي هذا إلى إزالة الفئة الفرعية وجميع ترجماتها. ستفقد المنتجات المرتبطة بها فئتها الفرعية.',
+  noSubcategoriesYet: 'لا توجد فئات فرعية بعد',
+  addFirstSubcategory: 'أضف فئات فرعية لمساعدة العملاء على التصفح بسهولة أكبر',
+  subcategoryFor: 'الفئة الفرعية لـ',
+  subcategoryLabel: 'الفئة الفرعية',
+  selectSubcategory: 'اختر الفئة الفرعية',
+  noSubcategoryOption: 'بدون فئة فرعية',
+  subcategoryCreated: 'تم إنشاء الفئة الفرعية',
+  subcategoryUpdated: 'تم تحديث الفئة الفرعية',
+  subcategoryDeleted: 'تم حذف الفئة الفرعية',
+
   // Phone login / OTP
   phoneBrandTagline: 'تجميل فاخر ومستحضرات راقية',
   phoneTabLabel: 'هاتف',

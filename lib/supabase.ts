@@ -83,6 +83,7 @@ export type Product = {
   specifications: Record<string, any> | null;
   try_on_type: string | null;
   makeup_subcategory: 'lips' | 'face' | 'eye' | 'nail' | null;
+  subcategory_id: string | null;
   // Loyalty / bonus
   bonus_enabled: boolean;
   bonus_points: number;
@@ -125,6 +126,27 @@ export type Category = {
 export type CategoryTranslation = {
   id: string;
   category_id: string;
+  language: string;
+  name: string;
+  description: string;
+};
+
+export type Subcategory = {
+  id: string;
+  category_id: string;
+  slug: string;
+  icon_url: string;
+  display_order: number;
+  is_active: boolean;
+  is_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  translation?: SubcategoryTranslation | SubcategoryTranslation[] | null;
+};
+
+export type SubcategoryTranslation = {
+  id: string;
+  subcategory_id: string;
   language: string;
   name: string;
   description: string;
@@ -396,6 +418,7 @@ export function clearStorefrontCache(): void {
 export async function fetchProducts(opts?: {
   category?: string;
   makeup_subcategory?: string;
+  subcategory_id?: string;
   featured?: boolean;
   language?: string;
   status?: string;
@@ -430,6 +453,7 @@ export async function fetchProducts(opts?: {
   }
   if (opts?.category) query = query.eq('category', opts.category);
   if (opts?.makeup_subcategory) query = query.eq('makeup_subcategory', opts.makeup_subcategory);
+  if (opts?.subcategory_id) query = query.eq('subcategory_id', opts.subcategory_id);
   if (opts?.featured) query = query.eq('is_featured', true);
 
   const { data, error } = await query;
@@ -474,6 +498,32 @@ export async function fetchCategories(language = 'en'): Promise<Category[]> {
   const result = (data ?? []).map((row) => normalizeCategoryRowWithLanguage(row, language));
   cacheSet(_categoryCache, key, result);
   return result;
+}
+
+export function getSubcategoryName(sub: Subcategory, language = 'en'): string {
+  const transArr: SubcategoryTranslation[] = Array.isArray(sub.translation)
+    ? sub.translation
+    : sub.translation ? [sub.translation] : [];
+  const match = transArr.find((t) => t.language === language);
+  if (match?.name) return match.name;
+  const en = transArr.find((t) => t.language === 'en');
+  return en?.name || sub.slug;
+}
+
+export async function fetchSubcategories(categoryId: string, language = 'en'): Promise<Subcategory[]> {
+  const { data, error } = await supabase
+    .from('subcategories')
+    .select(`
+      *,
+      translation:subcategory_translations!left(id, subcategory_id, language, name, description)
+    `)
+    .eq('category_id', categoryId)
+    .eq('is_active', true)
+    .eq('is_deleted', false)
+    .order('display_order', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as Subcategory[];
 }
 
 export async function fetchCMSContent(language = 'en'): Promise<CMSContent | null> {
