@@ -295,6 +295,7 @@ export default function CheckoutScreen() {
         shade_hex:           i.shade?.color_hex ?? '',
         shade_image:         i.shade?.shade_image ?? '',
         shade_product_image: i.shade?.product_image ?? '',
+        shade_id:            i.shade?.id ?? null,
       }));
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);

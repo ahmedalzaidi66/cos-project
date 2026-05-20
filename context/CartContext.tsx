@@ -7,6 +7,7 @@ export type CartShade = {
   color_hex: string;
   shade_image: string;
   product_image: string;
+  stock?: number;
 } | null;
 
 export type CartItem = {

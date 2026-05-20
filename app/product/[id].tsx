@@ -93,7 +93,15 @@ export default function ProductDetailScreen() {
 
   const requiresShade = shades.length > 0;
   const canTryOn = product ? isTryOnEligible(product.category, shades.length > 0) : false;
-  const isProductOOS = product ? (product.in_stock === false || product.stock === 0) : false;
+  const selectedShadeStock = selectedShade ? selectedShade.stock : null;
+  const isProductOOS = product
+    ? selectedShade
+      ? selectedShade.is_available === false || selectedShade.stock === 0
+      : (product.in_stock === false || product.stock === 0)
+    : false;
+  const maxQty = selectedShadeStock != null && selectedShadeStock > 0
+    ? selectedShadeStock
+    : (product && product.stock > 0 ? product.stock : 1);
 
   const handleAddToCart = useCallback(() => {
     if (!product) return;
@@ -110,6 +118,7 @@ export default function ProductDetailScreen() {
           color_hex: selectedShade.color_hex,
           shade_image: selectedShade.shade_image,
           product_image: selectedShade.product_image,
+          stock: selectedShade.stock,
         }
       : null;
     addToCart(product, quantity, shadeForCart);
@@ -310,7 +319,7 @@ export default function ProductDetailScreen() {
             >
               {shades.map((shade) => {
                 const isActive = selectedShade?.id === shade.id;
-                const shadeOOS = shade.is_available === false;
+                const shadeOOS = shade.is_available === false || shade.stock === 0;
                 return (
                   <TouchableOpacity
                     key={shade.id}
@@ -425,16 +434,16 @@ export default function ProductDetailScreen() {
                 {
                   backgroundColor: isProductOOS
                     ? Colors.error
-                    : product.stock > 10 ? Colors.success : Colors.warning,
+                    : maxQty > 10 ? Colors.success : Colors.warning,
                 },
               ]}
             />
             <Text style={[styles.stockText, { color: C.textSecondary }, isProductOOS && { color: Colors.error }]}>
               {isProductOOS
                 ? t.outOfStock
-                : product.stock > 10
+                : maxQty > 10
                 ? t.inStock
-                : t.onlyLeft.replace('{{n}}', String(product.stock))}
+                : t.onlyLeft.replace('{{n}}', String(maxQty))}
             </Text>
           </View>
 
@@ -456,9 +465,9 @@ export default function ProductDetailScreen() {
             <QuantitySelector
               value={quantity}
               onDecrement={() => { if (!isProductOOS) setQuantity((q) => Math.max(1, q - 1)); }}
-              onIncrement={() => { if (!isProductOOS) setQuantity((q) => Math.min(product.stock > 0 ? product.stock : 1, q + 1)); }}
+              onIncrement={() => { if (!isProductOOS) setQuantity((q) => Math.min(maxQty, q + 1)); }}
               min={1}
-              max={isProductOOS ? 1 : (product.stock > 0 ? product.stock : 1)}
+              max={isProductOOS ? 1 : maxQty}
             />
           </View>
 

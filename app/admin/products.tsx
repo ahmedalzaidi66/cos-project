@@ -164,6 +164,7 @@ type ShadeItem = {
   shade_image: string;
   product_image: string;
   is_available: boolean;
+  stock: number;
 };
 
 function hasMissingTranslation(form: FormState, lang: LangCode): boolean {
@@ -579,6 +580,7 @@ function WebProductsScreen() {
           shade_image: s.shade_image,
           product_image: s.product_image,
           is_available: s.is_available !== false,
+          stock: s.stock ?? 0,
         }))
       );
       setShowForm(true);
@@ -679,8 +681,13 @@ function WebProductsScreen() {
         product_image: s.product_image,
         sort_order: i,
         is_available: s.is_available !== false,
+        stock: Math.max(0, parseInt(String(s.stock ?? 0), 10) || 0),
       }));
       await db.from('product_shades').insert(shadeRows);
+
+      // Sync product-level stock = sum of all shade stocks
+      const totalShadeStock = shadeRows.reduce((sum, r) => sum + r.stock, 0);
+      await db.from('products').update({ stock: totalShadeStock }).eq('id', productId);
     }
 
     // Upsert product_translations — AR is source of truth, others fall back to AR
@@ -1770,10 +1777,11 @@ function ShadeManager({ shades, onChange }: { shades: ShadeItem[]; onChange: (s:
       shade_image: '',
       product_image: '',
       is_available: true,
+      stock: 0,
     }]);
   };
 
-  const updateShade = (id: string, field: keyof ShadeItem, value: string | boolean) => {
+  const updateShade = (id: string, field: keyof ShadeItem, value: string | boolean | number) => {
     onChange(shades.map((s) => s.id === id ? { ...s, [field]: value } : s));
   };
 
@@ -1910,9 +1918,30 @@ function ShadeManager({ shades, onChange }: { shades: ShadeItem[]; onChange: (s:
                 />
               </View>
             </View>
+            <View style={shadeStyles.fieldRow}>
+              <View style={shadeStyles.fieldHalf}>
+                <Text style={shadeStyles.label}>Stock Qty</Text>
+                <TextInput
+                  style={shadeStyles.input}
+                  value={String(shade.stock ?? 0)}
+                  onChangeText={(v) => updateShade(shade.id, 'stock', Math.max(0, parseInt(v, 10) || 0))}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={Colors.textMuted}
+                />
+              </View>
+            </View>
           </View>
         </View>
       ))}
+      {shades.length > 0 && (
+        <View style={shadeStyles.totalStockRow}>
+          <Text style={shadeStyles.totalStockLabel}>Total Stock (all shades):</Text>
+          <Text style={shadeStyles.totalStockValue}>
+            {shades.reduce((sum, s) => sum + (s.stock ?? 0), 0)}
+          </Text>
+        </View>
+      )}
       <TouchableOpacity style={shadeStyles.addBtn} onPress={addShade} activeOpacity={0.8}>
         <Palette size={15} color={Colors.neonBlue} strokeWidth={2} />
         <Text style={shadeStyles.addBtnText}>Add Shade</Text>
@@ -1924,6 +1953,20 @@ function ShadeManager({ shades, onChange }: { shades: ShadeItem[]; onChange: (s:
 const shadeStyles = StyleSheet.create({
   wrapper: { marginBottom: Spacing.md },
   emptyHint: { color: Colors.textMuted, fontSize: FontSize.xs, marginBottom: Spacing.sm, lineHeight: 18 },
+  totalStockRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,77,141,0.06)',
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,77,141,0.18)',
+  },
+  totalStockLabel: { color: Colors.textMuted, fontSize: FontSize.xs, fontFamily: 'Sora-Medium' },
+  totalStockValue: { color: Colors.neonPink, fontSize: FontSize.sm, fontFamily: 'Sora-SemiBold' },
   card: {
     backgroundColor: Colors.backgroundCard,
     borderRadius: Radius.md,

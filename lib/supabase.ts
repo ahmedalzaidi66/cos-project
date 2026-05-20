@@ -233,6 +233,7 @@ export type OrderItem = {
   product_image: string;
   quantity: number;
   unit_price: number;
+  shade_id?: string | null;
   shade_name?: string;
   shade_hex?: string;
   shade_image?: string;
@@ -351,6 +352,7 @@ export type ProductShade = {
   product_image: string;
   sort_order: number;
   is_available: boolean;
+  stock: number;
 };
 
 export async function fetchProductShades(productId: string): Promise<ProductShade[]> {
@@ -359,10 +361,10 @@ export async function fetchProductShades(productId: string): Promise<ProductShad
 
   const { data } = await supabase
     .from('product_shades')
-    .select('id, name, color_hex, shade_image, product_image, sort_order, is_available')
+    .select('id, name, color_hex, shade_image, product_image, sort_order, is_available, stock')
     .eq('product_id', productId)
     .order('sort_order', { ascending: true });
-  const result = (data ?? []) as ProductShade[];
+  const result = (data ?? []).map((r: any) => ({ ...r, stock: r.stock ?? 0 })) as ProductShade[];
   cacheSet(_shadesCache, productId, result);
   return result;
 }

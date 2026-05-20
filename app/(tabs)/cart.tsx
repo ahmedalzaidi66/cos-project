@@ -158,7 +158,7 @@ function CartItemCard({
             onDecrement={() => onUpdateQty(item.quantity - 1)}
             onIncrement={() => onUpdateQty(item.quantity + 1)}
             min={0}
-            max={item.product.stock}
+            max={item.shade?.stock != null ? item.shade.stock : item.product.stock}
           />
           <Text style={styles.lineTotal}>{formatPrice(lineTotal, language)}</Text>
         </View>
